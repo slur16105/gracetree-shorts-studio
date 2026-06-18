@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GraceTree Shorts Studio — UX Design Validation</title>
+<style>
+:root{--bg:#fafaf9;--surface:#fff;--border:#e7e5e4;--text:#1c1917;--muted:#78716c;--strong:#16a34a;--adequate:#65a30d;--high:#ea580c;--medium:#ca8a04;--low:#64748b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.container{max-width:960px;margin:auto;padding:32px 24px 64px}h1{font-size:22px;margin:0}.sub{color:var(--muted);font:12px ui-monospace,monospace;margin-top:4px}.synthesis,.card,details{background:var(--surface);border:1px solid var(--border);border-radius:8px}.synthesis{padding:18px 22px;margin:24px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:24px}.card{padding:12px 14px}.name{font-size:13px;color:var(--muted)}.verdict{font-weight:700}.strong{color:var(--strong)}.adequate{color:var(--adequate)}details{margin-bottom:12px}summary{cursor:pointer;padding:14px 18px;font-weight:650}.body{padding:0 18px 16px}.finding{border-top:1px solid var(--border);padding:12px 0}.badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;margin-right:8px}.high{color:var(--high);background:#ea580c18}.medium{color:var(--medium);background:#ca8a041c}.low{color:var(--low);background:#64748b1c}.resolved{color:var(--strong);font-weight:650}footer{margin-top:34px;border-top:1px solid var(--border);padding-top:14px;color:var(--muted);font:12px ui-monospace,monospace}
+</style>
+</head>
+<body><main class="container">
+<header><h1>GraceTree Shorts Studio — UX Design Validation Report</h1><div class="sub">DESIGN.md · EXPERIENCE.md · 2026-06-19</div></header>
+<section class="synthesis"><p>PRD의 사용자 여정 3개, 주요 컴포넌트와 상태, Windows/macOS 로컬 파일 안전 규칙이 구현 가능한 수준으로 연결되어 있습니다. 검증에서 발견된 대비, 준비 조건 의미, 동적 상태 공지와 시각 참고자료 연결 문제는 최종 문서에 반영했습니다.</p><p>구현 단계에서는 실제 UI로 대비, 포커스 순서와 스크린리더 공지를 다시 측정해야 합니다.</p></section>
+<section class="grid">
+<div class="card"><div class="name">Flow coverage</div><div class="verdict strong">strong</div></div>
+<div class="card"><div class="name">Token completeness</div><div class="verdict strong">strong</div></div>
+<div class="card"><div class="name">Component coverage</div><div class="verdict strong">strong</div></div>
+<div class="card"><div class="name">State coverage</div><div class="verdict strong">strong</div></div>
+<div class="card"><div class="name">Visual references</div><div class="verdict adequate">adequate</div></div>
+<div class="card"><div class="name">Bloat</div><div class="verdict strong">strong</div></div>
+<div class="card"><div class="name">Inheritance</div><div class="verdict strong">strong</div></div>
+<div class="card"><div class="name">Shape fit</div><div class="verdict strong">strong</div></div>
+</section>
+<details open><summary>전체 계약 검증</summary><div class="body">
+<div class="finding"><span class="badge high">high</span><b>달력 선택일 대비</b><p>선택일 전경을 어두운 색으로 변경해 5.54:1을 확보했습니다. <span class="resolved">해결됨</span></p></div>
+<div class="finding"><span class="badge high">high</span><b>시각 참고자료 승격</b><p>A안을 mockups 폴더로 승격하고 두 spine에서 연결했습니다. <span class="resolved">해결됨</span></p></div>
+<div class="finding"><span class="badge medium">medium</span><b>필수 입력 4/4 의미</b><p>네 번째 조건을 유효한 BGM 소스로 정의했습니다. <span class="resolved">해결됨</span></p></div>
+<div class="finding"><span class="badge low">low</span><b>설정 교체 실패 상태</b><p>기존 정상 리소스를 보존하도록 상태 계약을 추가했습니다. <span class="resolved">해결됨</span></p></div>
+</div></details>
+<details open><summary>접근성 검증</summary><div class="body">
+<div class="finding"><span class="badge medium">medium</span><b>컨트롤 경계 대비</b><p>강한 경계를 #686E6E로 변경해 3.84:1을 확보했습니다. <span class="resolved">해결됨</span></p></div>
+<div class="finding"><span class="badge medium">medium</span><b>진행률 공지</b><p>단계 변경과 10% 단위만 공지하도록 제한했습니다. <span class="resolved">해결됨</span></p></div>
+<div class="finding"><span class="badge medium">medium</span><b>달력 키보드 조작</b><p>grid 패턴과 Home/End, PageUp/PageDown을 정의했습니다. <span class="resolved">해결됨</span></p></div>
+<div class="finding"><span class="badge low">low</span><b>완료 행과 파일 등록 공지</b><p>별도 포커스 대상과 배치 결과 공지 규칙을 추가했습니다. <span class="resolved">해결됨</span></p></div>
+</div></details>
+<footer>review-rubric.md · review-accessibility.md · validation-report.md</footer>
+</main></body>
+</html>
