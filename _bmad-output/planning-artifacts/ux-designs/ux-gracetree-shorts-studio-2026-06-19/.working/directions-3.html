@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GraceTree Shorts Studio — 디자인 방향 3안</title>
+<style>
+  /* Direction A — Studio Black: #080909 #111313 #1b1e1e #f4f5f5 #a6aaaa #ff2f62 #36d399 */
+  /* Direction B — Quiet Chapel: #0b0c10 #14161d #20232d #f1eee8 #aaa69f #c8a96b #7dd3c7 */
+  /* Direction C — Render Console: #0b0e12 #111820 #17222d #e9f1f7 #8fa1ae #58a6ff #4ade80 */
+  *{box-sizing:border-box} body{margin:0;background:#050606;color:#f4f5f5;font-family:Inter,Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  .page{max-width:1560px;margin:auto;padding:48px 34px 100px}.intro{margin:0 0 42px}.intro h1{font-size:30px;margin:0 0 10px}.intro p{color:#9da1a1;margin:0}
+  .direction{margin:0 0 72px}.direction-head{display:flex;align-items:end;justify-content:space-between;margin:0 4px 16px}.direction-head h2{font-size:22px;margin:0 0 5px}.direction-head p{margin:0;color:#969b9c;font-size:14px}.tag{border:1px solid #303434;border-radius:999px;padding:7px 11px;color:#c7caca;font-size:12px}
+  .app{height:760px;border:1px solid #292c2d;border-radius:20px;overflow:hidden;display:grid;grid-template-columns:78px minmax(410px,42%) 1fr;grid-template-rows:1fr 70px;box-shadow:0 24px 80px #0008}
+  .rail{grid-row:1/3;padding:20px 14px;border-right:1px solid;display:flex;flex-direction:column;align-items:center;gap:20px}.logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-weight:800}.rail-btn{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;color:#9ca1a1;font-size:20px}.rail-btn.active{color:white}.settings{margin-top:auto}
+  .workspace{padding:32px 34px 26px;display:flex;flex-direction:column;min-width:0}.topline{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}.eyebrow{font-size:12px;letter-spacing:.09em;text-transform:uppercase}.date{font-size:14px;padding:9px 12px;border:1px solid;border-radius:9px}
+  .drop{min-height:326px;border:1.5px dashed;border-radius:18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:30px;position:relative;overflow:hidden}.drop-icon{font-size:38px;margin-bottom:18px}.drop h3{font-size:22px;margin:0 0 8px}.drop p{font-size:14px;line-height:1.55;margin:0}.file-grid{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:23px}.file{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;text-align:left;font-size:12px}.dot{width:7px;height:7px;border-radius:50%;flex:none}.file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .job{margin-top:24px}.job-row{display:flex;align-items:center;justify-content:space-between}.job h3{font-size:20px;margin:0 0 5px}.job p{margin:0;font-size:13px}.progress{height:5px;border-radius:999px;overflow:hidden;margin:18px 0 16px}.progress i{display:block;height:100%;width:68%;border-radius:inherit}.actions{display:flex;gap:10px}.button{border:0;border-radius:999px;padding:12px 18px;font-weight:700;font-size:14px}.button.secondary{border:1px solid;background:transparent}
+  .history{padding:32px 28px 22px;min-width:0}.history-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}.history h3{font-size:18px;margin:0}.count{font-size:12px}.row{display:grid;grid-template-columns:44px 1fr auto;gap:13px;align-items:center;padding:13px 12px;border-radius:12px;margin-bottom:4px}.thumb{width:44px;height:58px;border-radius:8px;display:grid;place-items:center;font-size:16px}.title{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{font-size:12px;margin-top:5px}.row-action{font-size:12px;padding:7px 9px;border:1px solid;border-radius:8px}.row.selected{outline:1px solid}
+  .player{grid-column:2/4;border-top:1px solid;display:grid;grid-template-columns:minmax(300px,42%) 1fr;align-items:center}.now{padding:0 34px;display:flex;align-items:center;gap:14px}.now-icon{width:38px;height:38px;border-radius:10px;display:grid;place-items:center}.now b{font-size:13px}.now small{display:block;margin-top:4px}.stage{padding:0 28px;display:flex;align-items:center;gap:15px}.stage strong{font-size:13px}.stage span{font-size:12px}.stage-line{height:4px;flex:1;border-radius:999px;overflow:hidden}.stage-line i{display:block;width:68%;height:100%}
+  /* A */
+  .a .app{background:radial-gradient(circle at 36% 28%,#1d2421 0,#0c0e0d 38%,#080909 70%)}.a .rail{background:#080909;border-color:#282b2b}.a .logo{background:#ff2f62}.a .rail-btn.active{background:#242727}.a .workspace{border-right:1px solid #242727}.a .eyebrow,.a .meta,.a .job p,.a small,.a .count{color:#9fa4a4}.a .date,.a .button.secondary,.a .row-action{border-color:#414545;color:#e8eaea}.a .drop{background:#101312cc;border-color:#515656}.a .drop p{color:#a6aaaa}.a .file{background:#1a1d1c}.a .dot,.a .progress i,.a .stage-line i{background:#36d399}.a .button{background:#f4f5f5;color:#080909}.a .history{background:#090a0a}.a .thumb{background:linear-gradient(145deg,#355f53,#17221f)}.a .row.selected{background:#202424;outline-color:#4c5151}.a .row:hover{background:#151717}.a .player{background:#181a1a;border-color:#343737}.a .now-icon{background:#ff2f62}.a .stage-line{background:#343838}
+  /* B */
+  .b .app{background:linear-gradient(135deg,#10131a,#0b0c10 48%,#161210)}.b .rail{background:#0b0c10;border-color:#2a2b31}.b .logo{background:#c8a96b;color:#17130c;font-family:Georgia,serif}.b .rail-btn.active{background:#25232a}.b .workspace{border-right:1px solid #292a31}.b .eyebrow{color:#c8a96b}.b .date,.b .button.secondary,.b .row-action{border-color:#454650;color:#f1eee8}.b .drop{background:linear-gradient(145deg,#181a22dd,#11131add);border-color:#65605a}.b .drop h3,.b .job h3,.b .history h3{font-family:Georgia,"Times New Roman",serif;font-weight:500}.b .drop p,.b .job p,.b .meta,.b small,.b .count{color:#aaa69f}.b .file{background:#20232d}.b .dot,.b .progress i,.b .stage-line i{background:#c8a96b}.b .button{background:#c8a96b;color:#17130c}.b .history{background:#0d0e13}.b .thumb{background:linear-gradient(145deg,#5d5041,#24212a);color:#e7d3aa}.b .row.selected{background:#25232a;outline-color:#6a5b45}.b .player{background:#17171d;border-color:#32323a}.b .now-icon{background:#c8a96b;color:#17130c}.b .stage-line{background:#33343c}
+  /* C */
+  .c .app{background:#0b0e12}.c .rail{background:#090c10;border-color:#22303a}.c .logo{background:#58a6ff;color:#07111d;border-radius:9px}.c .rail-btn{border-radius:8px}.c .rail-btn.active{background:#17222d}.c .workspace{border-right:1px solid #22303a}.c .eyebrow{color:#58a6ff}.c .date,.c .button.secondary,.c .row-action{border-color:#334756;color:#dce8ef;border-radius:7px}.c .drop{background:#0e151c;border-color:#3a5669;border-radius:10px;align-items:flex-start;text-align:left}.c .drop-icon{margin-bottom:12px}.c .drop p,.c .job p,.c .meta,.c small,.c .count{color:#8fa1ae}.c .file-grid{grid-template-columns:1fr}.c .file{background:#111c25;border-left:2px solid #4ade80;border-radius:4px;padding:8px 10px}.c .dot{display:none}.c .progress,.c .stage-line{border-radius:2px;background:#22313c}.c .progress i,.c .stage-line i{background:#58a6ff;border-radius:2px}.c .button{background:#58a6ff;color:#07111d;border-radius:7px}.c .history{background:#0c1117}.c .row{border-radius:6px;border-bottom:1px solid #1b2832}.c .row.selected{background:#15212b;outline-color:#35566c}.c .thumb{height:44px;border-radius:5px;background:#172c3a;color:#58a6ff}.c .player{background:#101820;border-color:#263844}.c .now-icon{background:#58a6ff;color:#07111d;border-radius:7px}.c .stage span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  @media(max-width:1050px){.app{grid-template-columns:64px 48% 1fr}.workspace{padding:25px 22px}.history{padding:25px 18px}.file-grid{grid-template-columns:1fr}.row-action{display:none}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="intro"><h1>GraceTree Shorts Studio — 디자인 방향 3안</h1><p>동일한 작업 흐름을 서로 다른 밀도와 분위기로 표현했습니다. 각 시안은 Windows와 macOS의 데스크톱 크기를 기준으로 합니다.</p></header>
+
+  <section class="direction a" id="direction-a">
+    <div class="direction-head"><div><h2>A. Studio Black</h2><p>YouTube Music과 가장 가까운 구조. 익숙하고 콘텐츠 중심적인 제작 화면.</p></div><span class="tag">익숙함 · 중간 밀도 · 선명한 상태</span></div>
+    <div class="app">
+      <aside class="rail"><div class="logo">G</div><div class="rail-btn active">⌂</div><div class="rail-btn">▤</div><div class="rail-btn settings">⚙</div></aside>
+      <section class="workspace">
+        <div class="topline"><div><div class="eyebrow">새 쇼츠 만들기</div></div><div class="date">게시 날짜&nbsp; 2026. 06. 20 ▾</div></div>
+        <div class="drop"><div class="drop-icon">＋</div><h3>파일을 여기에 놓으세요</h3><p>썸네일, 음성, 스크립트를 한 번에 등록합니다.<br>파일은 자동으로 분류됩니다.</p><div class="file-grid"><div class="file"><i class="dot"></i><span>thumbnail.png</span></div><div class="file"><i class="dot"></i><span>voice.m4a</span></div><div class="file"><i class="dot"></i><span>script.txt</span></div><div class="file"><i class="dot"></i><span>기본 배경음악 사용</span></div></div></div>
+        <div class="job"><div class="job-row"><div><h3>타인의 슬픔을 바라볼 때 드리는 기도</h3><p>모든 필수 파일이 준비되었습니다.</p></div><b>준비 완료</b></div><div class="progress"><i></i></div><div class="actions"><button class="button">영상 생성</button><button class="button secondary">파일 다시 선택</button></div></div>
+      </section>
+      <section class="history"><div class="history-head"><h3>완성된 영상</h3><span class="count">총 18개</span></div>
+        <div class="row selected"><div class="thumb">▶</div><div><div class="title">타인의 슬픔을 바라볼 때 드리는 기도</div><div class="meta">게시 06.19 · 생성 오늘 01:42</div></div><span class="row-action">폴더 열기</span></div>
+        <div class="row"><div class="thumb">▶</div><div><div class="title">오늘도 주님을 신뢰하는 기도</div><div class="meta">게시 06.18 · 생성 06.17</div></div><span class="row-action">열기</span></div>
+        <div class="row"><div class="thumb">▶</div><div><div class="title">마음이 흔들릴 때 드리는 기도</div><div class="meta">게시 06.17 · 생성 06.16</div></div><span class="row-action">열기</span></div>
+        <div class="row"><div class="thumb">!</div><div><div class="title">두려움보다 믿음을 선택하는 기도</div><div class="meta">게시 06.16 · 결과 폴더 없음</div></div><span class="row-action">확인</span></div>
+      </section>
+      <footer class="player"><div class="now"><div class="now-icon">✓</div><div><b>마지막 작업 완료</b><small>final.mp4 · 1080×1920 · 01:13</small></div></div><div class="stage"><strong>영상 합성</strong><div class="stage-line"><i></i></div><span>68%</span></div></footer>
+    </div>
+  </section>
+
+  <section class="direction b" id="direction-b">
+    <div class="direction-head"><div><h2>B. Quiet Chapel</h2><p>말씀기도의 차분함을 살린 절제된 작업실. 여백과 따뜻한 금색을 사용.</p></div><span class="tag">차분함 · 넉넉한 여백 · 브랜드 감성</span></div>
+    <div class="app">
+      <aside class="rail"><div class="logo">GT</div><div class="rail-btn active">⌂</div><div class="rail-btn">◫</div><div class="rail-btn settings">⚙</div></aside>
+      <section class="workspace">
+        <div class="topline"><div class="eyebrow">GraceTree · Daily Studio</div><div class="date">2026년 6월 20일 ▾</div></div>
+        <div class="drop"><div class="drop-icon">◇</div><h3>오늘의 자료를 모아주세요</h3><p>준비한 이미지와 음성, 스크립트를 이곳에 놓으면<br>게시용 쇼츠 한 편으로 정리합니다.</p><div class="file-grid"><div class="file"><i class="dot"></i><span>썸네일 준비됨</span></div><div class="file"><i class="dot"></i><span>음성 준비됨</span></div><div class="file"><i class="dot"></i><span>스크립트 준비됨</span></div><div class="file"><i class="dot"></i><span>기본 찬송 사용</span></div></div></div>
+        <div class="job"><div class="job-row"><div><h3>타인의 슬픔을 바라볼 때 드리는 기도</h3><p>게시 준비가 완료되었습니다.</p></div><b>준비됨</b></div><div class="progress"><i></i></div><div class="actions"><button class="button">쇼츠 만들기</button><button class="button secondary">자료 확인</button></div></div>
+      </section>
+      <section class="history"><div class="history-head"><h3>지난 말씀기도</h3><span class="count">게시일 순</span></div>
+        <div class="row selected"><div class="thumb">06<br>19</div><div><div class="title">타인의 슬픔을 바라볼 때 드리는 기도</div><div class="meta">오늘 새벽 생성 · 결과 보관 중</div></div><span class="row-action">폴더</span></div>
+        <div class="row"><div class="thumb">06<br>18</div><div><div class="title">오늘도 주님을 신뢰하는 기도</div><div class="meta">6월 17일 생성</div></div><span class="row-action">폴더</span></div>
+        <div class="row"><div class="thumb">06<br>17</div><div><div class="title">마음이 흔들릴 때 드리는 기도</div><div class="meta">6월 16일 생성</div></div><span class="row-action">폴더</span></div>
+        <div class="row"><div class="thumb">06<br>16</div><div><div class="title">두려움보다 믿음을 선택하는 기도</div><div class="meta">결과 위치를 찾을 수 없음</div></div><span class="row-action">확인</span></div>
+      </section>
+      <footer class="player"><div class="now"><div class="now-icon">✓</div><div><b>오늘의 영상이 완성되었습니다</b><small>결과 폴더에서 확인할 수 있습니다.</small></div></div><div class="stage"><strong>차분히 영상을 만들고 있습니다</strong><div class="stage-line"><i></i></div><span>68%</span></div></footer>
+    </div>
+  </section>
+
+  <section class="direction c" id="direction-c">
+    <div class="direction-head"><div><h2>C. Render Console</h2><p>파일 상태와 렌더링 단계를 빠르게 읽는 고밀도 도구형 화면.</p></div><span class="tag">전문 도구 · 높은 밀도 · 진단 중심</span></div>
+    <div class="app">
+      <aside class="rail"><div class="logo">GS</div><div class="rail-btn active">⌂</div><div class="rail-btn">≡</div><div class="rail-btn settings">⚙</div></aside>
+      <section class="workspace">
+        <div class="topline"><div class="eyebrow">WORKSPACE / NEW RENDER</div><div class="date">PUBLISH_DATE: 2026-06-20</div></div>
+        <div class="drop"><div class="drop-icon">⇩</div><h3>입력 패키지 드롭</h3><p>지원 파일: PNG/JPG · M4A/WAV · TXT · 선택 MP3</p><div class="file-grid"><div class="file"><i class="dot"></i><span>[THUMBNAIL] thumbnail.png · 1080×1920</span></div><div class="file"><i class="dot"></i><span>[VOICE] voice.m4a · 01:08</span></div><div class="file"><i class="dot"></i><span>[SCRIPT] script.txt · 3 sections valid</span></div><div class="file"><i class="dot"></i><span>[BGM] default_bgm.mp3 · inherited</span></div></div></div>
+        <div class="job"><div class="job-row"><div><h3>타인의 슬픔을 바라볼 때 드리는 기도</h3><p>VALIDATION: 4/4 PASS · OUTPUT: 1080×1920 / 30FPS</p></div><b>READY</b></div><div class="progress"><i></i></div><div class="actions"><button class="button">RENDER</button><button class="button secondary">INSPECT INPUT</button></div></div>
+      </section>
+      <section class="history"><div class="history-head"><h3>RENDER HISTORY</h3><span class="count">18 JOBS</span></div>
+        <div class="row selected"><div class="thumb">MP4</div><div><div class="title">타인의 슬픔을 바라볼 때 드리는 기도</div><div class="meta">PUB 06-19 · DONE 01:42 · 73.2s</div></div><span class="row-action">OPEN</span></div>
+        <div class="row"><div class="thumb">MP4</div><div><div class="title">오늘도 주님을 신뢰하는 기도</div><div class="meta">PUB 06-18 · DONE 06-17 · 69.8s</div></div><span class="row-action">OPEN</span></div>
+        <div class="row"><div class="thumb">MP4</div><div><div class="title">마음이 흔들릴 때 드리는 기도</div><div class="meta">PUB 06-17 · DONE 06-16 · 75.1s</div></div><span class="row-action">OPEN</span></div>
+        <div class="row"><div class="thumb">ERR</div><div><div class="title">두려움보다 믿음을 선택하는 기도</div><div class="meta">MISSING OUTPUT DIRECTORY</div></div><span class="row-action">FIX</span></div>
+      </section>
+      <footer class="player"><div class="now"><div class="now-icon">✓</div><div><b>JOB COMPLETE</b><small>output/2026-06-19/final.mp4</small></div></div><div class="stage"><strong>05 VIDEO_COMPOSE</strong><div class="stage-line"><i></i></div><span>68 / 100</span></div></footer>
+    </div>
+  </section>
+</main>
+</body>
+</html>
