@@ -1,0 +1,7 @@
+{
+  "protocolVersion": 1,
+  "type": "check_health",
+  "jobId": "health-check-1",
+  "timestamp": "not-a-date",
+  "payload": {}
+}

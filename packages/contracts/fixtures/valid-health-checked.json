@@ -1,0 +1,9 @@
+{
+  "protocolVersion": 1,
+  "type": "health_checked",
+  "jobId": "health-check-1",
+  "timestamp": "2026-06-19T10:00:01.000Z",
+  "payload": {
+    "status": "ok"
+  }
+}

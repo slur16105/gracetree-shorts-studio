@@ -1,0 +1,10 @@
+packages:
+  - apps/desktop
+  - packages/*
+
+storeDir: .pnpm-store
+managePackageManagerVersions: false
+
+allowBuilds:
+  electron: true
+  esbuild: true

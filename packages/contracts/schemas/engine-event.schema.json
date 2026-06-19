@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gracetree.local/schemas/engine-event.schema.json",
+  "title": "Engine event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "type": { "const": "health_checked" },
+    "jobId": { "type": "string", "minLength": 1 },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "const": "ok" }
+      }
+    }
+  }
+}

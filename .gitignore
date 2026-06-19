@@ -37,3 +37,4 @@ venv/
 
 # Local tooling caches
 .cache/
+.pnpm-store/
