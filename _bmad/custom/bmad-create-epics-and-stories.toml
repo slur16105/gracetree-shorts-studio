@@ -1,0 +1,11 @@
+[workflow]
+
+activation_steps_append = [
+  "Before Step 1, recursively discover canonical inputs using: {planning_artifacts}/prds/**/prd.md, {planning_artifacts}/ux-designs/**/DESIGN.md, {planning_artifacts}/ux-designs/**/EXPERIENCE.md, and {planning_artifacts}/**/*architecture*.md. Treat discovered files as valid prerequisite documents even when the legacy Step 1 top-level patterns do not match.",
+]
+
+persistent_facts = [
+  "file:{project-root}/_bmad-output/planning-artifacts/prds/**/prd.md",
+  "file:{project-root}/_bmad-output/planning-artifacts/ux-designs/**/DESIGN.md",
+  "file:{project-root}/_bmad-output/planning-artifacts/ux-designs/**/EXPERIENCE.md",
+]
