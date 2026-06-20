@@ -3,7 +3,12 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { isCheckHealthCommand, isHealthCheckedEvent } from '../src/protocol.js'
+import {
+  isCheckHealthCommand,
+  isGetOrCreateJobCommand,
+  isHealthCheckedEvent,
+  isJobLoadedEvent
+} from '../src/protocol.js'
 
 function fixture(name: string): unknown {
   const url = new URL(`../fixtures/${name}`, import.meta.url)
@@ -14,6 +19,8 @@ describe('engine protocol schemas', () => {
   it('accepts the valid command and event fixtures', () => {
     expect(isCheckHealthCommand(fixture('valid-check-health.json'))).toBe(true)
     expect(isHealthCheckedEvent(fixture('valid-health-checked.json'))).toBe(true)
+    expect(isGetOrCreateJobCommand(fixture('valid-get-or-create-job.json'))).toBe(true)
+    expect(isJobLoadedEvent(fixture('valid-job-loaded.json'))).toBe(true)
   })
 
   it.each([
@@ -24,5 +31,24 @@ describe('engine protocol schemas', () => {
     'invalid-command-non-utc-timestamp.json'
   ])('rejects %s', (name) => {
     expect(isCheckHealthCommand(fixture(name))).toBe(false)
+  })
+
+  it('rejects invalid dates and job IDs at the engine boundary', () => {
+    const command = fixture('valid-get-or-create-job.json') as Record<string, unknown>
+    expect(
+      isGetOrCreateJobCommand({
+        ...command,
+        jobId: 'not-a-uuid'
+      })
+    ).toBe(false)
+    expect(
+      isGetOrCreateJobCommand({
+        ...command,
+        payload: {
+          ...(command.payload as Record<string, unknown>),
+          publishDate: '2026-02-30'
+        }
+      })
+    ).toBe(false)
   })
 })

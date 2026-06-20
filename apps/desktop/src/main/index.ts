@@ -1,9 +1,14 @@
 import { app, BrowserWindow } from 'electron'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { shouldBlockNavigation } from './navigation-policy'
 import { createWindowOptions, enforceMinimumContentSize } from './window-options'
+import { registerJobHandlers } from './ipc/register-job-handlers'
+import { EngineClient } from './jobs/engine-client'
+
+const projectRoot = resolve(__dirname, '../../../..')
+const engineClient = new EngineClient(projectRoot)
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow(
@@ -38,6 +43,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.gracetree.shorts-studio')
+  registerJobHandlers(app.getPath('userData'), (command) => engineClient.request(command))
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -53,6 +59,10 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('before-quit', () => {
+  engineClient.stop()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

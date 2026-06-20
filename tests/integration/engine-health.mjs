@@ -61,8 +61,14 @@ if (events.length !== 2 || events[0].jobId !== first.jobId || events[1].jobId !=
 const eventSchema = JSON.parse(
   await readFile(join(root, 'packages/contracts/schemas/engine-event.schema.json'), 'utf8')
 )
+const healthEventSchema = eventSchema.oneOf.find(
+  (candidate) => candidate.properties?.type?.const === 'health_checked'
+)
+if (!healthEventSchema) {
+  throw new Error('health_checked event schema is missing')
+}
 for (const event of events) {
-  for (const key of eventSchema.required) {
+  for (const key of healthEventSchema.required) {
     if (!(key in event)) {
       throw new Error(`event is missing ${key}: ${JSON.stringify(event)}`)
     }

@@ -1,10 +1,30 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 
 describe('App shell', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'desktopApi', {
+      configurable: true,
+      value: {
+        getOrCreateJobForDate: vi.fn(async (publishDate: string) => ({
+          id: '11111111-1111-4111-8111-111111111111',
+          publishDate,
+          status: 'draft',
+          title: null,
+          workPath: `/managed/jobs/${publishDate}`,
+          resultPath: `/managed/jobs/${publishDate}/output`,
+          createdAt: '2026-06-20T00:00:00.000Z',
+          updatedAt: '2026-06-20T00:00:00.000Z',
+          pathState: 'ready',
+          inputMetadata: []
+        }))
+      }
+    })
+  })
+
   it('provides named global entry points and switches the active view', async () => {
     const user = userEvent.setup()
     render(<App />)

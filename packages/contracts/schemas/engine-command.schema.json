@@ -2,21 +2,39 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gracetree.local/schemas/engine-command.schema.json",
   "title": "Engine command",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
-  "properties": {
-    "protocolVersion": { "const": 1 },
-    "type": { "const": "check_health" },
-    "jobId": { "type": "string", "minLength": 1 },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "pattern": "Z$"
-    },
-    "payload": {
+  "oneOf": [
+    {
       "type": "object",
-      "additionalProperties": false
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "check_health" },
+        "jobId": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": { "type": "object", "additionalProperties": false }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "get_or_create_job" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["publishDate", "managedRoot", "workPath"],
+          "properties": {
+            "publishDate": { "type": "string", "format": "date" },
+            "managedRoot": { "type": "string", "minLength": 1 },
+            "workPath": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
     }
-  }
+  ]
 }

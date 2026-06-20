@@ -8,6 +8,8 @@ from typing import Any, TextIO
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
+from .storage.job_repository import JobRepository
+
 CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "packages" / "contracts"
 
 
@@ -43,6 +45,27 @@ def _health_checked(job_id: str) -> dict[str, Any]:
     return event
 
 
+def _job_loaded(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command["payload"]
+    repository = JobRepository(Path(payload["managedRoot"]))
+    job = repository.get_or_create_for_date(
+        publish_date=payload["publishDate"],
+        proposed_job_id=command["jobId"],
+        expected_work_path=Path(payload["workPath"]),
+    )
+    event = {
+        "protocolVersion": 1,
+        "type": "job_loaded",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": {"job": job},
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
     had_error = False
 
@@ -69,11 +92,24 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
             continue
 
         try:
-            event = _health_checked(command["jobId"])
-        except ValidationError as error:
-            schema_path = ".".join(str(part) for part in error.schema_path)
+            if command["type"] == "check_health":
+                event = _health_checked(command["jobId"])
+            else:
+                event = _job_loaded(command)
+        except (ValidationError, ValueError) as error:
+            if isinstance(error, ValidationError):
+                schema_path = ".".join(str(part) for part in error.schema_path)
+            else:
+                schema_path = "job_request"
             print(
                 f"INTERNAL_EVENT_INVALID: schema path {schema_path}",
+                file=stderr,
+                flush=True,
+            )
+            return 1
+        except OSError:
+            print(
+                "STORAGE_ERROR: managed storage is unavailable",
                 file=stderr,
                 flush=True,
             )

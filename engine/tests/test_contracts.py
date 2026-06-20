@@ -18,6 +18,8 @@ def fixture(name: str) -> object:
 def test_accepts_valid_command_and_event() -> None:
     COMMAND_VALIDATOR.validate(fixture("valid-check-health.json"))
     EVENT_VALIDATOR.validate(fixture("valid-health-checked.json"))
+    COMMAND_VALIDATOR.validate(fixture("valid-get-or-create-job.json"))
+    EVENT_VALIDATOR.validate(fixture("valid-job-loaded.json"))
 
 
 @pytest.mark.parametrize(

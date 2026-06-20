@@ -1,0 +1,91 @@
+.container {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(200px, max-content) 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.label,
+.jobStatus {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.trigger {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-raised);
+  cursor: pointer;
+}
+
+.popover {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  width: 356px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-raised);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 55%);
+}
+
+.monthLabel {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-primary);
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-1);
+}
+
+.gridRow {
+  display: contents;
+}
+
+.columnHeader {
+  padding-bottom: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.day {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.day:hover {
+  background: var(--color-panel);
+}
+
+.day[data-outside-month] {
+  color: var(--color-text-secondary);
+}
+
+.day[aria-current='date'] {
+  border-color: var(--color-text-secondary);
+}
+
+.day[aria-selected='true'] {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: var(--color-base);
+  font-weight: 900;
+}

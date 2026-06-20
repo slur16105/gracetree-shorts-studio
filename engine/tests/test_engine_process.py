@@ -62,3 +62,29 @@ def test_schema_invalid_input_stays_out_of_stdout_and_logs_no_value() -> None:
     assert result.stdout == ""
     assert "INVALID_COMMAND" in result.stderr
     assert "sentinel-secret" not in result.stderr
+
+
+def test_get_or_create_job_round_trip(tmp_path: Path) -> None:
+    job_id = "11111111-1111-4111-8111-111111111111"
+    managed_root = tmp_path / "GraceTreeData"
+    command = {
+        "protocolVersion": 1,
+        "type": "get_or_create_job",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "publishDate": "2026-06-20",
+            "managedRoot": str(managed_root),
+            "workPath": str(managed_root / "jobs" / "2026-06-20"),
+        },
+    }
+
+    result = run_engine(json.dumps(command) + "\n")
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    event = json.loads(result.stdout)
+    assert event["type"] == "job_loaded"
+    assert event["jobId"] == job_id
+    assert event["payload"]["job"]["id"] == job_id
+    assert event["payload"]["job"]["publishDate"] == "2026-06-20"

@@ -2,25 +2,71 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://gracetree.local/schemas/engine-event.schema.json",
   "title": "Engine event",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
-  "properties": {
-    "protocolVersion": { "const": 1 },
-    "type": { "const": "health_checked" },
-    "jobId": { "type": "string", "minLength": 1 },
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "pattern": "Z$"
-    },
-    "payload": {
+  "oneOf": [
+    {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status"],
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
       "properties": {
-        "status": { "const": "ok" }
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "health_checked" },
+        "jobId": { "type": "string", "minLength": 1 },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": { "status": { "const": "ok" } }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "job_loaded" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["job"],
+          "properties": {
+            "job": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "publishDate",
+                "status",
+                "title",
+                "workPath",
+                "resultPath",
+                "createdAt",
+                "updatedAt",
+                "pathState",
+                "inputMetadata"
+              ],
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "publishDate": { "type": "string", "format": "date" },
+                "status": {
+                  "enum": ["draft", "running", "completed", "failed", "cancelled", "interrupted"]
+                },
+                "title": { "type": ["string", "null"] },
+                "workPath": { "type": "string", "minLength": 1 },
+                "resultPath": { "type": "string", "minLength": 1 },
+                "createdAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+                "updatedAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+                "pathState": { "enum": ["ready", "missing"] },
+                "inputMetadata": { "type": "array", "maxItems": 0 }
+              }
+            }
+          }
+        }
       }
     }
-  }
+  ]
 }

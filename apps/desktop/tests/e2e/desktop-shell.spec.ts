@@ -1,11 +1,32 @@
 import { createRequire } from 'node:module'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
-import { _electron as electron, expect, test, type Page } from '@playwright/test'
+import {
+  _electron as electron,
+  expect,
+  test,
+  type ElectronApplication,
+  type Page
+} from '@playwright/test'
 
 const require = createRequire(__filename)
 const executablePath = require('electron') as string
 const appRoot = resolve(__dirname, '../..')
+const projectRoot = resolve(appRoot, '../..')
+
+async function launchApp(userDataDir: string): Promise<ElectronApplication> {
+  return electron.launch({
+    executablePath,
+    args: ['out/main/index.js', `--user-data-dir=${userDataDir}`],
+    cwd: appRoot,
+    env: {
+      ...process.env,
+      PYTHON: resolve(projectRoot, '.venv/bin/python')
+    }
+  })
+}
 
 async function expectScrollableAndUnclipped(page: Page, selector: string): Promise<void> {
   const locator = page.locator(selector)
@@ -22,11 +43,8 @@ async function expectScrollableAndUnclipped(page: Page, selector: string): Promi
 }
 
 test('loads the secure shell offline and remains usable at 200% zoom', async () => {
-  const electronApp = await electron.launch({
-    executablePath,
-    args: ['out/main/index.js'],
-    cwd: appRoot
-  })
+  const userDataDir = await mkdtemp(resolve(tmpdir(), 'gracetree-e2e-'))
+  let electronApp = await launchApp(userDataDir)
 
   try {
     const remoteRequests: string[] = []
@@ -60,10 +78,26 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
       hasNodeRequire: 'require' in window
     }))
     expect(bridgeSurface).toEqual({
-      desktopApiKeys: [],
+      desktopApiKeys: ['getOrCreateJobForDate'],
       hasNodeProcess: false,
       hasNodeRequire: false
     })
+
+    const publishDate = await page
+      .getByRole('button', { name: /게시 날짜/ })
+      .getAttribute('aria-label')
+      .then((label) => label?.match(/\d{4}-\d{2}-\d{2}/)?.[0])
+    expect(publishDate).toBeTruthy()
+    await expect(page.getByRole('status')).toHaveText('날짜별 작업 복원됨')
+    const firstJobId = await page.evaluate((date) => {
+      if (!date) throw new Error('Publish date is missing')
+      return window.desktopApi.getOrCreateJobForDate(date).then((job) => job.id)
+    }, publishDate)
+    const repeatedJobId = await page.evaluate((date) => {
+      if (!date) throw new Error('Publish date is missing')
+      return window.desktopApi.getOrCreateJobForDate(date).then((job) => job.id)
+    }, publishDate)
+    expect(repeatedJobId).toBe(firstJobId)
 
     await electronApp.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(2)
@@ -159,7 +193,18 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
     await page.reload()
     await expect(page).toHaveTitle('GraceTree Shorts Studio')
     expect(remoteRequests).toEqual([])
+
+    await electronApp.close()
+    electronApp = await launchApp(userDataDir)
+    const restoredPage = await electronApp.firstWindow()
+    await expect(restoredPage.getByRole('status')).toHaveText('날짜별 작업 복원됨')
+    const restoredJobId = await restoredPage.evaluate((date) => {
+      if (!date) throw new Error('Publish date is missing')
+      return window.desktopApi.getOrCreateJobForDate(date).then((job) => job.id)
+    }, publishDate)
+    expect(restoredJobId).toBe(firstJobId)
   } finally {
     await electronApp.close()
+    await rm(userDataDir, { recursive: true, force: true })
   }
 })
