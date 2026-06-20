@@ -11,7 +11,11 @@
         "protocolVersion": { "const": 1 },
         "type": { "const": "health_checked" },
         "jobId": { "type": "string", "minLength": 1 },
-        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
         "payload": {
           "type": "object",
           "additionalProperties": false,
@@ -28,7 +32,11 @@
         "protocolVersion": { "const": 1 },
         "type": { "const": "job_loaded" },
         "jobId": { "type": "string", "format": "uuid" },
-        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
         "payload": {
           "type": "object",
           "additionalProperties": false,
@@ -53,20 +61,127 @@
                 "id": { "type": "string", "format": "uuid" },
                 "publishDate": { "type": "string", "format": "date" },
                 "status": {
-                  "enum": ["draft", "running", "completed", "failed", "cancelled", "interrupted"]
+                  "enum": [
+                    "draft",
+                    "running",
+                    "completed",
+                    "failed",
+                    "cancelled",
+                    "interrupted"
+                  ]
                 },
                 "title": { "type": ["string", "null"] },
                 "workPath": { "type": "string", "minLength": 1 },
                 "resultPath": { "type": "string", "minLength": 1 },
-                "createdAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
-                "updatedAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "Z$"
+                },
                 "pathState": { "enum": ["ready", "missing"] },
-                "inputMetadata": { "type": "array", "maxItems": 0 }
+                "inputMetadata": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/jobInput" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "input_files_registered" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["results"],
+          "properties": {
+            "results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "originalName",
+                  "managedPath",
+                  "role",
+                  "status",
+                  "errorCode"
+                ],
+                "properties": {
+                  "originalName": { "type": "string", "minLength": 1 },
+                  "managedPath": { "type": ["string", "null"] },
+                  "role": { "const": "unclassified" },
+                  "status": { "enum": ["registered", "rejected", "conflict"] },
+                  "errorCode": {
+                    "enum": [
+                      "UNSUPPORTED_TYPE",
+                      "SOURCE_UNREADABLE",
+                      "SOURCE_INSIDE_MANAGED_ROOT",
+                      "SYMLINK_NOT_ALLOWED",
+                      "FILE_TOO_LARGE",
+                      "NAME_CONFLICT",
+                      "COPY_FAILED",
+                      null
+                    ]
+                  },
+                  "input": { "$ref": "#/$defs/jobInput" }
+                }
               }
             }
           }
         }
       }
     }
-  ]
+  ],
+  "$defs": {
+    "jobInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "jobId",
+        "role",
+        "originalName",
+        "managedPath",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "role": { "const": "unclassified" },
+        "originalName": { "type": "string", "minLength": 1 },
+        "managedPath": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["registered", "conflict"] },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        }
+      }
+    }
+  }
 }

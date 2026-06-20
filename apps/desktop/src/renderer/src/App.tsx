@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { SettingsDialog } from './components/SettingsDialog'
 import { SidebarIcon } from './components/SidebarIcon'
-import { DatePicker } from './features/job-editor/DatePicker'
+import { JobEditor } from './features/job-editor/JobEditor'
 import styles from './styles/App.module.css'
 
 type View = 'home' | 'guide'
@@ -67,7 +67,7 @@ function App(): React.JSX.Element {
             <div className={styles.homeLayout}>
               <section aria-labelledby="workspace-title" className={styles.workspaceRegion}>
                 <h2 id="workspace-title">새 영상 준비</h2>
-                <DatePicker />
+                <JobEditor />
                 <div className={styles.emptyState}>
                   <span aria-hidden="true" className={styles.emptyStateIcon}>
                     +

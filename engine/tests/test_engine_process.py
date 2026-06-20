@@ -163,3 +163,47 @@ def test_rejects_command_root_that_differs_from_the_approved_root(tmp_path: Path
     assert result.stdout == ""
     assert "INTERNAL_EVENT_INVALID" in result.stderr
     assert not command_root.exists()
+
+
+def test_register_input_files_round_trip_preserves_partial_success(tmp_path: Path) -> None:
+    managed_root = tmp_path / "GraceTreeData"
+    source = tmp_path / "voice.mp3"
+    unsupported = tmp_path / "bad.exe"
+    source.write_bytes(b"audio")
+    unsupported.write_bytes(b"binary")
+    job_id = "11111111-1111-4111-8111-111111111111"
+    create = {
+        "protocolVersion": 1,
+        "type": "get_or_create_job",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "publishDate": "2026-06-20",
+            "managedRoot": str(managed_root),
+            "workPath": str(managed_root / "jobs" / "2026-06-20"),
+        },
+    }
+    register = {
+        "protocolVersion": 1,
+        "type": "register_input_files",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:01.000Z",
+        "payload": {
+            "sourcePaths": [str(source), str(unsupported)],
+            "managedRoot": str(managed_root),
+        },
+    }
+
+    result = run_engine(
+        json.dumps(create) + "\n" + json.dumps(register) + "\n",
+        managed_root=managed_root,
+    )
+
+    assert result.returncode == 0
+    events = [json.loads(line) for line in result.stdout.splitlines()]
+    assert events[1]["type"] == "input_files_registered"
+    assert [item["status"] for item in events[1]["payload"]["results"]] == [
+        "registered",
+        "rejected",
+    ]
+    assert source.read_bytes() == b"audio"

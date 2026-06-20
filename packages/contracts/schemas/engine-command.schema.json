@@ -11,7 +11,11 @@
         "protocolVersion": { "const": 1 },
         "type": { "const": "check_health" },
         "jobId": { "type": "string", "minLength": 1 },
-        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
         "payload": { "type": "object", "additionalProperties": false }
       }
     },
@@ -23,7 +27,11 @@
         "protocolVersion": { "const": 1 },
         "type": { "const": "get_or_create_job" },
         "jobId": { "type": "string", "format": "uuid" },
-        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
         "payload": {
           "type": "object",
           "additionalProperties": false,
@@ -32,6 +40,35 @@
             "publishDate": { "type": "string", "format": "date" },
             "managedRoot": { "type": "string", "minLength": 1 },
             "workPath": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "register_input_files" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourcePaths", "managedRoot"],
+          "properties": {
+            "sourcePaths": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "managedRoot": { "type": "string", "minLength": 1 }
           }
         }
       }

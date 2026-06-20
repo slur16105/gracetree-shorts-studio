@@ -11,6 +11,7 @@ from typing import Any, TextIO
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
 from .storage.job_repository import JobRepository
+from .storage.input_repository import InputRepository
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "packages" / "contracts"
 
@@ -75,6 +76,28 @@ def _job_loaded(command: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
+def _input_files_registered(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command["payload"]
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value or Path(payload["managedRoot"]) != Path(approved_root_value):
+        raise ValueError("command managed root does not match the approved root")
+    repository = InputRepository(Path(approved_root_value))
+    results = repository.register_batch(
+        command["jobId"], [Path(value) for value in payload["sourcePaths"]]
+    )
+    event = {
+        "protocolVersion": 1,
+        "type": "input_files_registered",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": {"results": results},
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
     had_error = False
 
@@ -103,8 +126,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
         try:
             if command["type"] == "check_health":
                 event = _health_checked(command["jobId"])
-            else:
+            elif command["type"] == "get_or_create_job":
                 event = _job_loaded(command)
+            else:
+                event = _input_files_registered(command)
         except (ValidationError, ValueError) as error:
             if isinstance(error, ValidationError):
                 schema_path = ".".join(str(part) for part in error.schema_path)

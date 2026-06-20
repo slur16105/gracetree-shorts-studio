@@ -161,6 +161,15 @@ class JobRepository:
             work_path / child for child in ("input", "output", "temp", "logs")
         ]
         path_state = "ready" if all(path.is_dir() for path in required_paths) else "missing"
+        with connect_database(self.database_path) as connection:
+            inputs = connection.execute(
+                """
+                SELECT id, job_id, role, original_name, managed_path, status,
+                       created_at, updated_at
+                FROM job_inputs WHERE job_id = ? ORDER BY created_at, id
+                """,
+                (str(row["id"]),),
+            ).fetchall()
         return {
             "id": str(row["id"]),
             "publishDate": publish_date,
@@ -171,5 +180,17 @@ class JobRepository:
             "createdAt": str(row["created_at"]),
             "updatedAt": str(row["updated_at"]),
             "pathState": path_state,
-            "inputMetadata": [],
+            "inputMetadata": [
+                {
+                    "id": str(item["id"]),
+                    "jobId": str(item["job_id"]),
+                    "role": str(item["role"]),
+                    "originalName": str(item["original_name"]),
+                    "managedPath": str(item["managed_path"]),
+                    "status": str(item["status"]),
+                    "createdAt": str(item["created_at"]),
+                    "updatedAt": str(item["updated_at"]),
+                }
+                for item in inputs
+            ],
         }

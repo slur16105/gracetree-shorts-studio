@@ -11,7 +11,7 @@ from gracetree_engine.storage.migrations import apply_migrations, connect_databa
 def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
     database_path = tmp_path / "studio.db"
 
-    assert apply_migrations(database_path) == [1]
+    assert apply_migrations(database_path) == [1, 2]
     assert apply_migrations(database_path) == []
 
     with connect_database(database_path) as connection:
@@ -21,7 +21,7 @@ def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()
         columns = connection.execute("PRAGMA table_info(jobs)").fetchall()
 
-    assert [tuple(row) for row in versions] == [(1,)]
+    assert [tuple(row) for row in versions] == [(1,), (2,)]
     assert tuple(foreign_keys) == (1,)
     assert {column[1] for column in columns} >= {
         "id",
@@ -42,7 +42,25 @@ def test_upgrades_a_previous_schema_database(tmp_path: Path) -> None:
             "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
         )
 
-    assert apply_migrations(database_path) == [1]
+    assert apply_migrations(database_path) == [1, 2]
+
+
+def test_applies_002_to_a_story_1_3_database(tmp_path: Path) -> None:
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    source_dir = Path(__file__).resolve().parents[1] / "migrations"
+    for name in ("001_create_jobs.sql",):
+        (migrations_dir / name).write_text(
+            (source_dir / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    database_path = tmp_path / "studio.db"
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [1]
+    (migrations_dir / "002_create_job_inputs.sql").write_text(
+        (source_dir / "002_create_job_inputs.sql").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [2]
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == []
 
 
 def test_rejects_duplicate_migration_versions_before_opening_database(

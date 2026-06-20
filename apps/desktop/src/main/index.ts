@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { shouldBlockNavigation } from './navigation-policy'
 import { createWindowOptions, enforceMinimumContentSize } from './window-options'
 import { registerJobHandlers } from './ipc/register-job-handlers'
+import { registerFileHandlers } from './ipc/register-file-handlers'
 import { EngineClient } from './jobs/engine-client'
 import { createManagedJobPaths } from './files/managed-paths'
 
@@ -48,6 +49,10 @@ app.whenReady().then(() => {
   const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
   engineClient = new EngineClient(projectRoot, managedRoot)
   registerJobHandlers(userDataPath, (command) => {
+    if (!engineClient) throw new Error('Python engine is unavailable')
+    return engineClient.request(command)
+  })
+  registerFileHandlers(managedRoot, (command) => {
     if (!engineClient) throw new Error('Python engine is unavailable')
     return engineClient.request(command)
   })

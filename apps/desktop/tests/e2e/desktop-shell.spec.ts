@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -44,6 +44,11 @@ async function expectScrollableAndUnclipped(page: Page, selector: string): Promi
 
 test('loads the secure shell offline and remains usable at 200% zoom', async () => {
   const userDataDir = await mkdtemp(resolve(tmpdir(), 'gracetree-e2e-'))
+  const sourceDir = await mkdtemp(resolve(tmpdir(), 'gracetree-inputs-'))
+  const validSource = resolve(sourceDir, 'voice.mp3')
+  const unsupportedSource = resolve(sourceDir, 'bad.exe')
+  await writeFile(validSource, 'audio')
+  await writeFile(unsupportedSource, 'binary')
   let electronApp = await launchApp(userDataDir)
 
   try {
@@ -78,7 +83,7 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
       hasNodeRequire: 'require' in window
     }))
     expect(bridgeSurface).toEqual({
-      desktopApiKeys: ['getOrCreateJobForDate'],
+      desktopApiKeys: ['getOrCreateJobForDate', 'selectInputFiles', 'registerInputFiles'],
       hasNodeProcess: false,
       hasNodeRequire: false
     })
@@ -98,6 +103,24 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
       return window.desktopApi.getOrCreateJobForDate(date).then((job) => job.id)
     }, publishDate)
     expect(repeatedJobId).toBe(firstJobId)
+
+    const batchResults = await page.evaluate(
+      ({ id, validPath, unsupportedPath }) =>
+        window.desktopApi.registerInputFiles(id, [
+          { name: 'voice.mp3', sourcePath: validPath },
+          { name: 'bad.exe', sourcePath: unsupportedPath }
+        ]),
+      { id: firstJobId, validPath: validSource, unsupportedPath: unsupportedSource }
+    )
+    expect(batchResults.map((result) => result.status)).toEqual(['registered', 'rejected'])
+    expect(await readFile(validSource, 'utf8')).toBe('audio')
+    const restoredWithInput = await page.evaluate((date) => {
+      if (!date) throw new Error('Publish date is missing')
+      return window.desktopApi.getOrCreateJobForDate(date)
+    }, publishDate)
+    expect(restoredWithInput.inputMetadata.map((input) => input.originalName)).toEqual([
+      'voice.mp3'
+    ])
 
     await electronApp.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.webContents.setZoomFactor(2)
@@ -206,5 +229,6 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
   } finally {
     await electronApp.close()
     await rm(userDataDir, { recursive: true, force: true })
+    await rm(sourceDir, { recursive: true, force: true })
   }
 })

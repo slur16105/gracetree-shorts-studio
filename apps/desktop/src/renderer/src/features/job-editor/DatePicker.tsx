@@ -52,7 +52,11 @@ function calendarDates(focusedDate: string): string[] {
   })
 }
 
-export function DatePicker(): React.JSX.Element {
+interface DatePickerProps {
+  onJobLoaded?: (job: JobDto | null) => void
+}
+
+export function DatePicker({ onJobLoaded }: DatePickerProps = {}): React.JSX.Element {
   const [today, setToday] = useState(() => toDateKey(new Date()))
   const [selectedDate, setSelectedDate] = useState(today)
   const [focusedDate, setFocusedDate] = useState(today)
@@ -71,15 +75,21 @@ export function DatePicker(): React.JSX.Element {
     window.desktopApi
       .getOrCreateJobForDate(selectedDate)
       .then((loadedJob) => {
-        if (active) setJob(loadedJob)
+        if (active) {
+          setJob(loadedJob)
+          onJobLoaded?.(loadedJob)
+        }
       })
       .catch(() => {
-        if (active) setLoadError(true)
+        if (active) {
+          setLoadError(true)
+          onJobLoaded?.(null)
+        }
       })
     return () => {
       active = false
     }
-  }, [reloadRequest, selectedDate])
+  }, [onJobLoaded, reloadRequest, selectedDate])
 
   useEffect(() => {
     const now = new Date()
