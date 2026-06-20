@@ -1,0 +1,225 @@
+.shell {
+  display: grid;
+  grid-template:
+    'sidebar main' minmax(650px, 1fr)
+    'sidebar status' var(--status-height)
+    / var(--sidebar-width) minmax(1102px, 1fr);
+  min-width: 1180px;
+  min-height: 720px;
+  background: var(--color-base);
+}
+
+.sidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5) 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-nav);
+}
+
+.brandMark {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-base);
+  background: var(--color-brand);
+  font-weight: 900;
+}
+
+.primaryNavigation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.navigationButton,
+.closeButton {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.navigationButton svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+.navigationButton:hover {
+  color: var(--color-text-primary);
+  background: var(--color-raised);
+}
+
+.navigationButton[aria-current='page'] {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-brand) 52%, transparent);
+  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-raised));
+}
+
+.navigationButton[aria-expanded='true'] {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+  background: var(--color-raised);
+}
+
+.navigationButton[aria-current='page']::after {
+  position: absolute;
+  left: 0;
+  width: 3px;
+  height: 28px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-brand);
+  content: '';
+}
+
+.main {
+  grid-area: main;
+  min-width: 0;
+  padding: 48px 56px;
+  overflow: auto;
+  background:
+    radial-gradient(circle at 80% 12%, rgb(255 47 98 / 8%), transparent 26%),
+    var(--color-base);
+}
+
+.view {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.view h1,
+.dialog h2 {
+  margin: 0;
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+}
+
+.view h1 {
+  font-size: 32px;
+}
+
+.emptyState {
+  display: grid;
+  min-height: 420px;
+  margin-top: var(--space-8);
+  padding: 48px;
+  place-items: center;
+  align-content: center;
+  border: 1px dashed #3f4545;
+  border-radius: var(--radius-xl);
+  background: var(--color-panel);
+  text-align: center;
+}
+
+.emptyStateIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin-bottom: var(--space-4);
+  place-items: center;
+  border: 1px solid #3f4545;
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  font-size: 28px;
+}
+
+.emptyState h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.emptyState p,
+.dialogDescription {
+  max-width: 520px;
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary);
+}
+
+.statusBar {
+  grid-area: status;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-panel);
+  font-size: 14px;
+}
+
+.statusIndicator {
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--color-text-secondary);
+  border-radius: 50%;
+}
+
+.statusDetail {
+  margin-left: auto;
+  color: var(--color-text-secondary);
+}
+
+.dialogBackdrop {
+  position: fixed;
+  z-index: 10;
+  display: grid;
+  inset: 0;
+  padding: var(--space-8);
+  place-items: center;
+  background: rgb(0 0 0 / 72%);
+}
+
+.dialog {
+  width: min(560px, calc(100vw - 64px));
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-raised);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 48%);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.closeButton {
+  flex: 0 0 auto;
+  color: var(--color-text-primary);
+  background: var(--color-panel);
+  font-size: 26px;
+}
+
+.closeButton:hover {
+  border-color: #4a5050;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navigationButton,
+  .closeButton {
+    transition: none;
+  }
+}

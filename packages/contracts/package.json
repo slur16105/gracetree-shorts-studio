@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/protocol.ts"
+    ".": "./src/protocol.ts",
+    "./desktop-api": "./src/desktop-api.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -1,0 +1,48 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 1180px;
+  min-height: 720px;
+  margin: 0;
+}
+
+html {
+  background: var(--color-base);
+  overflow: auto;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text-primary);
+  background: var(--color-base);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  overflow: auto;
+}
+
+button {
+  color: inherit;
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

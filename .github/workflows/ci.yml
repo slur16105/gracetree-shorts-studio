@@ -27,3 +27,4 @@ jobs:
       - run: python -m pip install --no-build-isolation --no-deps ./engine
       - run: python -m pip check
       - run: pnpm run ci
+      - run: xvfb-run --auto-servernum pnpm test:e2e

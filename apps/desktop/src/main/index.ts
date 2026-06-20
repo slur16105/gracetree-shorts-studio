@@ -2,22 +2,13 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { shouldBlockNavigation } from './navigation-policy'
+import { createWindowOptions } from './window-options'
 
 function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  })
+  const mainWindow = new BrowserWindow(
+    createWindowOptions(join(__dirname, '../preload/index.js'), process.platform, icon)
+  )
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
@@ -25,8 +16,12 @@ function createWindow(): void {
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    if (shouldBlockNavigation(mainWindow.webContents.getURL(), targetUrl)) {
+      event.preventDefault()
+    }
+  })
+
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -38,8 +33,7 @@ function createWindow(): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.gracetree.shorts-studio')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
