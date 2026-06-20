@@ -54,6 +54,19 @@ function event(jobId: string): EngineEvent {
   }
 }
 
+function registerCommand(jobId: string): EngineCommand {
+  return {
+    protocolVersion: 1,
+    type: 'register_input_files',
+    jobId,
+    timestamp: '2026-06-20T00:00:00.000Z',
+    payload: {
+      sourcePaths: ['/source/large.mp4'],
+      managedRoot: '/managed/GraceTreeData'
+    }
+  }
+}
+
 describe('EngineClient', () => {
   beforeEach(() => {
     spawnMock.mockReset()
@@ -94,6 +107,40 @@ describe('EngineClient', () => {
 
     await expect(next).resolves.toEqual(event('job-2'))
     expect(spawnMock).toHaveBeenCalledTimes(2)
+    client.stop()
+  })
+
+  it('allows input registration to run beyond the default five-second timeout', async () => {
+    vi.useFakeTimers()
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+    const pending = client.request(registerCommand('11111111-1111-4111-8111-111111111111'))
+
+    await vi.advanceTimersByTimeAsync(5_001)
+    expect(child.kill).not.toHaveBeenCalled()
+
+    child.stdout.write(
+      `${JSON.stringify({
+        protocolVersion: 1,
+        type: 'input_files_registered',
+        jobId: '11111111-1111-4111-8111-111111111111',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        payload: {
+          results: [
+            {
+              originalName: 'large.mp4',
+              managedPath: null,
+              role: 'unclassified',
+              status: 'rejected',
+              errorCode: 'COPY_FAILED'
+            }
+          ]
+        }
+      })}\n`
+    )
+
+    await expect(pending).resolves.toMatchObject({ type: 'input_files_registered' })
     client.stop()
   })
 

@@ -66,4 +66,46 @@ describe("engine protocol schemas", () => {
       }),
     ).toBe(false);
   });
+
+  it("rejects contradictory input registration result states", () => {
+    const event = fixture("valid-input-files-registered.json") as Record<
+      string,
+      unknown
+    >;
+    const payload = event.payload as {
+      results: Array<Record<string, unknown>>;
+    };
+    const base = payload.results[0];
+
+    expect(
+      isInputFilesRegisteredEvent({
+        ...event,
+        payload: {
+          results: [
+            {
+              ...base,
+              status: "registered",
+              managedPath: null,
+              errorCode: "COPY_FAILED",
+            },
+          ],
+        },
+      }),
+    ).toBe(false);
+    expect(
+      isInputFilesRegisteredEvent({
+        ...event,
+        payload: {
+          results: [
+            {
+              ...base,
+              status: "conflict",
+              managedPath: "/managed/script.txt",
+              errorCode: null,
+            },
+          ],
+        },
+      }),
+    ).toBe(false);
+  });
 });

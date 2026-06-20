@@ -59,6 +59,9 @@ export function createRegisterInputFilesHandler(
     if (!isInputFilesRegisteredEvent(event) || event.jobId !== jobId) {
       throw new Error('Python engine response is invalid')
     }
+    if (event.payload.results.length !== validPaths.length) {
+      throw new Error('Python engine returned a mismatched batch')
+    }
     event.payload.results.forEach((result, index) => {
       const targetIndex = validIndexes[index]
       if (targetIndex !== undefined) results[targetIndex] = result

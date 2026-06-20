@@ -170,6 +170,30 @@ class JobRepository:
                 """,
                 (str(row["id"]),),
             ).fetchall()
+        input_metadata = []
+        for item in inputs:
+            managed_path = _require_canonical_absolute_path(
+                Path(str(item["managed_path"])), "stored input path"
+            )
+            if (
+                managed_path.parent != work_path / "input"
+                or not managed_path.is_relative_to(self.managed_root)
+            ):
+                raise ValueError("stored input path is outside the managed input directory")
+            if not managed_path.is_file():
+                path_state = "missing"
+            input_metadata.append(
+                {
+                    "id": str(item["id"]),
+                    "jobId": str(item["job_id"]),
+                    "role": str(item["role"]),
+                    "originalName": str(item["original_name"]),
+                    "managedPath": str(managed_path),
+                    "status": str(item["status"]),
+                    "createdAt": str(item["created_at"]),
+                    "updatedAt": str(item["updated_at"]),
+                }
+            )
         return {
             "id": str(row["id"]),
             "publishDate": publish_date,
@@ -180,17 +204,5 @@ class JobRepository:
             "createdAt": str(row["created_at"]),
             "updatedAt": str(row["updated_at"]),
             "pathState": path_state,
-            "inputMetadata": [
-                {
-                    "id": str(item["id"]),
-                    "jobId": str(item["job_id"]),
-                    "role": str(item["role"]),
-                    "originalName": str(item["original_name"]),
-                    "managedPath": str(item["managed_path"]),
-                    "status": str(item["status"]),
-                    "createdAt": str(item["created_at"]),
-                    "updatedAt": str(item["updated_at"]),
-                }
-                for item in inputs
-            ],
+            "inputMetadata": input_metadata,
         }

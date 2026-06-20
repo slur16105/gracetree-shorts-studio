@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import shutil
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -96,7 +99,9 @@ def test_copy_failure_leaves_no_metadata_or_final_file(
     source = tmp_path / "voice.mp3"
     source.write_bytes(b"audio")
 
-    def fail_copy(_source: Path, _target: Path) -> None:
+    def fail_copy(
+        _source: Path, _target: Path, _expected_stat: os.stat_result
+    ) -> os.stat_result:
         raise OSError("disk full")
 
     monkeypatch.setattr(repository, "_copy_to_temp", fail_copy)
@@ -117,11 +122,27 @@ def test_fk_cascade_unique_and_index(tmp_path: Path) -> None:
     with sqlite3.connect(root / "studio.db") as connection:
         connection.execute("PRAGMA foreign_keys = ON")
         indexes = connection.execute("PRAGMA index_list(job_inputs)").fetchall()
+        unique_index = next(row for row in indexes if row[2] and row[3] == "u")
+        unique_columns = connection.execute(
+            f"PRAGMA index_info({unique_index[1]})"
+        ).fetchall()
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                """
+                INSERT INTO job_inputs (
+                    id, job_id, role, original_name, managed_path, status,
+                    created_at, updated_at
+                ) SELECT ?, job_id, role, original_name, managed_path, status,
+                         created_at, updated_at
+                  FROM job_inputs LIMIT 1
+                """,
+                ("22222222-2222-4222-8222-222222222222",),
+            )
         connection.execute("DELETE FROM jobs WHERE id = ?", (JOB_ID,))
         count = connection.execute("SELECT COUNT(*) FROM job_inputs").fetchone()
 
     assert any(row[1] == "idx_job_inputs_job_id" for row in indexes)
-    assert any(row[2] for row in indexes if row[1] != "idx_job_inputs_job_id")
+    assert [row[2] for row in unique_columns] == ["job_id", "managed_path"]
     assert count == (0,)
 
 
@@ -139,3 +160,108 @@ def test_registered_metadata_is_restored_with_the_job(tmp_path: Path) -> None:
 
     assert len(job["inputMetadata"]) == 1
     assert job["inputMetadata"][0]["originalName"] == "script.txt"
+
+
+def test_rejects_source_with_symlinked_parent(tmp_path: Path) -> None:
+    _root, repository = setup_job(tmp_path)
+    real_dir = tmp_path / "real"
+    linked_dir = tmp_path / "linked"
+    real_dir.mkdir()
+    (real_dir / "script.txt").write_text("script", encoding="utf-8")
+    try:
+        linked_dir.symlink_to(real_dir, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+
+    result = repository.register_batch(JOB_ID, [linked_dir / "script.txt"])[0]
+
+    assert result["errorCode"] == "SYMLINK_NOT_ALLOWED"
+
+
+def test_rejects_symlinked_managed_storage_directory(tmp_path: Path) -> None:
+    root, repository = setup_job(tmp_path)
+    input_dir = root / "jobs" / "2026-06-20" / "input"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    input_dir.rmdir()
+    try:
+        input_dir.symlink_to(outside, target_is_directory=True)
+    except OSError:
+        pytest.skip("symlinks unavailable")
+    source = tmp_path / "script.txt"
+    source.write_text("script", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="storage directory"):
+        repository.register_batch(JOB_ID, [source])
+
+    assert list(outside.iterdir()) == []
+
+
+def test_source_change_during_copy_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, repository = setup_job(tmp_path)
+    source = tmp_path / "script.txt"
+    source.write_text("first", encoding="utf-8")
+    original_copy = shutil.copyfileobj
+
+    def mutate_after_copy(source_file: Any, target_file: Any) -> None:
+        original_copy(source_file, target_file)
+        source.write_text("other", encoding="utf-8")
+
+    monkeypatch.setattr(shutil, "copyfileobj", mutate_after_copy)
+
+    result = repository.register_batch(JOB_ID, [source])[0]
+
+    assert result["errorCode"] == "COPY_FAILED"
+    assert not (root / "jobs" / "2026-06-20" / "input" / "script.txt").exists()
+
+
+def test_temp_cleanup_failure_does_not_change_committed_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _root, repository = setup_job(tmp_path)
+    source = tmp_path / "script.txt"
+    source.write_text("script", encoding="utf-8")
+    original_unlink = Path.unlink
+
+    def fail_temp_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path.suffix == ".input-copy":
+            raise OSError("cleanup failed")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_temp_unlink)
+
+    result = repository.register_batch(JOB_ID, [source])[0]
+
+    assert result["status"] == "registered"
+
+
+def test_restored_input_metadata_marks_missing_file_and_rejects_external_path(
+    tmp_path: Path,
+) -> None:
+    root, repository = setup_job(tmp_path)
+    source = tmp_path / "script.txt"
+    source.write_text("script", encoding="utf-8")
+    registered = repository.register_batch(JOB_ID, [source])[0]
+    Path(registered["managedPath"]).unlink()
+
+    missing = JobRepository(root).get_or_create_for_date(
+        publish_date="2026-06-20",
+        proposed_job_id="22222222-2222-4222-8222-222222222222",
+        expected_work_path=root / "jobs" / "2026-06-20",
+    )
+    assert missing["pathState"] == "missing"
+
+    with sqlite3.connect(root / "studio.db") as connection:
+        connection.execute(
+            "UPDATE job_inputs SET managed_path = ? WHERE job_id = ?",
+            (str(tmp_path / "external.txt"), JOB_ID),
+        )
+
+    with pytest.raises(ValueError, match="managed input directory"):
+        JobRepository(root).get_or_create_for_date(
+            publish_date="2026-06-20",
+            proposed_job_id="22222222-2222-4222-8222-222222222222",
+            expected_work_path=root / "jobs" / "2026-06-20",
+        )

@@ -24,6 +24,11 @@
   opacity: 0.6;
 }
 
+.dropZone[data-drag-active] {
+  border-color: var(--color-brand);
+  background: var(--color-raised);
+}
+
 .dropZone p,
 .summary {
   margin: 0;

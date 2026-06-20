@@ -43,6 +43,36 @@ def _valid_uuid(value: str) -> bool:
         return False
 
 
+def _has_symlink_component(path: Path) -> bool:
+    for component in (path, *path.parents):
+        if component.parent == Path(component.anchor):
+            continue
+        if component.is_symlink():
+            return True
+    return False
+
+
+def _same_file_state(first: os.stat_result, second: os.stat_result) -> bool:
+    return (
+        first.st_dev,
+        first.st_ino,
+        first.st_size,
+        first.st_mtime_ns,
+    ) == (
+        second.st_dev,
+        second.st_ino,
+        second.st_size,
+        second.st_mtime_ns,
+    )
+
+
+def _unlink_quietly(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 class InputRepository:
     def __init__(self, managed_root: Path) -> None:
         if not managed_root.is_absolute() or managed_root != managed_root.resolve():
@@ -70,6 +100,17 @@ class InputRepository:
             raise ValueError("job work path is invalid")
         input_dir = expected_work / "input"
         temp_dir = expected_work / "temp"
+        for directory in (input_dir, temp_dir):
+            try:
+                if (
+                    _has_symlink_component(directory)
+                    or directory.resolve(strict=True) != directory
+                    or not directory.is_dir()
+                    or not directory.is_relative_to(self.managed_root)
+                ):
+                    raise ValueError("job storage directory is invalid")
+            except OSError as error:
+                raise ValueError("job storage directory is invalid") from error
         return [
             self._register_one(job_id, source_path, input_dir, temp_dir)
             for source_path in source_paths
@@ -84,7 +125,7 @@ class InputRepository:
             "managedPath": None,
             "role": "unclassified",
         }
-        if source_path.is_symlink():
+        if _has_symlink_component(source_path):
             return {**base, "status": "rejected", "errorCode": "SYMLINK_NOT_ALLOWED"}
         if not source_path.is_absolute():
             return {**base, "status": "rejected", "errorCode": "SOURCE_UNREADABLE"}
@@ -117,8 +158,8 @@ class InputRepository:
         temp_path = temp_dir / f"{uuid4()}.input-copy"
         created_target = False
         try:
-            self._copy_to_temp(canonical_source, temp_path)
-            if temp_path.stat().st_size != stat.st_size:
+            copied_stat = self._copy_to_temp(canonical_source, temp_path, stat)
+            if copied_stat.st_size != stat.st_size:
                 raise OSError("copy size mismatch")
             try:
                 os.link(temp_path, target)
@@ -144,10 +185,10 @@ class InputRepository:
                 )
         except (OSError, sqlite3.Error):
             if created_target:
-                target.unlink(missing_ok=True)
+                _unlink_quietly(target)
             return {**base, "status": "rejected", "errorCode": "COPY_FAILED"}
         finally:
-            temp_path.unlink(missing_ok=True)
+            _unlink_quietly(temp_path)
         return {
             **base,
             "managedPath": str(target),
@@ -165,9 +206,18 @@ class InputRepository:
             },
         }
 
-    def _copy_to_temp(self, source: Path, target: Path) -> None:
+    def _copy_to_temp(
+        self, source: Path, target: Path, expected_stat: os.stat_result
+    ) -> os.stat_result:
         target.parent.mkdir(parents=True, exist_ok=True)
         with source.open("rb") as source_file, target.open("xb") as target_file:
+            opened_stat = os.fstat(source_file.fileno())
+            if not _same_file_state(expected_stat, opened_stat):
+                raise OSError("source changed before copy")
             shutil.copyfileobj(source_file, target_file)
             target_file.flush()
             os.fsync(target_file.fileno())
+            copied_source_stat = os.fstat(source_file.fileno())
+            if not _same_file_state(opened_stat, copied_source_stat):
+                raise OSError("source changed during copy")
+        return target.stat()

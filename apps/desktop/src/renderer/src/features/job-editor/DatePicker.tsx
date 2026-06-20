@@ -115,6 +115,7 @@ export function DatePicker({ onJobLoaded }: DatePickerProps = {}): React.JSX.Ele
 
   const select = (date: string): void => {
     setJob(null)
+    onJobLoaded?.(null)
     setLoadError(false)
     setSelectedDate(date)
     setFocusedDate(date)

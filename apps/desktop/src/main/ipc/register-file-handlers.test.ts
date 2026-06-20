@@ -19,7 +19,17 @@ describe('input file batch handler', () => {
             managedPath: `/managed/${sourcePath.split('/').at(-1)}`,
             role: 'unclassified',
             status: 'registered',
-            errorCode: null
+            errorCode: null,
+            input: {
+              id: '22222222-2222-4222-8222-222222222222',
+              jobId: command.jobId,
+              role: 'unclassified',
+              originalName: sourcePath.split('/').at(-1) ?? sourcePath,
+              managedPath: `/managed/${sourcePath.split('/').at(-1)}`,
+              status: 'registered',
+              createdAt: '2026-06-20T00:00:00.000Z',
+              updatedAt: '2026-06-20T00:00:00.000Z'
+            }
           }))
         }
       })
@@ -78,5 +88,24 @@ describe('input file batch handler', () => {
     await expect(
       handler(jobId, [{ name: 'voice.mp3', sourcePath: '/source/voice.mp3' }])
     ).rejects.toThrow('engine response')
+  })
+
+  it('rejects an engine response with a mismatched batch size', async () => {
+    const handler = createRegisterInputFilesHandler(
+      '/managed',
+      vi.fn(
+        async (): Promise<EngineEvent> => ({
+          protocolVersion: 1,
+          type: 'input_files_registered',
+          jobId,
+          timestamp: '2026-06-20T00:00:00.000Z',
+          payload: { results: [] }
+        })
+      )
+    )
+
+    await expect(
+      handler(jobId, [{ name: 'voice.mp3', sourcePath: '/source/voice.mp3' }])
+    ).rejects.toThrow('mismatched batch')
   })
 })

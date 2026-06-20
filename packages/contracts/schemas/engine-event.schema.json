@@ -142,7 +142,43 @@
                     ]
                   },
                   "input": { "$ref": "#/$defs/jobInput" }
-                }
+                },
+                "oneOf": [
+                  {
+                    "required": ["input"],
+                    "properties": {
+                      "input": { "$ref": "#/$defs/jobInput" },
+                      "status": { "const": "registered" },
+                      "managedPath": { "type": "string", "minLength": 1 },
+                      "errorCode": { "type": "null" }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "input": false,
+                      "status": { "const": "rejected" },
+                      "managedPath": { "type": "null" },
+                      "errorCode": {
+                        "enum": [
+                          "UNSUPPORTED_TYPE",
+                          "SOURCE_UNREADABLE",
+                          "SOURCE_INSIDE_MANAGED_ROOT",
+                          "SYMLINK_NOT_ALLOWED",
+                          "FILE_TOO_LARGE",
+                          "COPY_FAILED"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "input": false,
+                      "status": { "const": "conflict" },
+                      "managedPath": { "type": "string", "minLength": 1 },
+                      "errorCode": { "const": "NAME_CONFLICT" }
+                    }
+                  }
+                ]
               }
             }
           }

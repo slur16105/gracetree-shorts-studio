@@ -9,6 +9,9 @@ interface PendingRequest {
   timeout: NodeJS.Timeout
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 5_000
+const INPUT_REGISTRATION_TIMEOUT_MS = 30 * 60 * 1_000
+
 export class EngineClient {
   private child: ChildProcessWithoutNullStreams | null = null
   private lines: Interface | null = null
@@ -29,10 +32,14 @@ export class EngineClient {
     if (!child) throw new Error('Python engine did not start')
 
     return new Promise<EngineEvent>((resolve, reject) => {
+      const timeoutMs =
+        command.type === 'register_input_files'
+          ? INPUT_REGISTRATION_TIMEOUT_MS
+          : DEFAULT_REQUEST_TIMEOUT_MS
       const timeout = setTimeout(() => {
         if (!this.pending.has(command.jobId)) return
         this.terminateChild(child, new Error('Python engine request timed out'))
-      }, 5000)
+      }, timeoutMs)
       this.pending.set(command.jobId, { resolve, reject, timeout })
       child.stdin.write(`${JSON.stringify(command)}\n`)
     })

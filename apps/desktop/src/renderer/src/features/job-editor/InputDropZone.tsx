@@ -1,6 +1,6 @@
 import type { InputFileCandidate, SelectedInputFile } from '@gracetree/contracts/desktop-api'
 import type { InputRegistrationResult } from '@gracetree/contracts'
-import { useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 
 import styles from './InputDropZone.module.css'
 
@@ -19,34 +19,78 @@ const ERROR_MESSAGES: Record<Exclude<InputRegistrationResult['errorCode'], null>
 }
 
 export function InputDropZone({ jobId }: InputDropZoneProps): React.JSX.Element {
-  const [results, setResults] = useState<InputRegistrationResult[]>([])
-  const [summary, setSummary] = useState('')
-  const [busy, setBusy] = useState(false)
+  return <InputDropZoneContent jobId={jobId} key={jobId ?? 'no-job'} />
+}
 
-  const register = async (files: InputFileCandidate[]): Promise<void> => {
-    if (!jobId || files.length === 0 || busy) return
-    setBusy(true)
-    try {
-      const nextResults = await window.desktopApi.registerInputFiles(jobId, files)
-      setResults(nextResults)
-      const successCount = nextResults.filter((item) => item.status === 'registered').length
-      const rejectedCount = nextResults.length - successCount
-      setSummary(`파일 등록 완료: 성공 ${successCount}개, 거부 ${rejectedCount}개`)
-    } catch {
-      setSummary('파일 등록을 완료하지 못했습니다. 다시 선택해주세요.')
-    } finally {
-      setBusy(false)
+function InputDropZoneContent({ jobId }: InputDropZoneProps): React.JSX.Element {
+  const [results, setResults] = useState<InputRegistrationResult[]>([])
+  const [summary, setSummary] = useState({ id: 0, text: '' })
+  const [pendingFiles, setPendingFiles] = useState<Array<{ id: string; name: string }>>([])
+  const [dragActive, setDragActive] = useState(false)
+  const activeRef = useRef(true)
+  const queueRef = useRef(Promise.resolve())
+  const batchSequenceRef = useRef(0)
+  const dragDepthRef = useRef(0)
+
+  useEffect(() => {
+    return () => {
+      activeRef.current = false
     }
+  }, [])
+
+  const announce = (text: string): void => {
+    setSummary((current) => ({ id: current.id + 1, text }))
+  }
+
+  const register = (files: InputFileCandidate[]): Promise<void> => {
+    if (!jobId || files.length === 0) return Promise.resolve()
+    const requestJobId = jobId
+    const batchId = `${requestJobId}-${batchSequenceRef.current++}`
+    const pending = files.map((file, index) => ({
+      id: `${batchId}-${index}`,
+      name: file.name
+    }))
+    setPendingFiles((current) => [...current, ...pending])
+
+    const execute = async (): Promise<void> => {
+      try {
+        const nextResults = await window.desktopApi.registerInputFiles(requestJobId, files)
+        if (!activeRef.current) return
+        setResults(nextResults)
+        const successCount = nextResults.filter((item) => item.status === 'registered').length
+        const rejectedCount = nextResults.length - successCount
+        announce(`파일 등록 완료: 성공 ${successCount}개, 거부 ${rejectedCount}개`)
+      } catch {
+        if (activeRef.current) {
+          announce('파일 등록을 완료하지 못했습니다. 다시 선택해주세요.')
+        }
+      } finally {
+        if (activeRef.current) {
+          const pendingIds = new Set(pending.map((file) => file.id))
+          setPendingFiles((current) => current.filter((file) => !pendingIds.has(file.id)))
+        }
+      }
+    }
+
+    const queued = queueRef.current.then(execute, execute)
+    queueRef.current = queued
+    return queued
   }
 
   const selectFiles = async (): Promise<void> => {
-    if (!jobId || busy) return
-    const selected: SelectedInputFile[] = await window.desktopApi.selectInputFiles()
-    await register(selected)
+    if (!jobId) return
+    try {
+      const selected: SelectedInputFile[] = await window.desktopApi.selectInputFiles()
+      await register(selected)
+    } catch {
+      announce('파일 선택을 완료하지 못했습니다. 다시 시도해주세요.')
+    }
   }
 
   const handleDrop = async (event: DragEvent<HTMLDivElement>): Promise<void> => {
     event.preventDefault()
+    dragDepthRef.current = 0
+    setDragActive(false)
     await register(Array.from(event.dataTransfer.files))
   }
 
@@ -55,18 +99,39 @@ export function InputDropZone({ jobId }: InputDropZoneProps): React.JSX.Element 
       <h3 id="input-files-title">입력 파일</h3>
       <div
         className={styles.dropZone}
-        data-disabled={!jobId || busy || undefined}
+        data-disabled={!jobId || undefined}
+        data-drag-active={dragActive || undefined}
+        onDragEnter={(event) => {
+          event.preventDefault()
+          dragDepthRef.current += 1
+          setDragActive(true)
+        }}
+        onDragLeave={(event) => {
+          event.preventDefault()
+          dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+          if (dragDepthRef.current === 0) setDragActive(false)
+        }}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
       >
         <p>썸네일, 음성, 영상, 스크립트 파일을 한 번에 놓으세요.</p>
-        <button disabled={!jobId || busy} onClick={selectFiles} type="button">
-          {busy ? '파일 등록 중…' : '파일 선택'}
+        <button disabled={!jobId} onClick={selectFiles} type="button">
+          파일 선택
         </button>
       </div>
-      <p aria-atomic="true" aria-live="polite" className={styles.summary}>
-        {summary}
+      <p aria-atomic="true" aria-live="polite" className={styles.summary} key={summary.id}>
+        {summary.text}
       </p>
+      {pendingFiles.length > 0 ? (
+        <ul aria-label="파일 등록 처리 상태" className={styles.results}>
+          {pendingFiles.map((file) => (
+            <li className={styles.result} key={file.id}>
+              <span>{file.name}</span>
+              <strong>등록 중</strong>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {results.length > 0 ? (
         <ul aria-label="파일 등록 결과" className={styles.results}>
           {results.map((result, index) => {
@@ -96,7 +161,7 @@ export function InputDropZone({ jobId }: InputDropZoneProps): React.JSX.Element 
         </ul>
       ) : null}
       {results.some((result) => result.status !== 'registered') ? (
-        <button className={styles.retry} disabled={busy} onClick={selectFiles} type="button">
+        <button className={styles.retry} onClick={selectFiles} type="button">
           파일 다시 선택
         </button>
       ) : null}

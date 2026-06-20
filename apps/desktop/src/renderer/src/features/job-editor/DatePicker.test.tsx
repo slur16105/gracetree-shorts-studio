@@ -118,6 +118,19 @@ describe('DatePicker', () => {
     expect(screen.getByRole('status')).toHaveTextContent('날짜별 작업 복원됨')
   })
 
+  it('clears the parent job before loading a newly selected date', async () => {
+    const onJobLoaded = vi.fn()
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<DatePicker onJobLoaded={onJobLoaded} />)
+    await waitFor(() => expect(onJobLoaded).toHaveBeenCalledWith(expect.objectContaining(job)))
+    onJobLoaded.mockClear()
+
+    await user.click(screen.getByRole('button', { name: /게시 날짜/ }))
+    await user.click(screen.getByRole('gridcell', { name: '2026-06-21' }))
+
+    expect(onJobLoaded).toHaveBeenNthCalledWith(1, null)
+  })
+
   it('contains Tab and Shift+Tab focus inside the modal calendar', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<DatePicker />)

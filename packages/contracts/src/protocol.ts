@@ -75,24 +75,40 @@ export interface JobLoadedEvent {
   };
 }
 
-export type InputRegistrationStatus = "registered" | "rejected" | "conflict";
-
-export interface InputRegistrationResult {
-  input?: JobInputDto;
+interface InputRegistrationResultBase {
   originalName: string;
-  managedPath: string | null;
   role: "unclassified";
-  status: InputRegistrationStatus;
+}
+
+export interface RegisteredInputResult extends InputRegistrationResultBase {
+  input: JobInputDto;
+  managedPath: string;
+  status: "registered";
+  errorCode: null;
+}
+
+export interface RejectedInputResult extends InputRegistrationResultBase {
+  managedPath: null;
+  status: "rejected";
   errorCode:
     | "UNSUPPORTED_TYPE"
     | "SOURCE_UNREADABLE"
     | "SOURCE_INSIDE_MANAGED_ROOT"
     | "SYMLINK_NOT_ALLOWED"
     | "FILE_TOO_LARGE"
-    | "NAME_CONFLICT"
-    | "COPY_FAILED"
-    | null;
+    | "COPY_FAILED";
 }
+
+export interface ConflictingInputResult extends InputRegistrationResultBase {
+  managedPath: string;
+  status: "conflict";
+  errorCode: "NAME_CONFLICT";
+}
+
+export type InputRegistrationResult =
+  | RegisteredInputResult
+  | RejectedInputResult
+  | ConflictingInputResult;
 
 export interface RegisterInputFilesCommand {
   protocolVersion: 1;
