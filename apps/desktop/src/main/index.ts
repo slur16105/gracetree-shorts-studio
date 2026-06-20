@@ -3,7 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { shouldBlockNavigation } from './navigation-policy'
-import { createWindowOptions } from './window-options'
+import { createWindowOptions, enforceMinimumContentSize } from './window-options'
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow(
@@ -11,16 +11,20 @@ function createWindow(): void {
   )
 
   mainWindow.on('ready-to-show', () => {
+    enforceMinimumContentSize(mainWindow)
     mainWindow.show()
   })
 
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+  const preventBlockedNavigation = (event: Electron.Event, targetUrl: string): void => {
     if (shouldBlockNavigation(mainWindow.webContents.getURL(), targetUrl)) {
       event.preventDefault()
     }
-  })
+  }
+
+  mainWindow.webContents.on('will-navigate', preventBlockedNavigation)
+  mainWindow.webContents.on('will-redirect', preventBlockedNavigation)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])

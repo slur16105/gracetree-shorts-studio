@@ -1,15 +1,24 @@
 import type { BrowserWindowConstructorOptions } from 'electron'
 
+export const MINIMUM_CONTENT_SIZE = {
+  width: 1180,
+  height: 720
+} as const
+
+type ContentSizedWindow = Pick<
+  Electron.BrowserWindow,
+  'getContentSize' | 'getSize' | 'setContentSize' | 'setMinimumSize'
+>
+
 export function createWindowOptions(
   preload: string,
   platform: NodeJS.Platform,
   linuxIcon?: string
 ): BrowserWindowConstructorOptions {
   return {
-    width: 1180,
-    height: 720,
-    minWidth: 1180,
-    minHeight: 720,
+    width: MINIMUM_CONTENT_SIZE.width,
+    height: MINIMUM_CONTENT_SIZE.height,
+    useContentSize: true,
     show: false,
     autoHideMenuBar: true,
     ...(platform === 'linux' && linuxIcon ? { icon: linuxIcon } : {}),
@@ -20,5 +29,24 @@ export function createWindowOptions(
       sandbox: true,
       webviewTag: false
     }
+  }
+}
+
+export function enforceMinimumContentSize(window: ContentSizedWindow): void {
+  const [contentWidth, contentHeight] = window.getContentSize()
+  const [outerWidth, outerHeight] = window.getSize()
+  const frameWidth = Math.max(0, outerWidth - contentWidth)
+  const frameHeight = Math.max(0, outerHeight - contentHeight)
+
+  window.setMinimumSize(
+    MINIMUM_CONTENT_SIZE.width + frameWidth,
+    MINIMUM_CONTENT_SIZE.height + frameHeight
+  )
+
+  if (contentWidth < MINIMUM_CONTENT_SIZE.width || contentHeight < MINIMUM_CONTENT_SIZE.height) {
+    window.setContentSize(
+      Math.max(contentWidth, MINIMUM_CONTENT_SIZE.width),
+      Math.max(contentHeight, MINIMUM_CONTENT_SIZE.height)
+    )
   }
 }

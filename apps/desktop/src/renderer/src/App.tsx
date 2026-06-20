@@ -62,13 +62,24 @@ function App(): React.JSX.Element {
         {view === 'home' ? (
           <section aria-labelledby="home-title" className={styles.view}>
             <p className={styles.eyebrow}>GraceTree Shorts Studio</p>
-            <h1 id="home-title">새 영상 준비</h1>
-            <div className={styles.emptyState}>
-              <span aria-hidden="true" className={styles.emptyStateIcon}>
-                +
-              </span>
-              <h2>아직 등록된 작업이 없습니다</h2>
-              <p>게시 날짜와 입력 파일을 준비하는 기능은 다음 단계에서 제공됩니다.</p>
+            <h1 id="home-title">영상 작업</h1>
+            <div className={styles.homeLayout}>
+              <section aria-labelledby="workspace-title" className={styles.workspaceRegion}>
+                <h2 id="workspace-title">새 영상 준비</h2>
+                <div className={styles.emptyState}>
+                  <span aria-hidden="true" className={styles.emptyStateIcon}>
+                    +
+                  </span>
+                  <h3>아직 등록된 작업이 없습니다</h3>
+                  <p>게시 날짜와 입력 파일을 준비하는 기능은 다음 단계에서 제공됩니다.</p>
+                </div>
+              </section>
+              <aside aria-labelledby="completed-title" className={styles.completedRegion}>
+                <h2 id="completed-title">완료 목록</h2>
+                <div className={styles.compactEmptyState}>
+                  <p>완료된 영상이 없습니다.</p>
+                </div>
+              </aside>
             </div>
           </section>
         ) : (

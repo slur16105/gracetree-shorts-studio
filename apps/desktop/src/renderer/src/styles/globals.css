@@ -7,23 +7,22 @@
 html,
 body,
 #root {
-  min-width: 1180px;
-  min-height: 720px;
+  width: 100%;
+  height: 100%;
   margin: 0;
 }
 
 html {
   background: var(--color-base);
-  overflow: auto;
+  overflow: hidden;
 }
 
 body {
-  min-height: 100vh;
   color: var(--color-text-primary);
   background: var(--color-base);
   font-family: var(--font-sans);
   line-height: 1.5;
-  overflow: auto;
+  overflow: hidden;
 }
 
 button {

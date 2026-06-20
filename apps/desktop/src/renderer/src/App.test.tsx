@@ -16,6 +16,9 @@ describe('App shell', () => {
     expect(home).toHaveAttribute('aria-current', 'page')
     expect(guide).not.toHaveAttribute('aria-current')
     expect(settings).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('region', { name: '새 영상 준비' })).toBeVisible()
+    expect(screen.getByRole('complementary', { name: '완료 목록' })).toBeVisible()
+    expect(screen.getByText('완료된 영상이 없습니다.')).toBeVisible()
 
     await user.click(guide)
 
@@ -37,6 +40,20 @@ describe('App shell', () => {
     home.focus()
     await user.keyboard(' ')
     expect(home).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('follows the global Home, Guide, Settings tab order', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.tab()
+    expect(screen.getByRole('button', { name: '홈' })).toHaveFocus()
+
+    await user.tab()
+    expect(screen.getByRole('button', { name: '사용 가이드' })).toHaveFocus()
+
+    await user.tab()
+    expect(screen.getByRole('button', { name: '공통 리소스 설정' })).toHaveFocus()
   })
 
   it('traps dialog focus, closes with Escape, and restores trigger focus', async () => {

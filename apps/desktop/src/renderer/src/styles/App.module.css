@@ -1,11 +1,11 @@
 .shell {
   display: grid;
   grid-template:
-    'sidebar main' minmax(650px, 1fr)
+    'sidebar main' minmax(0, 1fr)
     'sidebar status' var(--status-height)
-    / var(--sidebar-width) minmax(1102px, 1fr);
-  min-width: 1180px;
-  min-height: 720px;
+    / var(--sidebar-width) minmax(0, 1fr);
+  width: 100vw;
+  height: 100vh;
   background: var(--color-base);
 }
 
@@ -25,9 +25,10 @@
   width: 44px;
   height: 44px;
   place-items: center;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  color: var(--color-base);
-  background: var(--color-brand);
+  color: var(--color-text-primary);
+  background: var(--color-raised);
   font-weight: 900;
 }
 
@@ -90,19 +91,18 @@
   min-width: 0;
   padding: 48px 56px;
   overflow: auto;
-  background:
-    radial-gradient(circle at 80% 12%, rgb(255 47 98 / 8%), transparent 26%),
-    var(--color-base);
+  background: var(--color-base);
 }
 
 .view {
-  max-width: 1040px;
+  min-width: 760px;
+  max-width: 1120px;
   margin: 0 auto;
 }
 
 .eyebrow {
   margin: 0 0 var(--space-2);
-  color: var(--color-brand);
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -120,10 +120,28 @@
   font-size: 32px;
 }
 
+.homeLayout {
+  display: grid;
+  grid-template-columns: minmax(440px, 1fr) minmax(280px, 360px);
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+}
+
+.workspaceRegion,
+.completedRegion {
+  min-width: 0;
+}
+
+.workspaceRegion h2,
+.completedRegion h2 {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-primary);
+  font-size: 18px;
+}
+
 .emptyState {
   display: grid;
   min-height: 420px;
-  margin-top: var(--space-8);
   padding: 48px;
   place-items: center;
   align-content: center;
@@ -145,16 +163,33 @@
   font-size: 28px;
 }
 
-.emptyState h2 {
+.emptyState h2,
+.emptyState h3 {
   margin: 0;
   font-size: 20px;
 }
 
 .emptyState p,
+.compactEmptyState p,
 .dialogDescription {
   max-width: 520px;
   margin: var(--space-2) 0 0;
   color: var(--color-text-secondary);
+}
+
+.compactEmptyState {
+  display: grid;
+  min-height: 180px;
+  padding: var(--space-6);
+  place-items: center;
+  border: 1px dashed #3f4545;
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+  text-align: center;
+}
+
+.compactEmptyState p {
+  margin: 0;
 }
 
 .statusBar {

@@ -18,17 +18,41 @@ function contrast(foreground: string, background: string): number {
   return (light + 0.05) / (dark + 0.05)
 }
 
+function readColorTokens(): Record<string, string> {
+  const css = readFileSync(resolve(process.cwd(), 'src/renderer/src/styles/tokens.css'), 'utf8')
+  return Object.fromEntries(
+    [...css.matchAll(/--(color-[\w-]+):\s*(#[\da-f]{6})\s*;/gi)].map((match) => [
+      match[1],
+      match[2]
+    ])
+  )
+}
+
 describe('Studio Black tokens', () => {
   it('meet the target contrast ratios', () => {
-    expect(contrast('#F4F5F5', '#0D0F0F')).toBeGreaterThanOrEqual(4.5)
-    expect(contrast('#9FA4A4', '#0D0F0F')).toBeGreaterThanOrEqual(4.5)
-    expect(contrast('#7DD3FC', '#080909')).toBeGreaterThanOrEqual(3)
-    expect(contrast('#FF2F62', '#080909')).toBeGreaterThanOrEqual(3)
+    const tokens = readColorTokens()
+
+    expect(contrast(tokens['color-text-primary'], tokens['color-panel'])).toBeGreaterThanOrEqual(
+      4.5
+    )
+    expect(contrast(tokens['color-text-secondary'], tokens['color-panel'])).toBeGreaterThanOrEqual(
+      4.5
+    )
+    expect(contrast(tokens['color-focus'], tokens['color-base'])).toBeGreaterThanOrEqual(3)
+    expect(contrast(tokens['color-brand'], tokens['color-base'])).toBeGreaterThanOrEqual(3)
   })
 
   it('contains reduced-motion and scroll-safe zoom rules', () => {
-    const css = readFileSync(resolve(process.cwd(), 'src/renderer/src/styles/globals.css'), 'utf8')
-    expect(css).toContain('@media (prefers-reduced-motion: reduce)')
-    expect(css).toContain('overflow: auto')
+    const globalCss = readFileSync(
+      resolve(process.cwd(), 'src/renderer/src/styles/globals.css'),
+      'utf8'
+    )
+    const appCss = readFileSync(
+      resolve(process.cwd(), 'src/renderer/src/styles/App.module.css'),
+      'utf8'
+    )
+
+    expect(globalCss).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(appCss).toMatch(/\.main\s*\{[^}]*overflow:\s*auto/s)
   })
 })

@@ -14,8 +14,8 @@
     "test": "vitest run",
     "test:e2e": "pnpm build && playwright test",
     "start": "electron-vite preview",
-    "dev": "electron-vite dev",
-    "build": "pnpm typecheck && electron-vite build"
+    "dev": "node -e \"const { spawnSync } = require('node:child_process'); const result = spawnSync(process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-vite', ['dev'], { stdio: 'inherit', env: { ...process.env, VITE_CSP_STYLE_EXTRA: \\\"'unsafe-inline'\\\", VITE_CSP_CONNECT_EXTRA: 'ws://localhost:* ws://127.0.0.1:*' }, shell: process.platform === 'win32' }); process.exit(result.status ?? 1)\"",
+    "build": "pnpm typecheck && node -e \"const { spawnSync } = require('node:child_process'); const result = spawnSync(process.platform === 'win32' ? 'electron-vite.cmd' : 'electron-vite', ['build'], { stdio: 'inherit', env: { ...process.env, VITE_CSP_STYLE_EXTRA: '', VITE_CSP_CONNECT_EXTRA: '' }, shell: process.platform === 'win32' }); process.exit(result.status ?? 1)\""
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
