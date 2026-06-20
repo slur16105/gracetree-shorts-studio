@@ -15,7 +15,18 @@ def connect_database(database_path: Path) -> sqlite3.Connection:
     return connection
 
 
-def apply_migrations(database_path: Path) -> list[int]:
+def apply_migrations(
+    database_path: Path, *, migrations_dir: Path = MIGRATIONS_DIR
+) -> list[int]:
+    migrations: list[tuple[int, Path]] = []
+    versions: set[int] = set()
+    for migration_path in sorted(migrations_dir.glob("[0-9][0-9][0-9]_*.sql")):
+        version = int(migration_path.name.split("_", 1)[0])
+        if version in versions:
+            raise ValueError(f"duplicate migration version {version}")
+        versions.add(version)
+        migrations.append((version, migration_path))
+
     applied: list[int] = []
     with connect_database(database_path) as connection:
         connection.execute(
@@ -31,8 +42,7 @@ def apply_migrations(database_path: Path) -> list[int]:
             for row in connection.execute("SELECT version FROM schema_migrations")
         }
 
-        for migration_path in sorted(MIGRATIONS_DIR.glob("[0-9][0-9][0-9]_*.sql")):
-            version = int(migration_path.name.split("_", 1)[0])
+        for version, migration_path in migrations:
             if version in existing:
                 continue
 

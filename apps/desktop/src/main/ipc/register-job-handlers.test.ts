@@ -1,7 +1,8 @@
 import type { EngineEvent, GetOrCreateJobCommand, JobDto } from '@gracetree/contracts'
+import { win32 } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createGetOrCreateJobHandler } from './register-job-handlers'
+import { createGetOrCreateJobHandler, isCanonicalResultPath } from './register-job-handlers'
 
 const job: JobDto = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -64,5 +65,46 @@ describe('getOrCreateJobForDate handler', () => {
     const handler = createGetOrCreateJobHandler('/Users/test/AppData', requestEngine, () => job.id)
 
     await expect(handler('2026-06-20')).rejects.toThrow('engine response')
+  })
+
+  it.each(['input', 'temp', 'output/nested'])(
+    'rejects a non-canonical result directory: %s',
+    async (directory) => {
+      const requestEngine = vi.fn(
+        async (): Promise<EngineEvent> => ({
+          protocolVersion: 1,
+          type: 'job_loaded',
+          jobId: job.id,
+          timestamp: '2026-06-20T00:00:00.000Z',
+          payload: {
+            job: {
+              ...job,
+              resultPath: `${job.workPath}/${directory}`
+            }
+          }
+        })
+      )
+      const handler = createGetOrCreateJobHandler(
+        '/Users/test/AppData',
+        requestEngine,
+        () => job.id
+      )
+
+      await expect(handler('2026-06-20')).rejects.toThrow('invalid managed path')
+    }
+  )
+
+  it('rejects Windows cross-drive and absolute-relative path bypasses', () => {
+    const workPath = String.raw`C:\Users\test\AppData\GraceTreeData\jobs\2026-06-20`
+
+    expect(isCanonicalResultPath(workPath, String.raw`D:\output`, win32)).toBe(false)
+    expect(isCanonicalResultPath(workPath, String.raw`C:\output`, win32)).toBe(false)
+    expect(
+      isCanonicalResultPath(
+        workPath,
+        String.raw`C:\Users\test\AppData\GraceTreeData\jobs\2026-06-20\output`,
+        win32
+      )
+    ).toBe(true)
   })
 })

@@ -16,52 +16,60 @@ export class EngineClient {
 
   constructor(
     private readonly projectRoot: string,
+    private readonly approvedManagedRoot: string,
     private readonly pythonExecutable = process.env['PYTHON'] ?? 'python3'
   ) {}
 
   async request(command: EngineCommand): Promise<EngineEvent> {
+    if (this.pending.has(command.jobId)) {
+      throw new Error(`Python engine request for job ${command.jobId} is already pending`)
+    }
     this.ensureStarted()
-    if (!this.child) throw new Error('Python engine did not start')
+    const child = this.child
+    if (!child) throw new Error('Python engine did not start')
 
     return new Promise<EngineEvent>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        this.pending.delete(command.jobId)
-        reject(new Error('Python engine request timed out'))
+        if (!this.pending.has(command.jobId)) return
+        this.terminateChild(child, new Error('Python engine request timed out'))
       }, 5000)
       this.pending.set(command.jobId, { resolve, reject, timeout })
-      this.child?.stdin.write(`${JSON.stringify(command)}\n`)
+      child.stdin.write(`${JSON.stringify(command)}\n`)
     })
   }
 
   stop(): void {
-    this.lines?.close()
-    this.lines = null
-    this.child?.stdin.end()
-    this.child?.kill()
-    this.child = null
+    const child = this.child
+    if (child) {
+      this.terminateChild(child, new Error('Python engine stopped'))
+      return
+    }
     this.rejectPending(new Error('Python engine stopped'))
   }
 
   private ensureStarted(): void {
     if (this.child) return
     const engineRoot = `${this.projectRoot}/engine`
-    this.child = spawn(this.pythonExecutable, ['-m', 'gracetree_engine'], {
+    const child = spawn(this.pythonExecutable, ['-m', 'gracetree_engine'], {
       cwd: this.projectRoot,
-      env: { ...process.env, PYTHONPATH: engineRoot },
+      env: {
+        ...process.env,
+        PYTHONPATH: engineRoot,
+        GRACETREE_MANAGED_ROOT: this.approvedManagedRoot
+      },
       stdio: ['pipe', 'pipe', 'pipe']
     })
-    this.child.stderr.on('data', () => {
+    this.child = child
+    child.stderr.on('data', () => {
       // Diagnostics intentionally remain out of renderer-facing messages.
     })
-    this.child.once('error', () => {
-      this.rejectPending(new Error('Python engine failed to start'))
-      this.child = null
+    child.once('error', () => {
+      this.handleChildFailure(child, new Error('Python engine failed to start'))
     })
-    this.child.once('close', () => {
-      this.rejectPending(new Error('Python engine exited unexpectedly'))
-      this.child = null
+    child.once('close', () => {
+      this.handleChildFailure(child, new Error('Python engine exited unexpectedly'))
     })
-    this.lines = createInterface({ input: this.child.stdout })
+    this.lines = createInterface({ input: child.stdout })
     this.lines.on('line', (line) => this.handleLine(line))
   }
 
@@ -70,11 +78,11 @@ export class EngineClient {
     try {
       value = JSON.parse(line)
     } catch {
-      this.rejectPending(new Error('Python engine emitted invalid JSON'))
+      this.terminateCurrentChild(new Error('Python engine emitted invalid JSON'))
       return
     }
     if (!isEngineEvent(value)) {
-      this.rejectPending(new Error('Python engine emitted an invalid event'))
+      this.terminateCurrentChild(new Error('Python engine emitted an invalid event'))
       return
     }
     const pending = this.pending.get(value.jobId)
@@ -82,6 +90,33 @@ export class EngineClient {
     clearTimeout(pending.timeout)
     this.pending.delete(value.jobId)
     pending.resolve(value)
+  }
+
+  private terminateCurrentChild(error: Error): void {
+    const child = this.child
+    if (child) {
+      this.terminateChild(child, error)
+      return
+    }
+    this.rejectPending(error)
+  }
+
+  private terminateChild(child: ChildProcessWithoutNullStreams, error: Error): void {
+    if (this.child !== child) return
+    this.lines?.close()
+    this.lines = null
+    this.child = null
+    child.stdin.destroy()
+    child.kill()
+    this.rejectPending(error)
+  }
+
+  private handleChildFailure(child: ChildProcessWithoutNullStreams, error: Error): void {
+    if (this.child !== child) return
+    this.lines?.close()
+    this.lines = null
+    this.child = null
+    this.rejectPending(error)
   }
 
   private rejectPending(error: Error): void {

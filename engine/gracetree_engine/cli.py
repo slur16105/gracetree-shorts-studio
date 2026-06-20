@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,7 +49,14 @@ def _health_checked(job_id: str) -> dict[str, Any]:
 
 def _job_loaded(command: dict[str, Any]) -> dict[str, Any]:
     payload = command["payload"]
-    repository = JobRepository(Path(payload["managedRoot"]))
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value:
+        raise ValueError("approved managed root is unavailable")
+    approved_root = Path(approved_root_value)
+    command_root = Path(payload["managedRoot"])
+    if command_root != approved_root:
+        raise ValueError("command managed root does not match the approved root")
+    repository = JobRepository(approved_root)
     job = repository.get_or_create_for_date(
         publish_date=payload["publishDate"],
         proposed_job_id=command["jobId"],
@@ -107,7 +116,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 flush=True,
             )
             return 1
-        except OSError:
+        except (OSError, sqlite3.Error):
             print(
                 "STORAGE_ERROR: managed storage is unavailable",
                 file=stderr,

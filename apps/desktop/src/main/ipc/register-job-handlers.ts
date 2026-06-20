@@ -3,11 +3,24 @@ import { isJobLoadedEvent } from '@gracetree/contracts'
 import { JOB_GET_OR_CREATE_CHANNEL } from '@gracetree/contracts/desktop-api'
 import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { relative, resolve } from 'node:path'
+import { resolve } from 'node:path'
 
 import { createManagedJobPaths, isValidJobId, isValidPublishDate } from '../files/managed-paths'
 
 type RequestEngine = (command: GetOrCreateJobCommand) => Promise<EngineEvent>
+
+interface PathResolver {
+  resolve(...paths: string[]): string
+}
+
+export function isCanonicalResultPath(
+  workPath: string,
+  resultPath: string,
+  pathResolver: PathResolver = { resolve }
+): boolean {
+  const canonicalWorkPath = pathResolver.resolve(workPath)
+  return pathResolver.resolve(resultPath) === pathResolver.resolve(canonicalWorkPath, 'output')
+}
 
 export function createGetOrCreateJobHandler(
   userDataPath: string,
@@ -46,11 +59,9 @@ export function createGetOrCreateJobHandler(
     }
 
     const workPath = resolve(event.payload.job.workPath)
-    const resultPath = resolve(event.payload.job.resultPath)
     if (
       workPath !== resolve(paths.workPath) ||
-      relative(workPath, resultPath).startsWith('..') ||
-      relative(workPath, resultPath) === ''
+      !isCanonicalResultPath(workPath, event.payload.job.resultPath)
     ) {
       throw new Error('Python engine response contains an invalid managed path')
     }

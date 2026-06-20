@@ -53,13 +53,15 @@ function calendarDates(focusedDate: string): string[] {
 }
 
 export function DatePicker(): React.JSX.Element {
-  const today = useMemo(() => toDateKey(new Date()), [])
+  const [today, setToday] = useState(() => toDateKey(new Date()))
   const [selectedDate, setSelectedDate] = useState(today)
   const [focusedDate, setFocusedDate] = useState(today)
   const [open, setOpen] = useState(false)
   const [job, setJob] = useState<JobDto | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [reloadRequest, setReloadRequest] = useState(0)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const dayRefs = useRef(new Map<string, HTMLButtonElement>())
   const dates = useMemo(() => calendarDates(focusedDate), [focusedDate])
   const focusedMonth = fromDateKey(focusedDate)
@@ -77,7 +79,20 @@ export function DatePicker(): React.JSX.Element {
     return () => {
       active = false
     }
-  }, [selectedDate])
+  }, [reloadRequest, selectedDate])
+
+  useEffect(() => {
+    const now = new Date()
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    const timeout = window.setTimeout(() => {
+      const nextToday = toDateKey(new Date())
+      setSelectedDate((current) => (current === today ? nextToday : current))
+      setFocusedDate((current) => (current === today ? nextToday : current))
+      setToday(nextToday)
+    }, nextMidnight.getTime() - now.getTime())
+
+    return () => window.clearTimeout(timeout)
+  }, [today])
 
   useEffect(() => {
     if (open) dayRefs.current.get(focusedDate)?.focus()
@@ -93,7 +108,39 @@ export function DatePicker(): React.JSX.Element {
     setLoadError(false)
     setSelectedDate(date)
     setFocusedDate(date)
+    setReloadRequest((current) => current + 1)
     close()
+  }
+
+  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Tab') return
+
+    const focusableElements = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]):not([tabindex="-1"]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ) ?? []
+    )
+    const first = focusableElements.at(0)
+    const last = focusableElements.at(-1)
+    if (!first || !last) {
+      event.preventDefault()
+      return
+    }
+
+    const activeElement = document.activeElement
+    if (
+      event.shiftKey &&
+      (activeElement === first || !dialogRef.current?.contains(activeElement))
+    ) {
+      event.preventDefault()
+      last.focus()
+    } else if (
+      !event.shiftKey &&
+      (activeElement === last || !dialogRef.current?.contains(activeElement))
+    ) {
+      event.preventDefault()
+      first.focus()
+    }
   }
 
   const handleGridKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -133,6 +180,10 @@ export function DatePicker(): React.JSX.Element {
         aria-label={`게시 날짜 ${formatDate(selectedDate)}`}
         className={styles.trigger}
         onClick={() => {
+          if (open) {
+            close()
+            return
+          }
           setFocusedDate(selectedDate)
           setOpen(true)
         }}
@@ -152,7 +203,14 @@ export function DatePicker(): React.JSX.Element {
       </span>
 
       {open ? (
-        <div aria-label="게시 날짜 선택" aria-modal="true" className={styles.popover} role="dialog">
+        <div
+          aria-label="게시 날짜 선택"
+          aria-modal="true"
+          className={styles.popover}
+          onKeyDown={handleDialogKeyDown}
+          ref={dialogRef}
+          role="dialog"
+        >
           <p aria-live="polite" className={styles.monthLabel}>
             {focusedMonth.getFullYear()}년 {focusedMonth.getMonth() + 1}월
           </p>

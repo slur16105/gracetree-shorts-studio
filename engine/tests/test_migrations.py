@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from gracetree_engine.storage.migrations import apply_migrations, connect_database
 
 
@@ -41,3 +43,24 @@ def test_upgrades_a_previous_schema_database(tmp_path: Path) -> None:
         )
 
     assert apply_migrations(database_path) == [1]
+
+
+def test_rejects_duplicate_migration_versions_before_opening_database(
+    tmp_path: Path,
+) -> None:
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    (migrations_dir / "001_create_first.sql").write_text(
+        "CREATE TABLE first_table (id INTEGER PRIMARY KEY);",
+        encoding="utf-8",
+    )
+    (migrations_dir / "001_create_second.sql").write_text(
+        "CREATE TABLE second_table (id INTEGER PRIMARY KEY);",
+        encoding="utf-8",
+    )
+    database_path = tmp_path / "data" / "studio.db"
+
+    with pytest.raises(ValueError, match="duplicate migration version 1"):
+        apply_migrations(database_path, migrations_dir=migrations_dir)
+
+    assert not database_path.exists()

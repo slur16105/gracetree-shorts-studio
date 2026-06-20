@@ -6,9 +6,10 @@ import { shouldBlockNavigation } from './navigation-policy'
 import { createWindowOptions, enforceMinimumContentSize } from './window-options'
 import { registerJobHandlers } from './ipc/register-job-handlers'
 import { EngineClient } from './jobs/engine-client'
+import { createManagedJobPaths } from './files/managed-paths'
 
 const projectRoot = resolve(__dirname, '../../../..')
-const engineClient = new EngineClient(projectRoot)
+let engineClient: EngineClient | null = null
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow(
@@ -43,7 +44,13 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.gracetree.shorts-studio')
-  registerJobHandlers(app.getPath('userData'), (command) => engineClient.request(command))
+  const userDataPath = app.getPath('userData')
+  const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
+  engineClient = new EngineClient(projectRoot, managedRoot)
+  registerJobHandlers(userDataPath, (command) => {
+    if (!engineClient) throw new Error('Python engine is unavailable')
+    return engineClient.request(command)
+  })
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -62,7 +69,7 @@ app.whenReady().then(() => {
 })
 
 app.on('before-quit', () => {
-  engineClient.stop()
+  engineClient?.stop()
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common

@@ -14,9 +14,13 @@ VALID_COMMAND = json.loads(
 )
 
 
-def run_engine(stdin: str) -> subprocess.CompletedProcess[str]:
+def run_engine(
+    stdin: str, *, managed_root: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(ROOT / "engine")
+    if managed_root is not None:
+        environment["GRACETREE_MANAGED_ROOT"] = str(managed_root)
     return subprocess.run(
         [sys.executable, "-m", "gracetree_engine"],
         cwd=ROOT,
@@ -79,7 +83,7 @@ def test_get_or_create_job_round_trip(tmp_path: Path) -> None:
         },
     }
 
-    result = run_engine(json.dumps(command) + "\n")
+    result = run_engine(json.dumps(command) + "\n", managed_root=managed_root)
 
     assert result.returncode == 0
     assert result.stderr == ""
@@ -88,3 +92,74 @@ def test_get_or_create_job_round_trip(tmp_path: Path) -> None:
     assert event["jobId"] == job_id
     assert event["payload"]["job"]["id"] == job_id
     assert event["payload"]["job"]["publishDate"] == "2026-06-20"
+
+
+def test_rejects_noncanonical_managed_root_without_creating_storage(
+    tmp_path: Path,
+) -> None:
+    relative_root = f"relative-{tmp_path.name}/GraceTreeData"
+    command = {
+        "protocolVersion": 1,
+        "type": "get_or_create_job",
+        "jobId": "11111111-1111-4111-8111-111111111111",
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "publishDate": "2026-06-20",
+            "managedRoot": relative_root,
+            "workPath": f"{relative_root}/jobs/2026-06-20",
+        },
+    }
+
+    result = run_engine(json.dumps(command) + "\n", managed_root=tmp_path / "approved")
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "INTERNAL_EVENT_INVALID" in result.stderr
+    assert not (ROOT / relative_root).exists()
+
+
+def test_sqlite_error_is_reported_without_traceback(tmp_path: Path) -> None:
+    managed_root = tmp_path / "GraceTreeData"
+    managed_root.mkdir()
+    (managed_root / "studio.db").mkdir()
+    command = {
+        "protocolVersion": 1,
+        "type": "get_or_create_job",
+        "jobId": "11111111-1111-4111-8111-111111111111",
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "publishDate": "2026-06-20",
+            "managedRoot": str(managed_root),
+            "workPath": str(managed_root / "jobs" / "2026-06-20"),
+        },
+    }
+
+    result = run_engine(json.dumps(command) + "\n", managed_root=managed_root)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == "STORAGE_ERROR: managed storage is unavailable\n"
+    assert "Traceback" not in result.stderr
+
+
+def test_rejects_command_root_that_differs_from_the_approved_root(tmp_path: Path) -> None:
+    approved_root = tmp_path / "approved" / "GraceTreeData"
+    command_root = tmp_path / "unapproved" / "GraceTreeData"
+    command = {
+        "protocolVersion": 1,
+        "type": "get_or_create_job",
+        "jobId": "11111111-1111-4111-8111-111111111111",
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "publishDate": "2026-06-20",
+            "managedRoot": str(command_root),
+            "workPath": str(command_root / "jobs" / "2026-06-20"),
+        },
+    }
+
+    result = run_engine(json.dumps(command) + "\n", managed_root=approved_root)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "INTERNAL_EVENT_INVALID" in result.stderr
+    assert not command_root.exists()
