@@ -5,6 +5,24 @@ import type { FormatsPlugin } from "ajv-formats";
 import commandSchema from "../schemas/engine-command.schema.json" with { type: "json" };
 import eventSchema from "../schemas/engine-event.schema.json" with { type: "json" };
 
+export const INPUT_ROLES = [
+  "thumbnail",
+  "voice",
+  "bgm",
+  "script",
+  "unclassified",
+] as const;
+export type InputRole = (typeof INPUT_ROLES)[number];
+
+export const INPUT_STATES = [
+  "ready",
+  "missing",
+  "conflict",
+  "unclassified",
+  "invalid",
+] as const;
+export type InputState = (typeof INPUT_STATES)[number];
+
 export interface CheckHealthCommand {
   protocolVersion: 1;
   type: "check_health";
@@ -45,10 +63,10 @@ export interface JobDto {
 export interface JobInputDto {
   id: string;
   jobId: string;
-  role: "unclassified";
+  role: InputRole;
   originalName: string;
   managedPath: string;
-  status: "registered" | "conflict";
+  status: Exclude<InputState, "missing">;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,7 +95,7 @@ export interface JobLoadedEvent {
 
 interface InputRegistrationResultBase {
   originalName: string;
-  role: "unclassified";
+  role: InputRole;
 }
 
 export interface RegisteredInputResult extends InputRegistrationResultBase {
@@ -128,17 +146,55 @@ export interface InputFilesRegisteredEvent {
   timestamp: string;
   payload: {
     results: InputRegistrationResult[];
+    inputs: JobInputDto[];
+  };
+}
+
+export type ManageInputCommand = {
+  protocolVersion: 1;
+  type: "manage_input";
+  jobId: string;
+  timestamp: string;
+  payload:
+    | {
+        action: "assign_role";
+        inputId: string;
+        role: InputRole;
+        managedRoot: string;
+      }
+    | {
+        action: "remove";
+        inputId: string;
+        managedRoot: string;
+      }
+    | {
+        action: "replace";
+        inputId: string;
+        sourcePath: string;
+        managedRoot: string;
+      };
+};
+
+export interface InputStateChangedEvent {
+  protocolVersion: 1;
+  type: "input_state_changed";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    inputs: JobInputDto[];
   };
 }
 
 export type EngineCommand =
   | CheckHealthCommand
   | GetOrCreateJobCommand
-  | RegisterInputFilesCommand;
+  | RegisterInputFilesCommand
+  | ManageInputCommand;
 export type EngineEvent =
   | HealthCheckedEvent
   | JobLoadedEvent
-  | InputFilesRegisteredEvent;
+  | InputFilesRegisteredEvent
+  | InputStateChangedEvent;
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 const addFormats = (addFormatsModule.default ??
@@ -180,6 +236,18 @@ export function isInputFilesRegisteredEvent(
   value: unknown,
 ): value is InputFilesRegisteredEvent {
   return validateEvent(value) && value.type === "input_files_registered";
+}
+
+export function isManageInputCommand(
+  value: unknown,
+): value is ManageInputCommand {
+  return validateCommand(value) && value.type === "manage_input";
+}
+
+export function isInputStateChangedEvent(
+  value: unknown,
+): value is InputStateChangedEvent {
+  return validateEvent(value) && value.type === "input_state_changed";
 }
 
 export function isEngineEvent(value: unknown): value is EngineEvent {

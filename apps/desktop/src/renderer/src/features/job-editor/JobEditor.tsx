@@ -13,7 +13,7 @@ export function JobEditor(): React.JSX.Element {
   return (
     <>
       <DatePicker onJobLoaded={handleJobLoaded} />
-      <InputDropZone jobId={job?.id ?? null} />
+      <InputDropZone initialInputs={job?.inputMetadata} jobId={job?.id ?? null} />
     </>
   )
 }

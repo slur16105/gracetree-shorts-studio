@@ -46,9 +46,179 @@ def test_partial_success_preserves_sources_and_records_only_success(tmp_path: Pa
     assert managed.read_bytes() == b"audio"
     with sqlite3.connect(root / "studio.db") as connection:
         rows = connection.execute(
-            "SELECT original_name, managed_path, status FROM job_inputs"
+            "SELECT role, original_name, managed_path, status FROM job_inputs"
         ).fetchall()
-    assert rows == [("voice.mp3", str(managed), "registered")]
+    assert rows == [("voice", "voice.mp3", str(managed), "ready")]
+
+
+def test_classifies_candidates_and_marks_every_duplicate_role_as_conflict(
+    tmp_path: Path,
+) -> None:
+    _root, repository = setup_job(tmp_path)
+    first_voice = tmp_path / "voice.first.mp3"
+    second_voice = tmp_path / "VOICE.second.WAV"
+    script = tmp_path / "notes.final.txt"
+    unknown = tmp_path / "recording.mp3"
+    for path in (first_voice, second_voice, script, unknown):
+        path.write_bytes(b"content")
+
+    repository.register_batch(JOB_ID, [first_voice, script, unknown])
+    repository.register_batch(JOB_ID, [second_voice])
+
+    inputs = repository.list_inputs(JOB_ID)
+    assert [(item["role"], item["status"]) for item in inputs] == [
+        ("voice", "conflict"),
+        ("script", "ready"),
+        ("unclassified", "unclassified"),
+        ("voice", "conflict"),
+    ]
+
+
+def test_manual_role_assignment_recalculates_conflicts(tmp_path: Path) -> None:
+    _root, repository = setup_job(tmp_path)
+    first = tmp_path / "recording.mp3"
+    second = tmp_path / "other.mp3"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    results = repository.register_batch(JOB_ID, [first, second])
+
+    repository.assign_role(JOB_ID, results[0]["input"]["id"], "voice")
+    inputs = repository.assign_role(JOB_ID, results[1]["input"]["id"], "voice")
+    assert [item["status"] for item in inputs] == ["conflict", "conflict"]
+
+    inputs = repository.assign_role(JOB_ID, results[1]["input"]["id"], "bgm")
+    assert [(item["role"], item["status"]) for item in inputs] == [
+        ("voice", "ready"),
+        ("bgm", "ready"),
+    ]
+
+
+def test_rejects_unknown_manual_role(tmp_path: Path) -> None:
+    _root, repository = setup_job(tmp_path)
+    source = tmp_path / "recording.mp3"
+    source.write_bytes(b"audio")
+    result = repository.register_batch(JOB_ID, [source])[0]
+
+    with pytest.raises(ValueError, match="role"):
+        repository.assign_role(JOB_ID, result["input"]["id"], "other")
+
+
+def test_remove_deletes_managed_copy_and_metadata_then_recalculates(
+    tmp_path: Path,
+) -> None:
+    root, repository = setup_job(tmp_path)
+    first = tmp_path / "voice.first.mp3"
+    second = tmp_path / "voice.second.mp3"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    registered = repository.register_batch(JOB_ID, [first, second])
+
+    inputs = repository.remove_input(JOB_ID, registered[1]["input"]["id"])
+
+    assert [(item["role"], item["status"]) for item in inputs] == [
+        ("voice", "ready")
+    ]
+    assert not (root / "jobs" / "2026-06-20" / "input" / second.name).exists()
+
+
+def test_remove_rejects_stored_path_outside_managed_input_without_deleting(
+    tmp_path: Path,
+) -> None:
+    root, repository = setup_job(tmp_path)
+    source = tmp_path / "script.txt"
+    outside = tmp_path / "outside.txt"
+    source.write_text("script", encoding="utf-8")
+    outside.write_text("outside", encoding="utf-8")
+    registered = repository.register_batch(JOB_ID, [source])[0]
+    with sqlite3.connect(root / "studio.db") as connection:
+        connection.execute(
+            "UPDATE job_inputs SET managed_path = ? WHERE id = ?",
+            (str(outside), registered["input"]["id"]),
+        )
+
+    with pytest.raises(ValueError, match="managed input"):
+        repository.remove_input(JOB_ID, registered["input"]["id"])
+
+    assert outside.read_text(encoding="utf-8") == "outside"
+    with sqlite3.connect(root / "studio.db") as connection:
+        assert connection.execute("SELECT COUNT(*) FROM job_inputs").fetchone() == (1,)
+
+
+def test_remove_file_failure_keeps_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, repository = setup_job(tmp_path)
+    source = tmp_path / "script.txt"
+    source.write_text("script", encoding="utf-8")
+    registered = repository.register_batch(JOB_ID, [source])[0]
+    managed = Path(registered["managedPath"])
+    original_unlink = Path.unlink
+
+    def fail_managed_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
+        if path == managed:
+            raise OSError("locked")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_managed_unlink)
+
+    with pytest.raises(OSError, match="locked"):
+        repository.remove_input(JOB_ID, registered["input"]["id"])
+
+    assert managed.exists()
+    with sqlite3.connect(root / "studio.db") as connection:
+        assert connection.execute("SELECT COUNT(*) FROM job_inputs").fetchone() == (1,)
+
+
+def test_replace_commits_only_after_new_copy_is_valid(tmp_path: Path) -> None:
+    root, repository = setup_job(tmp_path)
+    old_source = tmp_path / "old" / "voice.mp3"
+    new_source = tmp_path / "new" / "voice-new.mp3"
+    old_source.parent.mkdir()
+    new_source.parent.mkdir()
+    old_source.write_bytes(b"old")
+    new_source.write_bytes(b"new")
+    registered = repository.register_batch(JOB_ID, [old_source])[0]
+
+    inputs = repository.replace_input(
+        JOB_ID, registered["input"]["id"], new_source
+    )
+
+    assert len(inputs) == 1
+    assert inputs[0]["role"] == "voice"
+    assert inputs[0]["originalName"] == "voice-new.mp3"
+    assert Path(inputs[0]["managedPath"]).read_bytes() == b"new"
+    assert not (root / "jobs" / "2026-06-20" / "input" / "voice.mp3").exists()
+
+
+def test_replace_copy_failure_preserves_old_file_and_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, repository = setup_job(tmp_path)
+    old_source = tmp_path / "old" / "voice.mp3"
+    new_source = tmp_path / "new" / "voice-new.mp3"
+    old_source.parent.mkdir()
+    new_source.parent.mkdir()
+    old_source.write_bytes(b"old")
+    new_source.write_bytes(b"new")
+    registered = repository.register_batch(JOB_ID, [old_source])[0]
+
+    def fail_copy(
+        _source: Path, _target: Path, _expected_stat: os.stat_result
+    ) -> os.stat_result:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(repository, "_copy_to_temp", fail_copy)
+
+    with pytest.raises(OSError, match="disk full"):
+        repository.replace_input(JOB_ID, registered["input"]["id"], new_source)
+
+    managed = root / "jobs" / "2026-06-20" / "input" / "voice.mp3"
+    assert managed.read_bytes() == b"old"
+    with sqlite3.connect(root / "studio.db") as connection:
+        row = connection.execute(
+            "SELECT original_name, managed_path FROM job_inputs"
+        ).fetchone()
+    assert row == ("voice.mp3", str(managed))
 
 
 def test_name_conflict_does_not_overwrite_existing_copy(tmp_path: Path) -> None:

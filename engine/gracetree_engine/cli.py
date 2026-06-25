@@ -11,7 +11,7 @@ from typing import Any, TextIO
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
 from .storage.job_repository import JobRepository
-from .storage.input_repository import InputRepository
+from .inputs.input_service import InputService
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "packages" / "contracts"
 
@@ -81,10 +81,7 @@ def _input_files_registered(command: dict[str, Any]) -> dict[str, Any]:
     approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
     if not approved_root_value or Path(payload["managedRoot"]) != Path(approved_root_value):
         raise ValueError("command managed root does not match the approved root")
-    repository = InputRepository(Path(approved_root_value))
-    results = repository.register_batch(
-        command["jobId"], [Path(value) for value in payload["sourcePaths"]]
-    )
+    service = InputService(Path(approved_root_value))
     event = {
         "protocolVersion": 1,
         "type": "input_files_registered",
@@ -92,7 +89,26 @@ def _input_files_registered(command: dict[str, Any]) -> dict[str, Any]:
         "timestamp": datetime.now(timezone.utc)
         .isoformat(timespec="milliseconds")
         .replace("+00:00", "Z"),
-        "payload": {"results": results},
+        "payload": service.register(command["jobId"], payload["sourcePaths"]),
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
+def _input_state_changed(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command["payload"]
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value or Path(payload["managedRoot"]) != Path(approved_root_value):
+        raise ValueError("command managed root does not match the approved root")
+    inputs = InputService(Path(approved_root_value)).manage(command["jobId"], payload)
+    event = {
+        "protocolVersion": 1,
+        "type": "input_state_changed",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": {"inputs": inputs},
     }
     EVENT_VALIDATOR.validate(event)
     return event
@@ -128,8 +144,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 event = _health_checked(command["jobId"])
             elif command["type"] == "get_or_create_job":
                 event = _job_loaded(command)
-            else:
+            elif command["type"] == "register_input_files":
                 event = _input_files_registered(command)
+            else:
+                event = _input_state_changed(command)
         except (ValidationError, ValueError) as error:
             if isinstance(error, ValidationError):
                 schema_path = ".".join(str(part) for part in error.schema_path)

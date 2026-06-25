@@ -207,3 +207,70 @@ def test_register_input_files_round_trip_preserves_partial_success(tmp_path: Pat
         "rejected",
     ]
     assert source.read_bytes() == b"audio"
+
+
+def test_manage_input_round_trip_assigns_role_and_removes_copy(tmp_path: Path) -> None:
+    managed_root = tmp_path / "GraceTreeData"
+    source = tmp_path / "recording.mp3"
+    source.write_bytes(b"audio")
+    job_id = "11111111-1111-4111-8111-111111111111"
+    create = {
+        "protocolVersion": 1,
+        "type": "get_or_create_job",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "publishDate": "2026-06-20",
+            "managedRoot": str(managed_root),
+            "workPath": str(managed_root / "jobs" / "2026-06-20"),
+        },
+    }
+    register = {
+        "protocolVersion": 1,
+        "type": "register_input_files",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:01.000Z",
+        "payload": {
+            "sourcePaths": [str(source)],
+            "managedRoot": str(managed_root),
+        },
+    }
+    registered = run_engine(
+        json.dumps(create) + "\n" + json.dumps(register) + "\n",
+        managed_root=managed_root,
+    )
+    input_value = json.loads(registered.stdout.splitlines()[1])["payload"]["results"][0][
+        "input"
+    ]
+    assign = {
+        "protocolVersion": 1,
+        "type": "manage_input",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:02.000Z",
+        "payload": {
+            "action": "assign_role",
+            "inputId": input_value["id"],
+            "role": "voice",
+            "managedRoot": str(managed_root),
+        },
+    }
+    assigned = run_engine(json.dumps(assign) + "\n", managed_root=managed_root)
+    assigned_event = json.loads(assigned.stdout)
+    assert assigned_event["payload"]["inputs"][0]["role"] == "voice"
+    assert assigned_event["payload"]["inputs"][0]["status"] == "ready"
+
+    remove = {
+        "protocolVersion": 1,
+        "type": "manage_input",
+        "jobId": job_id,
+        "timestamp": "2026-06-20T00:00:03.000Z",
+        "payload": {
+            "action": "remove",
+            "inputId": input_value["id"],
+            "managedRoot": str(managed_root),
+        },
+    }
+    removed = run_engine(json.dumps(remove) + "\n", managed_root=managed_root)
+
+    assert json.loads(removed.stdout)["payload"]["inputs"] == []
+    assert not Path(input_value["managedPath"]).exists()

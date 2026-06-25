@@ -83,7 +83,14 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
       hasNodeRequire: 'require' in window
     }))
     expect(bridgeSurface).toEqual({
-      desktopApiKeys: ['getOrCreateJobForDate', 'selectInputFiles', 'registerInputFiles'],
+      desktopApiKeys: [
+        'getOrCreateJobForDate',
+        'selectInputFiles',
+        'registerInputFiles',
+        'assignInputRole',
+        'removeInput',
+        'replaceInput'
+      ],
       hasNodeProcess: false,
       hasNodeRequire: false
     })
@@ -112,7 +119,10 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
         ]),
       { id: firstJobId, validPath: validSource, unsupportedPath: unsupportedSource }
     )
-    expect(batchResults.map((result) => result.status)).toEqual(['registered', 'rejected'])
+    expect(batchResults.results.map((result) => result.status)).toEqual(['registered', 'rejected'])
+    expect(batchResults.inputs.map((input) => [input.role, input.status])).toEqual([
+      ['voice', 'ready']
+    ])
     expect(await readFile(validSource, 'utf8')).toBe('audio')
     const restoredWithInput = await page.evaluate((date) => {
       if (!date) throw new Error('Publish date is missing')

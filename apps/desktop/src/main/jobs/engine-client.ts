@@ -33,7 +33,8 @@ export class EngineClient {
 
     return new Promise<EngineEvent>((resolve, reject) => {
       const timeoutMs =
-        command.type === 'register_input_files'
+        command.type === 'register_input_files' ||
+        (command.type === 'manage_input' && command.payload.action === 'replace')
           ? INPUT_REGISTRATION_TIMEOUT_MS
           : DEFAULT_REQUEST_TIMEOUT_MS
       const timeout = setTimeout(() => {

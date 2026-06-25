@@ -110,7 +110,7 @@
         "payload": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["results"],
+          "required": ["results", "inputs"],
           "properties": {
             "results": {
               "type": "array",
@@ -127,7 +127,9 @@
                 "properties": {
                   "originalName": { "type": "string", "minLength": 1 },
                   "managedPath": { "type": ["string", "null"] },
-                  "role": { "const": "unclassified" },
+                  "role": {
+                    "enum": ["thumbnail", "voice", "bgm", "script", "unclassified"]
+                  },
                   "status": { "enum": ["registered", "rejected", "conflict"] },
                   "errorCode": {
                     "enum": [
@@ -180,6 +182,36 @@
                   }
                 ]
               }
+            },
+            "inputs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/jobInput" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "input_state_changed" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inputs"],
+          "properties": {
+            "inputs": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/jobInput" }
             }
           }
         }
@@ -203,10 +235,14 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "jobId": { "type": "string", "format": "uuid" },
-        "role": { "const": "unclassified" },
+        "role": {
+          "enum": ["thumbnail", "voice", "bgm", "script", "unclassified"]
+        },
         "originalName": { "type": "string", "minLength": 1 },
         "managedPath": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["registered", "conflict"] },
+        "status": {
+          "enum": ["ready", "conflict", "unclassified", "invalid"]
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time",

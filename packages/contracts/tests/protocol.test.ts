@@ -4,11 +4,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  INPUT_ROLES,
+  INPUT_STATES,
   isCheckHealthCommand,
   isGetOrCreateJobCommand,
   isHealthCheckedEvent,
   isInputFilesRegisteredEvent,
+  isInputStateChangedEvent,
   isJobLoadedEvent,
+  isManageInputCommand,
   isRegisterInputFilesCommand,
 } from "../src/protocol.js";
 
@@ -18,6 +22,23 @@ function fixture(name: string): unknown {
 }
 
 describe("engine protocol schemas", () => {
+  it("exports explicit input role and state enums", () => {
+    expect(INPUT_ROLES).toEqual([
+      "thumbnail",
+      "voice",
+      "bgm",
+      "script",
+      "unclassified",
+    ]);
+    expect(INPUT_STATES).toEqual([
+      "ready",
+      "missing",
+      "conflict",
+      "unclassified",
+      "invalid",
+    ]);
+  });
+
   it("accepts the valid command and event fixtures", () => {
     expect(isCheckHealthCommand(fixture("valid-check-health.json"))).toBe(true);
     expect(isHealthCheckedEvent(fixture("valid-health-checked.json"))).toBe(
@@ -104,6 +125,72 @@ describe("engine protocol schemas", () => {
               errorCode: null,
             },
           ],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("accepts input management commands and state events", () => {
+    const base = {
+      protocolVersion: 1,
+      type: "manage_input",
+      jobId: "11111111-1111-4111-8111-111111111111",
+      timestamp: "2026-06-20T00:00:00.000Z",
+    };
+    expect(
+      isManageInputCommand({
+        ...base,
+        payload: {
+          action: "assign_role",
+          inputId: "22222222-2222-4222-8222-222222222222",
+          role: "voice",
+          managedRoot: "/managed",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isManageInputCommand({
+        ...base,
+        payload: {
+          action: "remove",
+          inputId: "22222222-2222-4222-8222-222222222222",
+          managedRoot: "/managed",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isManageInputCommand({
+        ...base,
+        payload: {
+          action: "replace",
+          inputId: "22222222-2222-4222-8222-222222222222",
+          sourcePath: "/source/voice.mp3",
+          managedRoot: "/managed",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isInputStateChangedEvent({
+        protocolVersion: 1,
+        type: "input_state_changed",
+        jobId: base.jobId,
+        timestamp: base.timestamp,
+        payload: { inputs: [] },
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects incomplete input management actions", () => {
+    expect(
+      isManageInputCommand({
+        protocolVersion: 1,
+        type: "manage_input",
+        jobId: "11111111-1111-4111-8111-111111111111",
+        timestamp: "2026-06-20T00:00:00.000Z",
+        payload: {
+          action: "replace",
+          inputId: "22222222-2222-4222-8222-222222222222",
+          managedRoot: "/managed",
         },
       }),
     ).toBe(false);

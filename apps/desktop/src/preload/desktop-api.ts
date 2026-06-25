@@ -1,6 +1,9 @@
 import type {
   DesktopApi,
+  INPUT_ASSIGN_ROLE_CHANNEL,
   INPUT_REGISTER_CHANNEL,
+  INPUT_REMOVE_CHANNEL,
+  INPUT_REPLACE_CHANNEL,
   INPUT_SELECT_CHANNEL,
   InputFileCandidate,
   JOB_GET_OR_CREATE_CHANNEL
@@ -10,23 +13,33 @@ import { ipcRenderer, webUtils } from 'electron'
 const jobGetOrCreateChannel: typeof JOB_GET_OR_CREATE_CHANNEL = 'jobs:get-or-create-for-date'
 const inputSelectChannel: typeof INPUT_SELECT_CHANNEL = 'inputs:select-files'
 const inputRegisterChannel: typeof INPUT_REGISTER_CHANNEL = 'inputs:register-files'
+const inputAssignRoleChannel: typeof INPUT_ASSIGN_ROLE_CHANNEL = 'inputs:assign-role'
+const inputRemoveChannel: typeof INPUT_REMOVE_CHANNEL = 'inputs:remove'
+const inputReplaceChannel: typeof INPUT_REPLACE_CHANNEL = 'inputs:replace'
+
+function toSelectedFile(file: InputFileCandidate): { name: string; sourcePath: string } {
+  let sourcePath = file.sourcePath ?? ''
+  if (!sourcePath) {
+    try {
+      sourcePath = webUtils.getPathForFile(file as unknown as File)
+    } catch {
+      throw new Error('파일 경로를 읽을 수 없습니다.')
+    }
+  }
+  return { name: file.name, sourcePath }
+}
 
 export const desktopApi = Object.freeze({
   getOrCreateJobForDate: (publishDate: string) =>
     ipcRenderer.invoke(jobGetOrCreateChannel, publishDate),
   selectInputFiles: () => ipcRenderer.invoke(inputSelectChannel),
   registerInputFiles: (jobId: string, files: InputFileCandidate[]) => {
-    const selected = files.map((file) => {
-      let sourcePath = file.sourcePath ?? ''
-      if (!sourcePath) {
-        try {
-          sourcePath = webUtils.getPathForFile(file as unknown as File)
-        } catch {
-          sourcePath = ''
-        }
-      }
-      return { name: file.name, sourcePath }
-    })
+    const selected = files.map(toSelectedFile)
     return ipcRenderer.invoke(inputRegisterChannel, jobId, selected)
-  }
+  },
+  assignInputRole: (jobId, inputId, role) =>
+    ipcRenderer.invoke(inputAssignRoleChannel, jobId, inputId, role),
+  removeInput: (jobId, inputId) => ipcRenderer.invoke(inputRemoveChannel, jobId, inputId),
+  replaceInput: (jobId, inputId, file) =>
+    ipcRenderer.invoke(inputReplaceChannel, jobId, inputId, toSelectedFile(file))
 }) satisfies DesktopApi

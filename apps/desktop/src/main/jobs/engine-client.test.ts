@@ -67,6 +67,21 @@ function registerCommand(jobId: string): EngineCommand {
   }
 }
 
+function replaceCommand(jobId: string): EngineCommand {
+  return {
+    protocolVersion: 1,
+    type: 'manage_input',
+    jobId,
+    timestamp: '2026-06-20T00:00:00.000Z',
+    payload: {
+      action: 'replace',
+      inputId: '22222222-2222-4222-8222-222222222222',
+      sourcePath: '/source/large.mp4',
+      managedRoot: '/managed/GraceTreeData'
+    }
+  }
+}
+
 describe('EngineClient', () => {
   beforeEach(() => {
     spawnMock.mockReset()
@@ -127,6 +142,7 @@ describe('EngineClient', () => {
         jobId: '11111111-1111-4111-8111-111111111111',
         timestamp: '2026-06-20T00:00:00.000Z',
         payload: {
+          inputs: [],
           results: [
             {
               originalName: 'large.mp4',
@@ -141,6 +157,30 @@ describe('EngineClient', () => {
     )
 
     await expect(pending).resolves.toMatchObject({ type: 'input_files_registered' })
+    client.stop()
+  })
+
+  it('allows input replacement to run beyond the default five-second timeout', async () => {
+    vi.useFakeTimers()
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+    const pending = client.request(replaceCommand('11111111-1111-4111-8111-111111111111'))
+
+    await vi.advanceTimersByTimeAsync(5_001)
+    expect(child.kill).not.toHaveBeenCalled()
+
+    child.stdout.write(
+      `${JSON.stringify({
+        protocolVersion: 1,
+        type: 'input_state_changed',
+        jobId: '11111111-1111-4111-8111-111111111111',
+        timestamp: '2026-06-20T00:00:00.000Z',
+        payload: { inputs: [] }
+      })}\n`
+    )
+
+    await expect(pending).resolves.toMatchObject({ type: 'input_state_changed' })
     client.stop()
   })
 

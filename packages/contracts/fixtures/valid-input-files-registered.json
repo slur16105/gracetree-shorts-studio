@@ -12,6 +12,7 @@
         "status": "rejected",
         "errorCode": "UNSUPPORTED_TYPE"
       }
-    ]
+    ],
+    "inputs": []
   }
 }

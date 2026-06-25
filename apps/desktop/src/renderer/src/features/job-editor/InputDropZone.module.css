@@ -83,3 +83,112 @@
 .retry {
   margin-top: var(--space-3);
 }
+
+.slots {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fileSlot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-raised);
+}
+
+.fileSlot[data-state='ready'] {
+  border-color: var(--color-success);
+}
+
+.fileSlot[data-state='conflict'],
+.fileSlot[data-state='unclassified'],
+.fileSlot[data-state='missing'] {
+  border-color: var(--color-warning);
+}
+
+.fileSlot[data-state='invalid'] {
+  border-color: var(--color-danger);
+}
+
+.stateIcon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+}
+
+.slotDetails {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.slotDetails span {
+  overflow-wrap: anywhere;
+}
+
+.stateText {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.roleControl {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.roleControl span {
+  font-size: 12px;
+}
+
+.roleControl select {
+  min-height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-panel);
+}
+
+.slotActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.slotActions button,
+.confirmation button {
+  min-height: 36px;
+}
+
+.confirmation {
+  display: flex;
+  grid-column: 2 / -1;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.confirmation span {
+  margin-right: auto;
+}
+
+@media (max-width: 1000px) {
+  .fileSlot {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .roleControl,
+  .slotActions,
+  .confirmation {
+    grid-column: 2;
+  }
+}

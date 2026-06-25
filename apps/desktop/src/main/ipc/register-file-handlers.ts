@@ -1,12 +1,23 @@
 import type {
   EngineEvent,
   InputRegistrationResult,
+  InputRole,
+  JobInputDto,
+  ManageInputCommand,
   RegisterInputFilesCommand
 } from '@gracetree/contracts'
-import { isInputFilesRegisteredEvent } from '@gracetree/contracts'
 import {
+  INPUT_ROLES,
+  isInputFilesRegisteredEvent,
+  isInputStateChangedEvent
+} from '@gracetree/contracts'
+import {
+  INPUT_ASSIGN_ROLE_CHANNEL,
   INPUT_REGISTER_CHANNEL,
+  INPUT_REMOVE_CHANNEL,
+  INPUT_REPLACE_CHANNEL,
   INPUT_SELECT_CHANNEL,
+  type InputRegistrationBatch,
   type SelectedInputFile
 } from '@gracetree/contracts/desktop-api'
 import { ipcMain } from 'electron'
@@ -16,11 +27,16 @@ import { isValidJobId } from '../files/managed-paths'
 import { selectInputFiles } from '../files/file-dialogs'
 
 type RequestEngine = (command: RegisterInputFilesCommand) => Promise<EngineEvent>
+type ManageRequestEngine = (command: ManageInputCommand) => Promise<EngineEvent>
+type ManageInputRequest =
+  | { action: 'assign_role'; inputId: string; role: InputRole }
+  | { action: 'remove'; inputId: string }
+  | { action: 'replace'; inputId: string; sourcePath: string }
 
 export function createRegisterInputFilesHandler(
   managedRoot: string,
   requestEngine: RequestEngine
-): (jobId: string, files: SelectedInputFile[]) => Promise<InputRegistrationResult[]> {
+): (jobId: string, files: SelectedInputFile[]) => Promise<InputRegistrationBatch> {
   return async (jobId, files) => {
     if (!isValidJobId(jobId)) throw new Error('Job ID is invalid')
     if (!Array.isArray(files) || files.length === 0 || files.length > 100) {
@@ -47,7 +63,9 @@ export function createRegisterInputFilesHandler(
         validIndexes.push(index)
       }
     })
-    if (validPaths.length === 0) return results.filter(Boolean) as InputRegistrationResult[]
+    if (validPaths.length === 0) {
+      return { results: results.filter(Boolean) as InputRegistrationResult[], inputs: null }
+    }
     const command: RegisterInputFilesCommand = {
       protocolVersion: 1,
       type: 'register_input_files',
@@ -69,12 +87,44 @@ export function createRegisterInputFilesHandler(
     if (results.some((result) => result === undefined)) {
       throw new Error('Python engine returned an incomplete batch')
     }
-    return results as InputRegistrationResult[]
+    return { results: results as InputRegistrationResult[], inputs: event.payload.inputs }
   }
 }
 
-export function registerFileHandlers(managedRoot: string, requestEngine: RequestEngine): void {
+export function createManageInputHandler(
+  managedRoot: string,
+  requestEngine: ManageRequestEngine
+): (jobId: string, request: ManageInputRequest) => Promise<JobInputDto[]> {
+  return async (jobId, request) => {
+    if (!isValidJobId(jobId)) throw new Error('Job ID is invalid')
+    if (!isValidJobId(request.inputId)) throw new Error('Input ID is invalid')
+    if (request.action === 'assign_role' && !INPUT_ROLES.includes(request.role)) {
+      throw new Error('Input role is invalid')
+    }
+    if (request.action === 'replace' && !isAbsolute(request.sourcePath)) {
+      throw new Error('Replacement path is invalid')
+    }
+    const command: ManageInputCommand = {
+      protocolVersion: 1,
+      type: 'manage_input',
+      jobId,
+      timestamp: new Date().toISOString(),
+      payload: { ...request, managedRoot }
+    }
+    const event = await requestEngine(command)
+    if (!isInputStateChangedEvent(event) || event.jobId !== jobId) {
+      throw new Error('Python engine response is invalid')
+    }
+    return event.payload.inputs
+  }
+}
+
+export function registerFileHandlers(
+  managedRoot: string,
+  requestEngine: RequestEngine & ManageRequestEngine
+): void {
   const register = createRegisterInputFilesHandler(managedRoot, requestEngine)
+  const manage = createManageInputHandler(managedRoot, requestEngine)
   ipcMain.handle(INPUT_SELECT_CHANNEL, () => selectInputFiles())
   ipcMain.handle(INPUT_REGISTER_CHANNEL, (_event, jobId: unknown, files: unknown) => {
     if (typeof jobId !== 'string' || !Array.isArray(files)) {
@@ -82,4 +132,36 @@ export function registerFileHandlers(managedRoot: string, requestEngine: Request
     }
     return register(jobId, files as SelectedInputFile[])
   })
+  ipcMain.handle(
+    INPUT_ASSIGN_ROLE_CHANNEL,
+    (_event, jobId: unknown, inputId: unknown, role: unknown) => {
+      if (typeof jobId !== 'string' || typeof inputId !== 'string' || typeof role !== 'string') {
+        throw new Error('Input role request is invalid')
+      }
+      return manage(jobId, { action: 'assign_role', inputId, role: role as InputRole })
+    }
+  )
+  ipcMain.handle(INPUT_REMOVE_CHANNEL, (_event, jobId: unknown, inputId: unknown) => {
+    if (typeof jobId !== 'string' || typeof inputId !== 'string') {
+      throw new Error('Input remove request is invalid')
+    }
+    return manage(jobId, { action: 'remove', inputId })
+  })
+  ipcMain.handle(
+    INPUT_REPLACE_CHANNEL,
+    (_event, jobId: unknown, inputId: unknown, file: unknown) => {
+      if (
+        typeof jobId !== 'string' ||
+        typeof inputId !== 'string' ||
+        typeof (file as SelectedInputFile | undefined)?.sourcePath !== 'string'
+      ) {
+        throw new Error('Input replacement request is invalid')
+      }
+      return manage(jobId, {
+        action: 'replace',
+        inputId,
+        sourcePath: (file as SelectedInputFile).sourcePath
+      })
+    }
+  )
 }

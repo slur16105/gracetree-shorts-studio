@@ -1,11 +1,13 @@
 import type { InputFileCandidate, SelectedInputFile } from '@gracetree/contracts/desktop-api'
-import type { InputRegistrationResult } from '@gracetree/contracts'
+import type { InputRegistrationResult, InputRole, JobInputDto } from '@gracetree/contracts'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 
 import styles from './InputDropZone.module.css'
+import { FileSlot, MissingFileSlot } from './FileSlot'
 
 interface InputDropZoneProps {
   jobId: string | null
+  initialInputs?: JobInputDto[]
 }
 
 const ERROR_MESSAGES: Record<Exclude<InputRegistrationResult['errorCode'], null>, string> = {
@@ -18,12 +20,23 @@ const ERROR_MESSAGES: Record<Exclude<InputRegistrationResult['errorCode'], null>
   COPY_FAILED: '파일 복사에 실패했습니다. 다시 선택해주세요.'
 }
 
-export function InputDropZone({ jobId }: InputDropZoneProps): React.JSX.Element {
-  return <InputDropZoneContent jobId={jobId} key={jobId ?? 'no-job'} />
+const SLOT_ROLES = ['thumbnail', 'voice', 'script', 'bgm'] as const
+
+export function InputDropZone({
+  jobId,
+  initialInputs = []
+}: InputDropZoneProps): React.JSX.Element {
+  return (
+    <InputDropZoneContent initialInputs={initialInputs} jobId={jobId} key={jobId ?? 'no-job'} />
+  )
 }
 
-function InputDropZoneContent({ jobId }: InputDropZoneProps): React.JSX.Element {
+function InputDropZoneContent({
+  jobId,
+  initialInputs = []
+}: InputDropZoneProps): React.JSX.Element {
   const [results, setResults] = useState<InputRegistrationResult[]>([])
+  const [inputs, setInputs] = useState<JobInputDto[]>(initialInputs)
   const [summary, setSummary] = useState({ id: 0, text: '' })
   const [pendingFiles, setPendingFiles] = useState<Array<{ id: string; name: string }>>([])
   const [dragActive, setDragActive] = useState(false)
@@ -54,9 +67,11 @@ function InputDropZoneContent({ jobId }: InputDropZoneProps): React.JSX.Element 
 
     const execute = async (): Promise<void> => {
       try {
-        const nextResults = await window.desktopApi.registerInputFiles(requestJobId, files)
+        const batch = await window.desktopApi.registerInputFiles(requestJobId, files)
         if (!activeRef.current) return
-        setResults(nextResults)
+        setResults(batch.results)
+        if (batch.inputs) setInputs(batch.inputs)
+        const nextResults = batch.results
         const successCount = nextResults.filter((item) => item.status === 'registered').length
         const rejectedCount = nextResults.length - successCount
         announce(`파일 등록 완료: 성공 ${successCount}개, 거부 ${rejectedCount}개`)
@@ -76,6 +91,22 @@ function InputDropZoneContent({ jobId }: InputDropZoneProps): React.JSX.Element 
     queueRef.current = queued
     return queued
   }
+
+  const assignRole = async (inputId: string, role: InputRole): Promise<void> => {
+    if (!jobId) return
+    setInputs(await window.desktopApi.assignInputRole(jobId, inputId, role))
+  }
+
+  const removeInput = async (inputId: string): Promise<void> => {
+    if (!jobId) return
+    setInputs(await window.desktopApi.removeInput(jobId, inputId))
+  }
+
+  const replaceInput = async (inputId: string, file: InputFileCandidate): Promise<void> => {
+    if (!jobId) return
+    setInputs(await window.desktopApi.replaceInput(jobId, inputId, file))
+  }
+  const occupiedRoles = new Set(inputs.map((input) => input.role))
 
   const selectFiles = async (): Promise<void> => {
     if (!jobId) return
@@ -122,6 +153,22 @@ function InputDropZoneContent({ jobId }: InputDropZoneProps): React.JSX.Element 
       <p aria-atomic="true" aria-live="polite" className={styles.summary} key={summary.id}>
         {summary.text}
       </p>
+      {jobId ? (
+        <ul aria-label="파일 슬롯" className={styles.slots}>
+          {SLOT_ROLES.filter((role) => !occupiedRoles.has(role)).map((role) => (
+            <MissingFileSlot key={role} role={role} />
+          ))}
+          {inputs.map((input) => (
+            <FileSlot
+              input={input}
+              key={input.id}
+              onAssignRole={assignRole}
+              onRemove={removeInput}
+              onReplace={replaceInput}
+            />
+          ))}
+        </ul>
+      ) : null}
       {pendingFiles.length > 0 ? (
         <ul aria-label="파일 등록 처리 상태" className={styles.results}>
           {pendingFiles.map((file) => (

@@ -42,7 +42,10 @@ describe('desktopApi bridge surface', () => {
     expect(Object.keys(desktopApi)).toEqual([
       'getOrCreateJobForDate',
       'selectInputFiles',
-      'registerInputFiles'
+      'registerInputFiles',
+      'assignInputRole',
+      'removeInput',
+      'replaceInput'
     ])
     expect(desktopApi).not.toHaveProperty('ipcRenderer')
     expect(desktopApi).not.toHaveProperty('fs')
@@ -59,6 +62,15 @@ describe('desktopApi bridge surface', () => {
     expect(electronMock.invoke).toHaveBeenCalledWith('inputs:register-files', 'job', [
       { name: 'voice.mp3', sourcePath: '/source/voice.mp3' }
     ])
+    await desktopApi.assignInputRole('job', 'input', 'voice')
+    expect(electronMock.invoke).toHaveBeenCalledWith('inputs:assign-role', 'job', 'input', 'voice')
+    await desktopApi.removeInput('job', 'input')
+    expect(electronMock.invoke).toHaveBeenCalledWith('inputs:remove', 'job', 'input')
+    await desktopApi.replaceInput('job', 'input', { name: 'new.mp3' })
+    expect(electronMock.invoke).toHaveBeenCalledWith('inputs:replace', 'job', 'input', {
+      name: 'new.mp3',
+      sourcePath: '/source/voice.mp3'
+    })
   })
 
   it('wires exactly one desktopApi namespace through contextBridge', async () => {
@@ -70,7 +82,10 @@ describe('desktopApi bridge surface', () => {
     expect(Object.keys(exposedValue)).toEqual([
       'getOrCreateJobForDate',
       'selectInputFiles',
-      'registerInputFiles'
+      'registerInputFiles',
+      'assignInputRole',
+      'removeInput',
+      'replaceInput'
     ])
     expect(Object.isFrozen(exposedValue)).toBe(true)
   })
