@@ -77,6 +77,7 @@ function App(): React.JSX.Element {
                 <JobEditor
                   managedRoot={managedRoot}
                   onManagedRootResolved={handleManagedRootResolved}
+                  onOpenSettings={() => setSettingsOpen(true)}
                 />
               </section>
               <aside aria-labelledby="completed-title" className={styles.completedRegion}>

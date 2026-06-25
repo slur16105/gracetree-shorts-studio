@@ -187,6 +187,11 @@ def test_applies_004_to_a_story_1_5_database_and_preserves_rows(
             "SELECT resource_type, status FROM resources ORDER BY resource_type"
         ).fetchall()
 
+    with connect_database(database_path) as connection:
+        resource_updated_at_rows = connection.execute(
+            "SELECT updated_at FROM resources"
+        ).fetchall()
+
     assert job_row is not None
     assert tuple(input_row) == ("voice", "ready")
     assert len(resource_rows) == 4
@@ -199,6 +204,11 @@ def test_applies_004_to_a_story_1_5_database_and_preserves_rows(
         "default_bgm",
         "subtitle_font",
     }
+    # Seed rows must have ISO 8601 Z-terminated timestamps for schema validation
+    for row in resource_updated_at_rows:
+        assert row["updated_at"].endswith("Z"), (
+            f"resource seed row updated_at must end with 'Z', got: {row['updated_at']!r}"
+        )
 
 
 def test_rejects_duplicate_migration_versions_before_opening_database(

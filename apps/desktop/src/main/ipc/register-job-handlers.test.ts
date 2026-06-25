@@ -236,4 +236,12 @@ describe('openResultFolder handler', () => {
     await expect(handler('job-id', '/missing/path')).rejects.toThrow('does not exist')
     expect(shellOpenPath).not.toHaveBeenCalled()
   })
+
+  it('throws when shell.openPath reports an OS error', async () => {
+    const fsExistsSync = vi.fn(() => true)
+    const shellOpenPath = vi.fn(async () => 'No application is associated with the file')
+    const handler = createOpenResultFolderHandler(fsExistsSync, shellOpenPath)
+
+    await expect(handler('job-id', '/some/path')).rejects.toThrow('Failed to open result folder')
+  })
 })

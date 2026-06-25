@@ -12,6 +12,7 @@ type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
 function formatDate(isoString: string): string {
   const date = new Date(isoString)
+  if (isNaN(date.getTime())) return isoString
   return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
@@ -84,7 +85,7 @@ export function CompletionList({
         </div>
       ) : loadState !== 'loading' && jobs.length === 0 ? (
         <div className={styles.emptyState}>
-          <p>아직 완료된 작업이 없습니다. 첫 영상을 제작해보세요.</p>
+          <p>아직 완료된 작업이 없습니다. 날짜를 선택해 새 작업을 등록하고 첫 영상을 제작해보세요.</p>
         </div>
       ) : (
         <ul aria-label="완료된 작업 목록" className={styles.list} role="listbox">

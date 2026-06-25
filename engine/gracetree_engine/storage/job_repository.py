@@ -77,11 +77,12 @@ def get_completed_jobs(conn: sqlite3.Connection) -> list[dict]:
         {
             "id": str(row["id"]),
             "publishDate": str(row["publish_date"]),
-            "title": row["title"] if row["title"] is not None else None,
+            "title": row["title"],
             "completedAt": str(row["completed_at"]),
             "resultPath": str(row["result_path"]),
         }
         for row in rows
+        if row["result_path"] is not None
     ]
 
 

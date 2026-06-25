@@ -224,3 +224,12 @@ def test_input_id_and_version_echoed_on_error(tmp_path: Path) -> None:
 
     assert result["inputId"] == custom_id
     assert result["inputVersion"] == custom_version
+
+
+def test_non_utf8_binary_file_returns_file_unreadable(tmp_path: Path) -> None:
+    p = tmp_path / "binary.txt"
+    p.write_bytes(b"\xff\xfe\x00binary garbage that is not valid UTF-8\x80\x81")
+    result = validate_script(str(p), INPUT_ID, INPUT_VERSION)
+
+    assert result["status"] == "invalid"
+    assert any(e["code"] == "FILE_UNREADABLE" for e in result["errors"])

@@ -130,6 +130,7 @@ export function createValidateScriptHandler(
   return async (jobId, inputId, inputVersion, managedPath) => {
     if (!isValidJobId(jobId)) throw new Error('Job ID is invalid')
     if (!isValidJobId(inputId)) throw new Error('Input ID is invalid')
+    if (!inputVersion) throw new Error('Input version is invalid')
     const command: ValidateScriptCommand = {
       protocolVersion: 1,
       type: 'validate_script',

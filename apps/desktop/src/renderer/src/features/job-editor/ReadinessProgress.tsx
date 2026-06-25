@@ -4,11 +4,13 @@ import styles from './ReadinessProgress.module.css'
 interface ReadinessProgressProps {
   readiness: ReadinessResult
   isParsing: boolean
+  onOpenSettings?: () => void
 }
 
 export function ReadinessProgress({
   readiness,
   isParsing,
+  onOpenSettings,
 }: ReadinessProgressProps): React.JSX.Element {
   const { slots, satisfiedCount, total, percent, isReady, nextAction, commonResourcesReady } = readiness
   const fullyReady = isReady && commonResourcesReady
@@ -21,6 +23,7 @@ export function ReadinessProgress({
       </div>
       <div className={styles.progressTrack}>
         <div
+          aria-label="작업 준비 진행률"
           aria-valuemax={100}
           aria-valuemin={0}
           aria-valuenow={percent}
@@ -32,7 +35,12 @@ export function ReadinessProgress({
       </div>
       <ul className={styles.slots}>
         {slots.map((slot) => (
-          <li className={styles.slot} data-satisfied={slot.satisfied} key={slot.role}>
+          <li
+            aria-label={`${slot.label}: ${slot.satisfied ? '완료' : '미완료'}`}
+            className={styles.slot}
+            data-satisfied={slot.satisfied}
+            key={slot.role}
+          >
             <span
               aria-hidden="true"
               className={styles.slotIcon}
@@ -40,7 +48,7 @@ export function ReadinessProgress({
             >
               {slot.satisfied ? '✓' : '✗'}
             </span>
-            <span className={styles.slotLabel}>{slot.label}</span>
+            <span aria-hidden="true" className={styles.slotLabel}>{slot.label}</span>
           </li>
         ))}
       </ul>
@@ -55,7 +63,12 @@ export function ReadinessProgress({
           </span>
         ) : isReady && !commonResourcesReady ? (
           <span className={styles.nextAction} role="status">
-            공통 리소스를 설정하세요.
+            공통 리소스를 설정하세요.{' '}
+            {onOpenSettings ? (
+              <button className={styles.openSettingsButton} onClick={onOpenSettings} type="button">
+                설정 열기
+              </button>
+            ) : null}
           </span>
         ) : nextAction != null ? (
           <span className={styles.nextAction}>{nextAction}</span>

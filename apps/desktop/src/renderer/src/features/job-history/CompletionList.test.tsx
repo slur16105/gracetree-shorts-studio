@@ -43,7 +43,7 @@ describe('CompletionList', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('아직 완료된 작업이 없습니다. 첫 영상을 제작해보세요.')
+        screen.getByText('아직 완료된 작업이 없습니다. 날짜를 선택해 새 작업을 등록하고 첫 영상을 제작해보세요.')
       ).toBeVisible()
     })
   })
@@ -182,7 +182,7 @@ describe('CompletionList', () => {
     listCompletedJobs.mockResolvedValue([])
     render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
-    await screen.findByText('아직 완료된 작업이 없습니다. 첫 영상을 제작해보세요.')
+    await screen.findByText('아직 완료된 작업이 없습니다. 날짜를 선택해 새 작업을 등록하고 첫 영상을 제작해보세요.')
 
     const newJob = makeJob()
     listCompletedJobs.mockResolvedValue([newJob])

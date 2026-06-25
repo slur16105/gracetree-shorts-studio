@@ -11,15 +11,16 @@ import { computeReadiness } from './readiness'
 interface JobEditorProps {
   managedRoot: string
   onManagedRootResolved?: (managedRoot: string) => void
+  onOpenSettings?: () => void
 }
 
-export function JobEditor({ managedRoot, onManagedRootResolved }: JobEditorProps): React.JSX.Element {
+export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }: JobEditorProps): React.JSX.Element {
   const [job, setJob] = useState<JobDto | null>(null)
   const [inputs, setInputs] = useState<JobInputDto[]>([])
   const [scriptValidation, setScriptValidation] = useState<ScriptValidationDto | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [resources, setResources] = useState<ResourceDto[]>([])
-  const validationRef = useRef<{ inputId: string; inputVersion: string } | null>(null)
+  const validationRef = useRef<{ jobId: string; inputId: string; inputVersion: string } | null>(null)
   const onManagedRootResolvedRef = useRef(onManagedRootResolved)
 
   useEffect(() => {
@@ -80,6 +81,7 @@ export function JobEditor({ managedRoot, onManagedRootResolved }: JobEditorProps
 
     // 이미 같은 버전으로 검증 요청 중이거나 완료된 경우 스킵
     if (
+      validationRef.current?.jobId === job.id &&
       validationRef.current?.inputId === inputId &&
       validationRef.current?.inputVersion === inputVersion
     ) {
@@ -87,7 +89,7 @@ export function JobEditor({ managedRoot, onManagedRootResolved }: JobEditorProps
     }
 
     // 새 검증 요청 시작
-    validationRef.current = { inputId, inputVersion }
+    validationRef.current = { jobId: job.id, inputId, inputVersion }
     setIsParsing(true)
 
     let cancelled = false
@@ -96,8 +98,9 @@ export function JobEditor({ managedRoot, onManagedRootResolved }: JobEditorProps
       .validateScript(job.id, inputId, inputVersion, managedPath)
       .then((result) => {
         if (cancelled) return
-        // stale 검사: ref와 응답의 inputId/inputVersion이 일치할 때만 반영
+        // stale 검사: ref와 응답의 jobId/inputId/inputVersion이 모두 일치할 때만 반영
         if (
+          validationRef.current?.jobId === job.id &&
           validationRef.current?.inputId === result.inputId &&
           validationRef.current?.inputVersion === result.inputVersion
         ) {
@@ -108,6 +111,7 @@ export function JobEditor({ managedRoot, onManagedRootResolved }: JobEditorProps
       .catch(() => {
         if (cancelled) return
         if (
+          validationRef.current?.jobId === job.id &&
           validationRef.current?.inputId === inputId &&
           validationRef.current?.inputVersion === inputVersion
         ) {
@@ -133,7 +137,7 @@ export function JobEditor({ managedRoot, onManagedRootResolved }: JobEditorProps
       />
       {job ? (
         <>
-          <ReadinessProgress isParsing={isParsing} readiness={readiness} />
+          <ReadinessProgress isParsing={isParsing} onOpenSettings={onOpenSettings} readiness={readiness} />
           <JobSummary isParsing={isParsing} scriptValidation={scriptValidation} />
         </>
       ) : null}

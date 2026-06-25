@@ -115,7 +115,10 @@ export function createOpenResultFolderHandler(
     if (!fsExistsSync(resultPath)) {
       throw new Error(`Result folder does not exist: ${resultPath}`)
     }
-    await shellOpenPath(resultPath)
+    const openError = await shellOpenPath(resultPath)
+    if (openError) {
+      throw new Error(`Failed to open result folder: ${openError}`)
+    }
   }
 }
 

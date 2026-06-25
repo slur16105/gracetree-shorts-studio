@@ -260,7 +260,7 @@
                   "required": ["resourceType", "code", "message"],
                   "properties": {
                     "resourceType": { "enum": ["title_scripture_video", "prayer_loop_video", "default_bgm", "subtitle_font"] },
-                    "code": { "type": "string", "minLength": 1 },
+                    "code": { "enum": ["MANAGED_ROOT_MISSING", "SOURCE_UNREADABLE", "UNSUPPORTED_FORMAT", "COPY_FAILED"] },
                     "message": { "type": "string", "minLength": 1 }
                   }
                 }
@@ -373,7 +373,9 @@
         "managedPath": { "type": ["string", "null"] },
         "status": { "enum": ["ready", "missing", "invalid"] },
         "updatedAt": { "type": "string", "format": "date-time", "pattern": "Z$" }
-      }
+      },
+      "if": { "properties": { "status": { "const": "ready" } }, "required": ["status"] },
+      "then": { "properties": { "managedPath": { "type": "string", "minLength": 1 } } }
     },
     "jobInput": {
       "type": "object",

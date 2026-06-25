@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_resources_status ON resources (status);
 -- 초기 행 삽입 (없으면): 모든 4개 타입을 missing으로
 INSERT OR IGNORE INTO resources (resource_type, managed_path, status, updated_at)
 VALUES
-    ('title_scripture_video', NULL, 'missing', datetime('now')),
-    ('prayer_loop_video', NULL, 'missing', datetime('now')),
-    ('default_bgm', NULL, 'missing', datetime('now')),
-    ('subtitle_font', NULL, 'missing', datetime('now'));
+    ('title_scripture_video', NULL, 'missing', strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now')),
+    ('prayer_loop_video', NULL, 'missing', strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now')),
+    ('default_bgm', NULL, 'missing', strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now')),
+    ('subtitle_font', NULL, 'missing', strftime('%Y-%m-%dT%H:%M:%S.000Z', 'now'));

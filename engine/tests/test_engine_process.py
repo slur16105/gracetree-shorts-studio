@@ -209,6 +209,63 @@ def test_register_input_files_round_trip_preserves_partial_success(tmp_path: Pat
     assert source.read_bytes() == b"audio"
 
 
+def test_validate_script_rejects_managed_path_outside_approved_root(tmp_path: Path) -> None:
+    """managedPath pointing outside GRACETREE_MANAGED_ROOT must be rejected (path traversal)."""
+    managed_root = tmp_path / "GraceTreeData"
+    managed_root.mkdir(parents=True)
+    outside_file = tmp_path / "secret.txt"
+    outside_file.write_text("sensitive", encoding="utf-8")
+
+    command = {
+        "protocolVersion": 1,
+        "type": "validate_script",
+        "jobId": "11111111-1111-4111-8111-111111111111",
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "inputId": "22222222-2222-4222-8222-222222222222",
+            "inputVersion": "v1",
+            "managedPath": str(outside_file),
+        },
+    }
+
+    result = run_engine(json.dumps(command) + "\n", managed_root=managed_root)
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "INTERNAL_EVENT_INVALID" in result.stderr
+
+
+def test_validate_script_returns_valid_for_script_inside_root(tmp_path: Path) -> None:
+    managed_root = tmp_path / "GraceTreeData"
+    script_dir = managed_root / "jobs" / "2026-06-20" / "input"
+    script_dir.mkdir(parents=True)
+    script_file = script_dir / "script.txt"
+    script_file.write_text(
+        "[제목]\n제목입니다\n\n[말씀]\n말씀내용\n\n[기도]\n기도내용\n",
+        encoding="utf-8",
+    )
+
+    command = {
+        "protocolVersion": 1,
+        "type": "validate_script",
+        "jobId": "11111111-1111-4111-8111-111111111111",
+        "timestamp": "2026-06-20T00:00:00.000Z",
+        "payload": {
+            "inputId": "22222222-2222-4222-8222-222222222222",
+            "inputVersion": "v1",
+            "managedPath": str(script_file),
+        },
+    }
+
+    result = run_engine(json.dumps(command) + "\n", managed_root=managed_root)
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    event = json.loads(result.stdout)
+    assert event["type"] == "script_validated"
+    assert event["payload"]["status"] == "valid"
+
+
 def test_manage_input_round_trip_assigns_role_and_removes_copy(tmp_path: Path) -> None:
     managed_root = tmp_path / "GraceTreeData"
     source = tmp_path / "recording.mp3"

@@ -1,6 +1,6 @@
 # Story 1.7: 공통 리소스 설정과 작업별 BGM 적용
 
-Status: review
+Status: done
 
 ## Story
 

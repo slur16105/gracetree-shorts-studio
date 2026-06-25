@@ -275,6 +275,12 @@ describe('script validation handler', () => {
     await expect(handler(jobId, 'invalid', inputVersion, managedPath)).rejects.toThrow('Input ID')
   })
 
+  it('rejects empty inputVersion', async () => {
+    const handler = createValidateScriptHandler(vi.fn())
+
+    await expect(handler(jobId, inputId, '', managedPath)).rejects.toThrow('version')
+  })
+
   it('rejects an invalid engine event', async () => {
     const handler = createValidateScriptHandler(
       vi.fn(

@@ -102,6 +102,7 @@ export async function selectResourceFile(
   })
   if (result.canceled || result.filePaths.length === 0) return null
   const sourcePath = result.filePaths[0]!
+  if (!sourcePath) return null
   return { name: basename(sourcePath), sourcePath }
 }
 

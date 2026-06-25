@@ -107,10 +107,12 @@ def update_resource(
     try:
         shutil.copy2(str(source), str(dest))
     except OSError as exc:
-        # restore backup if we moved it
-        if backup is not None and backup.exists() and not dest.exists():
+        # restore backup: remove any partial dest first, then restore
+        if backup is not None:
             try:
-                os.replace(backup, dest)
+                dest.unlink(missing_ok=True)
+                if backup.exists():
+                    os.replace(backup, dest)
             except OSError:
                 pass
         resources = get_all_resources(conn)

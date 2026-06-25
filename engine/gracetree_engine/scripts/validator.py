@@ -123,7 +123,13 @@ def validate_script(
         return result
 
     # Decode: strip UTF-8 BOM if present, normalise CRLF → LF.
-    text = raw_bytes.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+    try:
+        text = raw_bytes.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+    except UnicodeDecodeError:
+        result["errors"].append(
+            _make_error("FILE_UNREADABLE", None, "스크립트 파일을 읽을 수 없습니다.")
+        )
+        return result
 
     # --- empty check ---
     if not text.strip():

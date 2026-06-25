@@ -151,7 +151,7 @@ def _resource_updated(command: dict[str, Any]) -> dict[str, Any]:
     with connect_database(database_path) as conn:
         result = update_resource(
             conn,
-            managed_root=payload["managedRoot"],
+            managed_root=str(approved_root),
             resource_type=payload["resourceType"],
             source_path=payload["sourcePath"],
         )
@@ -195,6 +195,16 @@ def _script_validated(command: dict[str, Any]) -> dict[str, Any]:
     from gracetree_engine.scripts.validator import validate_script
 
     payload = command["payload"]
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value:
+        raise ValueError("approved managed root is unavailable")
+    approved_root = Path(approved_root_value)
+    managed_path = Path(payload["managedPath"])
+    try:
+        if not managed_path.resolve().is_relative_to(approved_root.resolve()):
+            raise ValueError("managedPath escapes the approved managed root")
+    except ValueError:
+        raise
     result = validate_script(
         managed_path=payload["managedPath"],
         input_id=payload["inputId"],
