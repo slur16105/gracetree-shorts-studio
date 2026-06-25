@@ -4,12 +4,15 @@ import type {
   InputRole,
   JobInputDto,
   ManageInputCommand,
-  RegisterInputFilesCommand
+  RegisterInputFilesCommand,
+  ScriptValidationDto,
+  ValidateScriptCommand
 } from '@gracetree/contracts'
 import {
   INPUT_ROLES,
   isInputFilesRegisteredEvent,
-  isInputStateChangedEvent
+  isInputStateChangedEvent,
+  isScriptValidatedEvent
 } from '@gracetree/contracts'
 import {
   INPUT_ASSIGN_ROLE_CHANNEL,
@@ -17,6 +20,7 @@ import {
   INPUT_REMOVE_CHANNEL,
   INPUT_REPLACE_CHANNEL,
   INPUT_SELECT_CHANNEL,
+  SCRIPT_VALIDATE_CHANNEL,
   type InputRegistrationBatch,
   type SelectedInputFile
 } from '@gracetree/contracts/desktop-api'
@@ -28,6 +32,7 @@ import { selectInputFiles } from '../files/file-dialogs'
 
 type RequestEngine = (command: RegisterInputFilesCommand) => Promise<EngineEvent>
 type ManageRequestEngine = (command: ManageInputCommand) => Promise<EngineEvent>
+type ValidateScriptRequestEngine = (command: ValidateScriptCommand) => Promise<EngineEvent>
 type ManageInputRequest =
   | { action: 'assign_role'; inputId: string; role: InputRole }
   | { action: 'remove'; inputId: string }
@@ -119,12 +124,34 @@ export function createManageInputHandler(
   }
 }
 
+export function createValidateScriptHandler(
+  requestEngine: ValidateScriptRequestEngine
+): (jobId: string, inputId: string, inputVersion: string, managedPath: string) => Promise<ScriptValidationDto> {
+  return async (jobId, inputId, inputVersion, managedPath) => {
+    if (!isValidJobId(jobId)) throw new Error('Job ID is invalid')
+    if (!isValidJobId(inputId)) throw new Error('Input ID is invalid')
+    const command: ValidateScriptCommand = {
+      protocolVersion: 1,
+      type: 'validate_script',
+      jobId,
+      timestamp: new Date().toISOString(),
+      payload: { inputId, inputVersion, managedPath }
+    }
+    const event = await requestEngine(command)
+    if (!isScriptValidatedEvent(event) || event.jobId !== jobId) {
+      throw new Error('Python engine response is invalid')
+    }
+    return event.payload
+  }
+}
+
 export function registerFileHandlers(
   managedRoot: string,
-  requestEngine: RequestEngine & ManageRequestEngine
+  requestEngine: RequestEngine & ManageRequestEngine & ValidateScriptRequestEngine
 ): void {
   const register = createRegisterInputFilesHandler(managedRoot, requestEngine)
   const manage = createManageInputHandler(managedRoot, requestEngine)
+  const validateScript = createValidateScriptHandler(requestEngine)
   ipcMain.handle(INPUT_SELECT_CHANNEL, () => selectInputFiles())
   ipcMain.handle(INPUT_REGISTER_CHANNEL, (_event, jobId: unknown, files: unknown) => {
     if (typeof jobId !== 'string' || !Array.isArray(files)) {
@@ -162,6 +189,20 @@ export function registerFileHandlers(
         inputId,
         sourcePath: (file as SelectedInputFile).sourcePath
       })
+    }
+  )
+  ipcMain.handle(
+    SCRIPT_VALIDATE_CHANNEL,
+    (_event, jobId: unknown, inputId: unknown, inputVersion: unknown, managedPath: unknown) => {
+      if (
+        typeof jobId !== 'string' ||
+        typeof inputId !== 'string' ||
+        typeof inputVersion !== 'string' ||
+        typeof managedPath !== 'string'
+      ) {
+        throw new Error('Script validation request is invalid')
+      }
+      return validateScript(jobId, inputId, inputVersion, managedPath)
     }
   )
 }

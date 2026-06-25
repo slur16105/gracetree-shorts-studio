@@ -8,6 +8,7 @@ import { FileSlot, MissingFileSlot } from './FileSlot'
 interface InputDropZoneProps {
   jobId: string | null
   initialInputs?: JobInputDto[]
+  onInputsChanged?: (inputs: JobInputDto[]) => void
 }
 
 const ERROR_MESSAGES: Record<Exclude<InputRegistrationResult['errorCode'], null>, string> = {
@@ -24,26 +25,38 @@ const SLOT_ROLES = ['thumbnail', 'voice', 'script', 'bgm'] as const
 
 export function InputDropZone({
   jobId,
-  initialInputs = []
+  initialInputs = [],
+  onInputsChanged
 }: InputDropZoneProps): React.JSX.Element {
   return (
-    <InputDropZoneContent initialInputs={initialInputs} jobId={jobId} key={jobId ?? 'no-job'} />
+    <InputDropZoneContent
+      initialInputs={initialInputs}
+      jobId={jobId}
+      key={jobId ?? 'no-job'}
+      onInputsChanged={onInputsChanged}
+    />
   )
 }
 
 function InputDropZoneContent({
   jobId,
-  initialInputs = []
+  initialInputs = [],
+  onInputsChanged
 }: InputDropZoneProps): React.JSX.Element {
   const [results, setResults] = useState<InputRegistrationResult[]>([])
   const [inputs, setInputs] = useState<JobInputDto[]>(initialInputs)
   const [summary, setSummary] = useState({ id: 0, text: '' })
+  const onInputsChangedRef = useRef(onInputsChanged)
   const [pendingFiles, setPendingFiles] = useState<Array<{ id: string; name: string }>>([])
   const [dragActive, setDragActive] = useState(false)
   const activeRef = useRef(true)
   const queueRef = useRef(Promise.resolve())
   const batchSequenceRef = useRef(0)
   const dragDepthRef = useRef(0)
+
+  useEffect(() => {
+    onInputsChangedRef.current = onInputsChanged
+  })
 
   useEffect(() => {
     return () => {
@@ -53,6 +66,11 @@ function InputDropZoneContent({
 
   const announce = (text: string): void => {
     setSummary((current) => ({ id: current.id + 1, text }))
+  }
+
+  const updateInputs = (nextInputs: JobInputDto[]): void => {
+    setInputs(nextInputs)
+    onInputsChangedRef.current?.(nextInputs)
   }
 
   const register = (files: InputFileCandidate[]): Promise<void> => {
@@ -70,7 +88,7 @@ function InputDropZoneContent({
         const batch = await window.desktopApi.registerInputFiles(requestJobId, files)
         if (!activeRef.current) return
         setResults(batch.results)
-        if (batch.inputs) setInputs(batch.inputs)
+        if (batch.inputs) updateInputs(batch.inputs)
         const nextResults = batch.results
         const successCount = nextResults.filter((item) => item.status === 'registered').length
         const rejectedCount = nextResults.length - successCount
@@ -94,17 +112,17 @@ function InputDropZoneContent({
 
   const assignRole = async (inputId: string, role: InputRole): Promise<void> => {
     if (!jobId) return
-    setInputs(await window.desktopApi.assignInputRole(jobId, inputId, role))
+    updateInputs(await window.desktopApi.assignInputRole(jobId, inputId, role))
   }
 
   const removeInput = async (inputId: string): Promise<void> => {
     if (!jobId) return
-    setInputs(await window.desktopApi.removeInput(jobId, inputId))
+    updateInputs(await window.desktopApi.removeInput(jobId, inputId))
   }
 
   const replaceInput = async (inputId: string, file: InputFileCandidate): Promise<void> => {
     if (!jobId) return
-    setInputs(await window.desktopApi.replaceInput(jobId, inputId, file))
+    updateInputs(await window.desktopApi.replaceInput(jobId, inputId, file))
   }
   const occupiedRoles = new Set(inputs.map((input) => input.role))
 

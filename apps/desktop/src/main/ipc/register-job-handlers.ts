@@ -1,13 +1,25 @@
-import type { EngineEvent, GetOrCreateJobCommand, JobDto } from '@gracetree/contracts'
-import { isJobLoadedEvent } from '@gracetree/contracts'
-import { JOB_GET_OR_CREATE_CHANNEL } from '@gracetree/contracts/desktop-api'
-import { ipcMain } from 'electron'
+import type {
+  CompletedJobDto,
+  EngineEvent,
+  GetOrCreateJobCommand,
+  JobDto,
+  ListCompletedJobsCommand
+} from '@gracetree/contracts'
+import { isCompletedJobsListedEvent, isJobLoadedEvent } from '@gracetree/contracts'
+import {
+  JOBS_LIST_COMPLETED_CHANNEL,
+  JOBS_OPEN_RESULT_CHANNEL,
+  JOB_GET_OR_CREATE_CHANNEL,
+  type CompletedJobSummary
+} from '@gracetree/contracts/desktop-api'
+import { shell, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { createManagedJobPaths, isValidJobId, isValidPublishDate } from '../files/managed-paths'
 
-type RequestEngine = (command: GetOrCreateJobCommand) => Promise<EngineEvent>
+type RequestEngine = (command: GetOrCreateJobCommand | ListCompletedJobsCommand) => Promise<EngineEvent>
 
 interface PathResolver {
   resolve(...paths: string[]): string
@@ -69,12 +81,67 @@ export function createGetOrCreateJobHandler(
   }
 }
 
+export function createListCompletedJobsHandler(
+  managedRoot: string,
+  requestEngine: RequestEngine,
+  idFactory: () => string = randomUUID,
+  fsExistsSync: (path: string) => boolean = existsSync
+): (managedRoot: string) => Promise<CompletedJobSummary[]> {
+  return async (_managedRoot: string): Promise<CompletedJobSummary[]> => {
+    const requestId = idFactory()
+    const command: ListCompletedJobsCommand = {
+      protocolVersion: 1,
+      type: 'list_completed_jobs',
+      jobId: requestId,
+      timestamp: new Date().toISOString(),
+      payload: { managedRoot }
+    }
+    const event = await requestEngine(command)
+    if (!isCompletedJobsListedEvent(event) || event.jobId !== requestId) {
+      throw new Error('Python engine response is invalid')
+    }
+    return event.payload.jobs.map((job: CompletedJobDto): CompletedJobSummary => ({
+      ...job,
+      resultExists: fsExistsSync(job.resultPath)
+    }))
+  }
+}
+
+export function createOpenResultFolderHandler(
+  fsExistsSync: (path: string) => boolean = existsSync,
+  shellOpenPath: (path: string) => Promise<string> = shell.openPath.bind(shell)
+): (jobId: string, resultPath: string) => Promise<void> {
+  return async (_jobId: string, resultPath: string): Promise<void> => {
+    if (!fsExistsSync(resultPath)) {
+      throw new Error(`Result folder does not exist: ${resultPath}`)
+    }
+    await shellOpenPath(resultPath)
+  }
+}
+
 export function registerJobHandlers(userDataPath: string, requestEngine: RequestEngine): void {
-  const handler = createGetOrCreateJobHandler(userDataPath, requestEngine)
+  const getOrCreateJob = createGetOrCreateJobHandler(userDataPath, requestEngine)
   ipcMain.handle(JOB_GET_OR_CREATE_CHANNEL, (_event, publishDate: unknown) => {
     if (typeof publishDate !== 'string') {
       throw new Error('Publish date must be a string')
     }
-    return handler(publishDate)
+    return getOrCreateJob(publishDate)
+  })
+
+  const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
+  const listCompletedJobs = createListCompletedJobsHandler(managedRoot, requestEngine)
+  ipcMain.handle(JOBS_LIST_COMPLETED_CHANNEL, (_event, managedRootArg: unknown) => {
+    if (typeof managedRootArg !== 'string') {
+      throw new Error('List completed jobs request is invalid')
+    }
+    return listCompletedJobs(managedRootArg)
+  })
+
+  const openResultFolder = createOpenResultFolderHandler()
+  ipcMain.handle(JOBS_OPEN_RESULT_CHANNEL, (_event, jobId: unknown, resultPath: unknown) => {
+    if (typeof jobId !== 'string' || typeof resultPath !== 'string') {
+      throw new Error('Open result folder request is invalid')
+    }
+    return openResultFolder(jobId, resultPath)
   })
 }

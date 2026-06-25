@@ -157,6 +157,27 @@ test('loads the secure shell offline and remains usable at 200% zoom', async () 
       'page'
     )
 
+    // Guide section navigation accessibility checks
+    const guideNav = page.getByRole('navigation', { name: '가이드 섹션' })
+    await expect(guideNav).toBeVisible()
+    const firstSectionButton = guideNav.getByRole('button', { name: '첫 영상 만들기' })
+    await expect(firstSectionButton).toHaveAttribute('aria-current', 'true')
+    await expect(page.getByRole('region', { name: '첫 영상 만들기' })).toBeVisible()
+
+    // Navigate to 파일명 규칙 section
+    await guideNav.getByRole('button', { name: '파일명 규칙' }).click()
+    await expect(guideNav.getByRole('button', { name: '파일명 규칙' })).toHaveAttribute('aria-current', 'true')
+    await expect(page.getByRole('region', { name: '파일명 규칙' })).toBeVisible()
+
+    // Return to home and verify job-editor state is preserved
+    const dateTriggerBefore = page.getByRole('button', { name: /게시 날짜/ })
+    // (not visible now; navigate home first)
+    await page.getByRole('button', { name: '홈' }).click()
+    const dateTriggerAfter = page.getByRole('button', { name: /게시 날짜/ })
+    await expect(dateTriggerAfter).toBeVisible()
+    const dateLabel = await dateTriggerAfter.getAttribute('aria-label')
+    expect(dateLabel).toMatch(/\d{4}-\d{2}-\d{2}/)
+
     await page.getByRole('button', { name: '공통 리소스 설정' }).click()
     const dialog = page.getByRole('dialog', { name: '공통 리소스 설정' })
     await dialog.scrollIntoViewIfNeeded()

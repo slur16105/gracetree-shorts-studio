@@ -45,7 +45,13 @@ describe('desktopApi bridge surface', () => {
       'registerInputFiles',
       'assignInputRole',
       'removeInput',
-      'replaceInput'
+      'replaceInput',
+      'validateScript',
+      'getResources',
+      'updateResource',
+      'selectResourceFile',
+      'listCompletedJobs',
+      'openResultFolder'
     ])
     expect(desktopApi).not.toHaveProperty('ipcRenderer')
     expect(desktopApi).not.toHaveProperty('fs')
@@ -71,6 +77,33 @@ describe('desktopApi bridge surface', () => {
       name: 'new.mp3',
       sourcePath: '/source/voice.mp3'
     })
+    await desktopApi.validateScript('job', 'input', 'abc123', '/managed/script.txt')
+    expect(electronMock.invoke).toHaveBeenCalledWith(
+      'script:validate',
+      'job',
+      'input',
+      'abc123',
+      '/managed/script.txt'
+    )
+    await desktopApi.getResources('/managed')
+    expect(electronMock.invoke).toHaveBeenCalledWith('resources:get', '/managed')
+    await desktopApi.updateResource('default_bgm', '/source/bgm.mp3', '/managed')
+    expect(electronMock.invoke).toHaveBeenCalledWith(
+      'resources:update',
+      'default_bgm',
+      '/source/bgm.mp3',
+      '/managed'
+    )
+    await desktopApi.selectResourceFile('default_bgm')
+    expect(electronMock.invoke).toHaveBeenCalledWith('resources:select-file', 'default_bgm')
+    await desktopApi.listCompletedJobs('/managed')
+    expect(electronMock.invoke).toHaveBeenCalledWith('jobs:list-completed', '/managed')
+    await desktopApi.openResultFolder('job-id', '/managed/output')
+    expect(electronMock.invoke).toHaveBeenCalledWith(
+      'jobs:open-result',
+      'job-id',
+      '/managed/output'
+    )
   })
 
   it('wires exactly one desktopApi namespace through contextBridge', async () => {
@@ -85,7 +118,13 @@ describe('desktopApi bridge surface', () => {
       'registerInputFiles',
       'assignInputRole',
       'removeInput',
-      'replaceInput'
+      'replaceInput',
+      'validateScript',
+      'getResources',
+      'updateResource',
+      'selectResourceFile',
+      'listCompletedJobs',
+      'openResultFolder'
     ])
     expect(Object.isFrozen(exposedValue)).toBe(true)
   })

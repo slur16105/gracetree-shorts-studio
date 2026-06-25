@@ -1,0 +1,245 @@
+.layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.sectionNav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+}
+
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.navButton {
+  position: relative;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  transition: color 0.15s, background 0.15s;
+}
+
+.navButton:hover {
+  color: var(--color-text-primary);
+  background: var(--color-raised);
+}
+
+.navButton[aria-current='true'] {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-brand) 52%, transparent);
+  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-raised));
+}
+
+.navButton[aria-current='true']::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-brand);
+  content: '';
+  transform: translateY(-50%);
+}
+
+.content {
+  min-width: 0;
+}
+
+.content h2 {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-primary);
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.content h3 {
+  margin: var(--space-6) 0 var(--space-3);
+  color: var(--color-text-primary);
+  font-size: 16px;
+}
+
+.content h4 {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-primary);
+  font-size: 15px;
+}
+
+.sectionLead {
+  margin: 0 0 var(--space-6);
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Step list for Guide Cards */
+.stepList {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guideCard {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-panel);
+}
+
+.cardStep {
+  margin: 0 0 var(--space-2);
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.guideCard p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Rule and example lists */
+.ruleList,
+.exampleList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 0 0 var(--space-5);
+}
+
+.ruleList li,
+.exampleList li {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ruleList strong,
+.exampleList strong {
+  color: var(--color-text-primary);
+}
+
+/* Troubleshoot list */
+.troubleshootList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.troubleshootList li {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+}
+
+.troubleshootList strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.troubleshootList p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Storage list */
+.storageList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-6);
+  padding: 0;
+  list-style: none;
+}
+
+.storageList li {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+}
+
+.storageList strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.storageList p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Code block */
+.codeBlock {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-5);
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+  color: var(--color-text-primary);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.content code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-raised);
+  color: var(--color-text-primary);
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+}
+
+.codeBlock code {
+  padding: 0;
+  background: none;
+}
+
+.content p {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navButton {
+    transition: none;
+  }
+}

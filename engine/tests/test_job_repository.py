@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from gracetree_engine.storage.job_repository import JobRepository
+from gracetree_engine.storage.job_repository import JobRepository, get_completed_jobs
+from gracetree_engine.storage.migrations import apply_migrations, connect_database
 
 
 def repository(tmp_path: Path) -> JobRepository:
@@ -208,3 +209,153 @@ def test_rejects_noncanonical_managed_root(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="managed root"):
         JobRepository(relative_root)
+
+
+# ---------------------------------------------------------------------------
+# get_completed_jobs 테스트
+# ---------------------------------------------------------------------------
+
+def _open_db(tmp_path: Path) -> sqlite3.Connection:
+    db_path = tmp_path / "studio.db"
+    apply_migrations(db_path)
+    return connect_database(db_path)
+
+
+def _insert_job(
+    conn: sqlite3.Connection,
+    *,
+    job_id: str,
+    publish_date: str,
+    status: str,
+    title: str | None = None,
+    result_path: str = "/some/output",
+    updated_at: str = "2026-06-25T10:00:00.000Z",
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO jobs (id, publish_date, status, title, work_path, result_path,
+                          created_at, updated_at)
+        VALUES (?, ?, ?, ?, '/some/work', ?, '2026-06-25T09:00:00.000Z', ?)
+        """,
+        (job_id, publish_date, status, title, result_path, updated_at),
+    )
+    conn.commit()
+
+
+def test_get_completed_jobs_empty_db(tmp_path: Path) -> None:
+    with _open_db(tmp_path) as conn:
+        result = get_completed_jobs(conn)
+    assert result == []
+
+
+def test_get_completed_jobs_only_draft_returns_empty(tmp_path: Path) -> None:
+    with _open_db(tmp_path) as conn:
+        _insert_job(
+            conn,
+            job_id="11111111-1111-4111-8111-111111111111",
+            publish_date="2026-06-20",
+            status="draft",
+        )
+        result = get_completed_jobs(conn)
+    assert result == []
+
+
+def test_get_completed_jobs_single_completed(tmp_path: Path) -> None:
+    with _open_db(tmp_path) as conn:
+        _insert_job(
+            conn,
+            job_id="11111111-1111-4111-8111-111111111111",
+            publish_date="2026-06-20",
+            status="completed",
+            title="오늘의 말씀",
+            result_path="/data/output",
+            updated_at="2026-06-20T10:00:00.000Z",
+        )
+        result = get_completed_jobs(conn)
+
+    assert len(result) == 1
+    assert result[0]["id"] == "11111111-1111-4111-8111-111111111111"
+    assert result[0]["publishDate"] == "2026-06-20"
+    assert result[0]["title"] == "오늘의 말씀"
+    assert result[0]["completedAt"] == "2026-06-20T10:00:00.000Z"
+    assert result[0]["resultPath"] == "/data/output"
+
+
+def test_get_completed_jobs_ordered_by_publish_date_desc(tmp_path: Path) -> None:
+    with _open_db(tmp_path) as conn:
+        _insert_job(
+            conn,
+            job_id="11111111-1111-4111-8111-111111111111",
+            publish_date="2026-06-18",
+            status="completed",
+            updated_at="2026-06-18T10:00:00.000Z",
+        )
+        _insert_job(
+            conn,
+            job_id="22222222-2222-4222-8222-222222222222",
+            publish_date="2026-06-25",
+            status="completed",
+            updated_at="2026-06-25T10:00:00.000Z",
+        )
+        _insert_job(
+            conn,
+            job_id="33333333-3333-4333-8333-333333333333",
+            publish_date="2026-06-20",
+            status="completed",
+            updated_at="2026-06-20T10:00:00.000Z",
+        )
+        result = get_completed_jobs(conn)
+
+    assert len(result) == 3
+    assert result[0]["publishDate"] == "2026-06-25"
+    assert result[1]["publishDate"] == "2026-06-20"
+    assert result[2]["publishDate"] == "2026-06-18"
+
+
+def test_get_completed_jobs_mixed_statuses_returns_only_completed(
+    tmp_path: Path,
+) -> None:
+    with _open_db(tmp_path) as conn:
+        _insert_job(
+            conn,
+            job_id="11111111-1111-4111-8111-111111111111",
+            publish_date="2026-06-20",
+            status="completed",
+        )
+        _insert_job(
+            conn,
+            job_id="22222222-2222-4222-8222-222222222222",
+            publish_date="2026-06-21",
+            status="draft",
+        )
+        _insert_job(
+            conn,
+            job_id="33333333-3333-4333-8333-333333333333",
+            publish_date="2026-06-22",
+            status="failed",
+        )
+        _insert_job(
+            conn,
+            job_id="44444444-4444-4444-8444-444444444444",
+            publish_date="2026-06-23",
+            status="running",
+        )
+        result = get_completed_jobs(conn)
+
+    assert len(result) == 1
+    assert result[0]["id"] == "11111111-1111-4111-8111-111111111111"
+
+
+def test_get_completed_jobs_title_none(tmp_path: Path) -> None:
+    with _open_db(tmp_path) as conn:
+        _insert_job(
+            conn,
+            job_id="11111111-1111-4111-8111-111111111111",
+            publish_date="2026-06-20",
+            status="completed",
+            title=None,
+        )
+        result = get_completed_jobs(conn)
+
+    assert len(result) == 1
+    assert result[0]["title"] is None

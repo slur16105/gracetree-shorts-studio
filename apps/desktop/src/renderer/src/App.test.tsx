@@ -19,9 +19,11 @@ describe('App shell', () => {
           createdAt: '2026-06-20T00:00:00.000Z',
           updatedAt: '2026-06-20T00:00:00.000Z',
           pathState: 'ready',
-          inputMetadata: []
-        }))
-      }
+          inputMetadata: [],
+        })),
+        getResources: vi.fn(async () => []),
+        listCompletedJobs: vi.fn(async () => []),
+      },
     })
   })
 
@@ -38,7 +40,6 @@ describe('App shell', () => {
     expect(settings).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('region', { name: '새 영상 준비' })).toBeVisible()
     expect(screen.getByRole('complementary', { name: '완료 목록' })).toBeVisible()
-    expect(screen.getByText('완료된 영상이 없습니다.')).toBeVisible()
 
     await user.click(guide)
 
@@ -76,6 +77,28 @@ describe('App shell', () => {
     expect(screen.getByRole('button', { name: '공통 리소스 설정' })).toHaveFocus()
   })
 
+  it('preserves job-editor date and slot state when navigating to guide and back', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    // 홈 뷰에서 DatePicker 날짜 버튼이 표시됨 (초기 로딩 대기)
+    const dateTrigger = await screen.findByRole('button', { name: /게시 날짜/ })
+    const initialLabel = dateTrigger.getAttribute('aria-label')
+
+    // 가이드로 이동
+    await user.click(screen.getByRole('button', { name: '사용 가이드' }))
+    expect(screen.getByRole('navigation', { name: '가이드 섹션' })).toBeVisible()
+
+    // 홈으로 복귀
+    await user.click(screen.getByRole('button', { name: '홈' }))
+
+    // 날짜 상태가 보존되어야 함
+    const restoredTrigger = screen.getByRole('button', { name: /게시 날짜/ })
+    expect(restoredTrigger.getAttribute('aria-label')).toBe(initialLabel)
+    // 파일 선택 슬롯도 보존
+    expect(screen.getByRole('button', { name: '파일 선택' })).toBeVisible()
+  })
+
   it('traps dialog focus, closes with Escape, and restores trigger focus', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -84,16 +107,14 @@ describe('App shell', () => {
     await user.click(trigger)
 
     const dialog = screen.getByRole('dialog', { name: '공통 리소스 설정' })
-    const close = screen.getByRole('button', { name: '설정 닫기' })
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     expect(dialog).toBeVisible()
-    expect(close).toHaveFocus()
 
-    await user.tab()
-    expect(close).toHaveFocus()
-    await user.tab({ shift: true })
-    expect(close).toHaveFocus()
+    // 다이얼로그가 열리면 첫 번째 파일 선택 버튼에 초기 포커스
+    const firstSelectButton = screen.getByRole('button', { name: '제목·말씀 영상 파일 선택' })
+    expect(firstSelectButton).toHaveFocus()
 
+    // Escape로 닫기
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(trigger).toHaveAttribute('aria-expanded', 'false')

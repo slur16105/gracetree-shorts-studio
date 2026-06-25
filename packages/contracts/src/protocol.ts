@@ -185,16 +185,75 @@ export interface InputStateChangedEvent {
   };
 }
 
+export const SCRIPT_ERROR_CODES = [
+  "FILE_UNREADABLE",
+  "FILE_EMPTY",
+  "SECTION_MISSING",
+  "SECTION_EMPTY",
+  "SECTION_DUPLICATE",
+] as const;
+export type ScriptErrorCode = (typeof SCRIPT_ERROR_CODES)[number];
+
+export const SCRIPT_SECTIONS = ["title", "scripture", "prayer"] as const;
+export type ScriptSection = (typeof SCRIPT_SECTIONS)[number];
+
+export interface ScriptSectionError {
+  code: ScriptErrorCode;
+  section: ScriptSection | null;
+  message: string;
+}
+
+export interface ScriptValidationDto {
+  inputId: string;
+  inputVersion: string;
+  status: "valid" | "invalid";
+  oneLiner: string | null;
+  sections: {
+    title: string | null;
+    scripture: string | null;
+    prayer: string | null;
+  };
+  errors: ScriptSectionError[];
+}
+
+export interface ValidateScriptCommand {
+  protocolVersion: 1;
+  type: "validate_script";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    inputId: string;
+    inputVersion: string;
+    managedPath: string;
+  };
+}
+
+export interface ScriptValidatedEvent {
+  protocolVersion: 1;
+  type: "script_validated";
+  jobId: string;
+  timestamp: string;
+  payload: ScriptValidationDto;
+}
+
 export type EngineCommand =
   | CheckHealthCommand
   | GetOrCreateJobCommand
   | RegisterInputFilesCommand
-  | ManageInputCommand;
+  | ManageInputCommand
+  | ValidateScriptCommand
+  | GetResourcesCommand
+  | UpdateResourceCommand
+  | ListCompletedJobsCommand;
 export type EngineEvent =
   | HealthCheckedEvent
   | JobLoadedEvent
   | InputFilesRegisteredEvent
-  | InputStateChangedEvent;
+  | InputStateChangedEvent
+  | ScriptValidatedEvent
+  | ResourcesLoadedEvent
+  | ResourceUpdatedEvent
+  | CompletedJobsListedEvent;
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 const addFormats = (addFormatsModule.default ??
@@ -248,6 +307,143 @@ export function isInputStateChangedEvent(
   value: unknown,
 ): value is InputStateChangedEvent {
   return validateEvent(value) && value.type === "input_state_changed";
+}
+
+// ── Story 1.7: Common resources ──────────────────────────────────────────
+
+export const RESOURCE_TYPES = [
+  "title_scripture_video",
+  "prayer_loop_video",
+  "default_bgm",
+  "subtitle_font",
+] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
+
+export const RESOURCE_STATUSES = ["ready", "missing", "invalid"] as const;
+export type ResourceStatus = (typeof RESOURCE_STATUSES)[number];
+
+export interface ResourceDto {
+  type: ResourceType;
+  managedPath: string | null;
+  status: ResourceStatus;
+  updatedAt: string;
+}
+
+export interface GetResourcesCommand {
+  protocolVersion: 1;
+  type: "get_resources";
+  jobId: string;
+  timestamp: string;
+  payload: { managedRoot: string };
+}
+
+export interface UpdateResourceCommand {
+  protocolVersion: 1;
+  type: "update_resource";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    resourceType: ResourceType;
+    sourcePath: string;
+    managedRoot: string;
+  };
+}
+
+export interface ResourcesLoadedEvent {
+  protocolVersion: 1;
+  type: "resources_loaded";
+  jobId: string;
+  timestamp: string;
+  payload: { resources: ResourceDto[] };
+}
+
+export interface ResourceUpdatedEvent {
+  protocolVersion: 1;
+  type: "resource_updated";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    resources: ResourceDto[];
+    error: {
+      resourceType: ResourceType;
+      code: string;
+      message: string;
+    } | null;
+  };
+}
+
+// ── Story 4.1: Completed jobs list ───────────────────────────────────────
+
+export interface CompletedJobDto {
+  id: string;
+  publishDate: string;
+  title: string | null;
+  completedAt: string;
+  resultPath: string;
+}
+
+export interface ListCompletedJobsCommand {
+  protocolVersion: 1;
+  type: "list_completed_jobs";
+  jobId: string;
+  timestamp: string;
+  payload: { managedRoot: string };
+}
+
+export interface CompletedJobsListedEvent {
+  protocolVersion: 1;
+  type: "completed_jobs_listed";
+  jobId: string;
+  timestamp: string;
+  payload: { jobs: CompletedJobDto[] };
+}
+
+export function isValidateScriptCommand(
+  value: unknown,
+): value is ValidateScriptCommand {
+  return validateCommand(value) && value.type === "validate_script";
+}
+
+export function isScriptValidatedEvent(
+  value: unknown,
+): value is ScriptValidatedEvent {
+  return validateEvent(value) && value.type === "script_validated";
+}
+
+export function isGetResourcesCommand(
+  value: unknown,
+): value is GetResourcesCommand {
+  return validateCommand(value) && value.type === "get_resources";
+}
+
+export function isUpdateResourceCommand(
+  value: unknown,
+): value is UpdateResourceCommand {
+  return validateCommand(value) && value.type === "update_resource";
+}
+
+export function isResourcesLoadedEvent(
+  value: unknown,
+): value is ResourcesLoadedEvent {
+  return validateEvent(value) && value.type === "resources_loaded";
+}
+
+export function isResourceUpdatedEvent(
+  value: unknown,
+): value is ResourceUpdatedEvent {
+  return validateEvent(value) && value.type === "resource_updated";
+}
+
+export function isListCompletedJobsCommand(
+  value: unknown,
+): value is ListCompletedJobsCommand {
+  return validateCommand(value) && value.type === "list_completed_jobs";
+}
+
+export function isCompletedJobsListedEvent(
+  value: unknown,
+): value is CompletedJobsListedEvent {
+  return validateEvent(value) && value.type === "completed_jobs_listed";
 }
 
 export function isEngineEvent(value: unknown): value is EngineEvent {

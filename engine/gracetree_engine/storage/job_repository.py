@@ -63,6 +63,28 @@ def _create_job_directories(work_path: Path) -> list[Path]:
     return created
 
 
+def get_completed_jobs(conn: sqlite3.Connection) -> list[dict]:
+    """게시 날짜 내림차순으로 완료된 job 목록을 반환한다."""
+    rows = conn.execute(
+        """
+        SELECT id, publish_date, title, updated_at AS completed_at, result_path
+        FROM jobs
+        WHERE status = 'completed'
+        ORDER BY publish_date DESC
+        """
+    ).fetchall()
+    return [
+        {
+            "id": str(row["id"]),
+            "publishDate": str(row["publish_date"]),
+            "title": row["title"] if row["title"] is not None else None,
+            "completedAt": str(row["completed_at"]),
+            "resultPath": str(row["result_path"]),
+        }
+        for row in rows
+    ]
+
+
 def _remove_empty_directories(paths: list[Path]) -> None:
     for path in reversed(paths):
         try:

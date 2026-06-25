@@ -6,7 +6,13 @@ import type {
   INPUT_REPLACE_CHANNEL,
   INPUT_SELECT_CHANNEL,
   InputFileCandidate,
-  JOB_GET_OR_CREATE_CHANNEL
+  JOBS_LIST_COMPLETED_CHANNEL,
+  JOBS_OPEN_RESULT_CHANNEL,
+  JOB_GET_OR_CREATE_CHANNEL,
+  RESOURCE_GET_CHANNEL,
+  RESOURCE_SELECT_FILE_CHANNEL,
+  RESOURCE_UPDATE_CHANNEL,
+  SCRIPT_VALIDATE_CHANNEL
 } from '@gracetree/contracts/desktop-api'
 import { ipcRenderer, webUtils } from 'electron'
 
@@ -16,6 +22,12 @@ const inputRegisterChannel: typeof INPUT_REGISTER_CHANNEL = 'inputs:register-fil
 const inputAssignRoleChannel: typeof INPUT_ASSIGN_ROLE_CHANNEL = 'inputs:assign-role'
 const inputRemoveChannel: typeof INPUT_REMOVE_CHANNEL = 'inputs:remove'
 const inputReplaceChannel: typeof INPUT_REPLACE_CHANNEL = 'inputs:replace'
+const scriptValidateChannel: typeof SCRIPT_VALIDATE_CHANNEL = 'script:validate'
+const resourceGetChannel: typeof RESOURCE_GET_CHANNEL = 'resources:get'
+const resourceUpdateChannel: typeof RESOURCE_UPDATE_CHANNEL = 'resources:update'
+const resourceSelectFileChannel: typeof RESOURCE_SELECT_FILE_CHANNEL = 'resources:select-file'
+const jobsListCompletedChannel: typeof JOBS_LIST_COMPLETED_CHANNEL = 'jobs:list-completed'
+const jobsOpenResultChannel: typeof JOBS_OPEN_RESULT_CHANNEL = 'jobs:open-result'
 
 function toSelectedFile(file: InputFileCandidate): { name: string; sourcePath: string } {
   let sourcePath = file.sourcePath ?? ''
@@ -41,5 +53,14 @@ export const desktopApi = Object.freeze({
     ipcRenderer.invoke(inputAssignRoleChannel, jobId, inputId, role),
   removeInput: (jobId, inputId) => ipcRenderer.invoke(inputRemoveChannel, jobId, inputId),
   replaceInput: (jobId, inputId, file) =>
-    ipcRenderer.invoke(inputReplaceChannel, jobId, inputId, toSelectedFile(file))
+    ipcRenderer.invoke(inputReplaceChannel, jobId, inputId, toSelectedFile(file)),
+  validateScript: (jobId, inputId, inputVersion, managedPath) =>
+    ipcRenderer.invoke(scriptValidateChannel, jobId, inputId, inputVersion, managedPath),
+  getResources: (managedRoot) => ipcRenderer.invoke(resourceGetChannel, managedRoot),
+  updateResource: (resourceType, sourcePath, managedRoot) =>
+    ipcRenderer.invoke(resourceUpdateChannel, resourceType, sourcePath, managedRoot),
+  selectResourceFile: (resourceType) => ipcRenderer.invoke(resourceSelectFileChannel, resourceType),
+  listCompletedJobs: (managedRoot) => ipcRenderer.invoke(jobsListCompletedChannel, managedRoot),
+  openResultFolder: (jobId, resultPath) =>
+    ipcRenderer.invoke(jobsOpenResultChannel, jobId, resultPath)
 }) satisfies DesktopApi

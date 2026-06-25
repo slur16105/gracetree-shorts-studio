@@ -1,11 +1,16 @@
 import type {
   EngineEvent,
   ManageInputCommand,
-  RegisterInputFilesCommand
+  RegisterInputFilesCommand,
+  ValidateScriptCommand
 } from '@gracetree/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
-import { createManageInputHandler, createRegisterInputFilesHandler } from './register-file-handlers'
+import {
+  createManageInputHandler,
+  createRegisterInputFilesHandler,
+  createValidateScriptHandler
+} from './register-file-handlers'
 
 const jobId = '11111111-1111-4111-8111-111111111111'
 
@@ -192,5 +197,99 @@ describe('input management handler', () => {
       )
     )
     await expect(badEngine(jobId, { action: 'remove', inputId })).rejects.toThrow('engine response')
+  })
+})
+
+describe('script validation handler', () => {
+  const inputId = '22222222-2222-4222-8222-222222222222'
+  const inputVersion = 'abc123'
+  const managedPath = '/managed/script.txt'
+
+  it('sends a validate_script command and returns ScriptValidationDto for a valid script', async () => {
+    const requestEngine = vi.fn(
+      async (command: ValidateScriptCommand): Promise<EngineEvent> => ({
+        protocolVersion: 1,
+        type: 'script_validated',
+        jobId: command.jobId,
+        timestamp: '2026-06-20T00:00:00.000Z',
+        payload: {
+          inputId: command.payload.inputId,
+          inputVersion: command.payload.inputVersion,
+          status: 'valid',
+          oneLiner: '주님의 은혜',
+          sections: { title: '제목', scripture: '성경', prayer: '기도' },
+          errors: []
+        }
+      })
+    )
+    const handler = createValidateScriptHandler(requestEngine)
+
+    const result = await handler(jobId, inputId, inputVersion, managedPath)
+
+    expect(result.status).toBe('valid')
+    expect(result.oneLiner).toBe('주님의 은혜')
+    expect(result.errors).toHaveLength(0)
+    expect(requestEngine).toHaveBeenCalledTimes(1)
+    expect(requestEngine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'validate_script',
+        jobId,
+        payload: { inputId, inputVersion, managedPath }
+      })
+    )
+  })
+
+  it('sends a validate_script command and returns ScriptValidationDto for an invalid script', async () => {
+    const requestEngine = vi.fn(
+      async (command: ValidateScriptCommand): Promise<EngineEvent> => ({
+        protocolVersion: 1,
+        type: 'script_validated',
+        jobId: command.jobId,
+        timestamp: '2026-06-20T00:00:00.000Z',
+        payload: {
+          inputId: command.payload.inputId,
+          inputVersion: command.payload.inputVersion,
+          status: 'invalid',
+          oneLiner: null,
+          sections: { title: null, scripture: null, prayer: null },
+          errors: [
+            { code: 'SECTION_MISSING', section: 'title', message: '제목 섹션이 없습니다' }
+          ]
+        }
+      })
+    )
+    const handler = createValidateScriptHandler(requestEngine)
+
+    const result = await handler(jobId, inputId, inputVersion, managedPath)
+
+    expect(result.status).toBe('invalid')
+    expect(result.oneLiner).toBeNull()
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]?.code).toBe('SECTION_MISSING')
+  })
+
+  it('rejects invalid job ID and input ID', async () => {
+    const handler = createValidateScriptHandler(vi.fn())
+
+    await expect(handler('invalid', inputId, inputVersion, managedPath)).rejects.toThrow('Job ID')
+    await expect(handler(jobId, 'invalid', inputVersion, managedPath)).rejects.toThrow('Input ID')
+  })
+
+  it('rejects an invalid engine event', async () => {
+    const handler = createValidateScriptHandler(
+      vi.fn(
+        async (): Promise<EngineEvent> => ({
+          protocolVersion: 1,
+          type: 'health_checked',
+          jobId,
+          timestamp: '2026-06-20T00:00:00.000Z',
+          payload: { status: 'ok' }
+        })
+      )
+    )
+
+    await expect(handler(jobId, inputId, inputVersion, managedPath)).rejects.toThrow(
+      'engine response'
+    )
   })
 })

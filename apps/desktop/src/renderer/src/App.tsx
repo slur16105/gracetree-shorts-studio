@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { SettingsDialog } from './components/SettingsDialog'
 import { SidebarIcon } from './components/SidebarIcon'
+import { GuideView } from './features/guide/GuideView'
+import { CompletionList } from './features/job-history/CompletionList'
 import { JobEditor } from './features/job-editor/JobEditor'
 import styles from './styles/App.module.css'
 
@@ -10,6 +12,7 @@ type View = 'home' | 'guide'
 function App(): React.JSX.Element {
   const [view, setView] = useState<View>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [managedRoot, setManagedRoot] = useState('')
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsWasOpen = useRef(false)
 
@@ -19,6 +22,10 @@ function App(): React.JSX.Element {
     }
     settingsWasOpen.current = settingsOpen
   }, [settingsOpen])
+
+  const handleManagedRootResolved = useCallback((resolved: string) => {
+    setManagedRoot((current) => (current === resolved ? current : resolved))
+  }, [])
 
   return (
     <div className={styles.shell}>
@@ -67,13 +74,20 @@ function App(): React.JSX.Element {
             <div className={styles.homeLayout}>
               <section aria-labelledby="workspace-title" className={styles.workspaceRegion}>
                 <h2 id="workspace-title">새 영상 준비</h2>
-                <JobEditor />
+                <JobEditor
+                  managedRoot={managedRoot}
+                  onManagedRootResolved={handleManagedRootResolved}
+                />
               </section>
               <aside aria-labelledby="completed-title" className={styles.completedRegion}>
                 <h2 id="completed-title">완료 목록</h2>
-                <div className={styles.compactEmptyState}>
-                  <p>완료된 영상이 없습니다.</p>
-                </div>
+                {managedRoot ? (
+                  <CompletionList managedRoot={managedRoot} />
+                ) : (
+                  <div className={styles.compactEmptyState}>
+                    <p>완료된 영상이 없습니다.</p>
+                  </div>
+                )}
               </aside>
             </div>
           </section>
@@ -81,10 +95,7 @@ function App(): React.JSX.Element {
           <section aria-labelledby="guide-title" className={styles.view}>
             <p className={styles.eyebrow}>도움말</p>
             <h1 id="guide-title">사용 가이드</h1>
-            <div className={styles.emptyState}>
-              <h2>가이드 콘텐츠를 준비하고 있습니다</h2>
-              <p>첫 영상 만들기와 파일 준비 방법은 이후 단계에서 제공됩니다.</p>
-            </div>
+            <GuideView />
           </section>
         )}
       </main>
@@ -95,7 +106,9 @@ function App(): React.JSX.Element {
         <span className={styles.statusDetail}>모든 기능은 로컬에서 실행됩니다</span>
       </footer>
 
-      {settingsOpen ? <SettingsDialog onClose={() => setSettingsOpen(false)} /> : null}
+      {settingsOpen ? (
+        <SettingsDialog managedRoot={managedRoot} onClose={() => setSettingsOpen(false)} />
+      ) : null}
     </div>
   )
 }

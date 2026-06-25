@@ -216,9 +216,165 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "resources_loaded" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resources"],
+          "properties": {
+            "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "resource_updated" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resources", "error"],
+          "properties": {
+            "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" } },
+            "error": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["resourceType", "code", "message"],
+                  "properties": {
+                    "resourceType": { "enum": ["title_scripture_video", "prayer_loop_video", "default_bgm", "subtitle_font"] },
+                    "code": { "type": "string", "minLength": 1 },
+                    "message": { "type": "string", "minLength": 1 }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "completed_jobs_listed" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["jobs"],
+          "properties": {
+            "jobs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "publishDate", "title", "completedAt", "resultPath"],
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "publishDate": { "type": "string", "format": "date" },
+                  "title": { "type": ["string", "null"] },
+                  "completedAt": { "type": "string", "format": "date-time", "pattern": "Z$" },
+                  "resultPath": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "script_validated" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inputId", "inputVersion", "status", "oneLiner", "sections", "errors"],
+          "properties": {
+            "inputId": { "type": "string", "format": "uuid" },
+            "inputVersion": { "type": "string", "minLength": 1 },
+            "status": { "enum": ["valid", "invalid"] },
+            "oneLiner": { "type": ["string", "null"] },
+            "sections": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["title", "scripture", "prayer"],
+              "properties": {
+                "title": { "type": ["string", "null"] },
+                "scripture": { "type": ["string", "null"] },
+                "prayer": { "type": ["string", "null"] }
+              }
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["code", "section", "message"],
+                "properties": {
+                  "code": {
+                    "enum": [
+                      "FILE_UNREADABLE",
+                      "FILE_EMPTY",
+                      "SECTION_MISSING",
+                      "SECTION_EMPTY",
+                      "SECTION_DUPLICATE"
+                    ]
+                  },
+                  "section": {
+                    "enum": ["title", "scripture", "prayer", null]
+                  },
+                  "message": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "managedPath", "status", "updatedAt"],
+      "properties": {
+        "type": { "enum": ["title_scripture_video", "prayer_loop_video", "default_bgm", "subtitle_font"] },
+        "managedPath": { "type": ["string", "null"] },
+        "status": { "enum": ["ready", "missing", "invalid"] },
+        "updatedAt": { "type": "string", "format": "date-time", "pattern": "Z$" }
+      }
+    },
     "jobInput": {
       "type": "object",
       "additionalProperties": false,

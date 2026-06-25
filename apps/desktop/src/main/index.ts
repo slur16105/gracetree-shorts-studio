@@ -6,6 +6,7 @@ import { shouldBlockNavigation } from './navigation-policy'
 import { createWindowOptions, enforceMinimumContentSize } from './window-options'
 import { registerJobHandlers } from './ipc/register-job-handlers'
 import { registerFileHandlers } from './ipc/register-file-handlers'
+import { registerResourceHandlers } from './ipc/register-resource-handlers'
 import { EngineClient } from './jobs/engine-client'
 import { createManagedJobPaths } from './files/managed-paths'
 
@@ -53,6 +54,10 @@ app.whenReady().then(() => {
     return engineClient.request(command)
   })
   registerFileHandlers(managedRoot, (command) => {
+    if (!engineClient) throw new Error('Python engine is unavailable')
+    return engineClient.request(command)
+  })
+  registerResourceHandlers(userDataPath, (command) => {
     if (!engineClient) throw new Error('Python engine is unavailable')
     return engineClient.request(command)
   })

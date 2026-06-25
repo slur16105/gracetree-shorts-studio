@@ -10,8 +10,11 @@ from typing import Any, TextIO
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
-from .storage.job_repository import JobRepository
+from .storage.job_repository import JobRepository, get_completed_jobs
 from .inputs.input_service import InputService
+from .storage.resource_repository import get_all_resources
+from .inputs.resource_service import update_resource
+from .storage.migrations import apply_migrations, connect_database
 
 CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "packages" / "contracts"
 
@@ -114,6 +117,102 @@ def _input_state_changed(command: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
+def _resources_loaded(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command["payload"]
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value or Path(payload["managedRoot"]) != Path(approved_root_value):
+        raise ValueError("command managed root does not match the approved root")
+    approved_root = Path(approved_root_value)
+    database_path = approved_root / "studio.db"
+    apply_migrations(database_path)
+    with connect_database(database_path) as conn:
+        resources = get_all_resources(conn)
+    event = {
+        "protocolVersion": 1,
+        "type": "resources_loaded",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": {"resources": resources},
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
+def _resource_updated(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command["payload"]
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value or Path(payload["managedRoot"]) != Path(approved_root_value):
+        raise ValueError("command managed root does not match the approved root")
+    approved_root = Path(approved_root_value)
+    database_path = approved_root / "studio.db"
+    apply_migrations(database_path)
+    with connect_database(database_path) as conn:
+        result = update_resource(
+            conn,
+            managed_root=payload["managedRoot"],
+            resource_type=payload["resourceType"],
+            source_path=payload["sourcePath"],
+        )
+    event = {
+        "protocolVersion": 1,
+        "type": "resource_updated",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": result,
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
+def _completed_jobs_listed(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command["payload"]
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value or Path(payload["managedRoot"]) != Path(approved_root_value):
+        raise ValueError("command managed root does not match the approved root")
+    approved_root = Path(approved_root_value)
+    database_path = approved_root / "studio.db"
+    apply_migrations(database_path)
+    with connect_database(database_path) as conn:
+        jobs = get_completed_jobs(conn)
+    event = {
+        "protocolVersion": 1,
+        "type": "completed_jobs_listed",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": {"jobs": jobs},
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
+def _script_validated(command: dict[str, Any]) -> dict[str, Any]:
+    from gracetree_engine.scripts.validator import validate_script
+
+    payload = command["payload"]
+    result = validate_script(
+        managed_path=payload["managedPath"],
+        input_id=payload["inputId"],
+        input_version=payload["inputVersion"],
+    )
+    event = {
+        "protocolVersion": 1,
+        "type": "script_validated",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
+        "payload": result,
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
     had_error = False
 
@@ -146,6 +245,14 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 event = _job_loaded(command)
             elif command["type"] == "register_input_files":
                 event = _input_files_registered(command)
+            elif command["type"] == "validate_script":
+                event = _script_validated(command)
+            elif command["type"] == "get_resources":
+                event = _resources_loaded(command)
+            elif command["type"] == "update_resource":
+                event = _resource_updated(command)
+            elif command["type"] == "list_completed_jobs":
+                event = _completed_jobs_listed(command)
             else:
                 event = _input_state_changed(command)
         except (ValidationError, ValueError) as error:

@@ -226,12 +226,19 @@
 }
 
 .dialog {
+  position: relative;
   width: min(560px, calc(100vw - 64px));
   padding: var(--space-6);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-raised);
   box-shadow: 0 24px 80px rgb(0 0 0 / 48%);
+}
+
+.dialogCloseButton {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
 }
 
 .dialogHeader {
@@ -250,6 +257,105 @@
 
 .closeButton:hover {
   border-color: #4a5050;
+}
+
+.resourceList {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.resourceRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.resourceRowMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-panel);
+}
+
+.resourceInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.resourceLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.resourceFormats {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.resourceStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  min-width: 80px;
+}
+
+.resourceStatus[data-status='ready'] {
+  color: var(--color-success, #4caf50);
+}
+
+.resourceStatus[data-status='missing'] {
+  color: var(--color-text-secondary);
+}
+
+.resourceStatus[data-status='invalid'] {
+  color: var(--color-warning, #ff9800);
+}
+
+.resourceStatusIcon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.resourceStatusText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.resourceSelectButton {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-raised);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.resourceSelectButton:hover {
+  background: var(--color-panel);
+  border-color: var(--color-text-secondary);
+}
+
+.resourceError {
+  margin: 0;
+  padding: 0 var(--space-4);
+  font-size: 12px;
+  color: var(--color-error, #f44336);
 }
 
 @media (prefers-reduced-motion: reduce) {
