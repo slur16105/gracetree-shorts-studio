@@ -6,6 +6,8 @@ import { desktopApi } from './desktop-api'
 const electronMock = vi.hoisted(() => ({
   exposeInMainWorld: vi.fn(),
   invoke: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
   getPathForFile: vi.fn()
 }))
 
@@ -14,7 +16,9 @@ vi.mock('electron', () => ({
     exposeInMainWorld: electronMock.exposeInMainWorld
   },
   ipcRenderer: {
-    invoke: electronMock.invoke
+    invoke: electronMock.invoke,
+    on: electronMock.on,
+    off: electronMock.off
   },
   webUtils: {
     getPathForFile: electronMock.getPathForFile
@@ -51,7 +55,10 @@ describe('desktopApi bridge surface', () => {
       'updateResource',
       'selectResourceFile',
       'listCompletedJobs',
-      'openResultFolder'
+      'openResultFolder',
+      'startJob',
+      'cancelJob',
+      'onJobEvent'
     ])
     expect(desktopApi).not.toHaveProperty('ipcRenderer')
     expect(desktopApi).not.toHaveProperty('fs')
@@ -104,6 +111,15 @@ describe('desktopApi bridge surface', () => {
       'job-id',
       '/managed/output'
     )
+    await desktopApi.startJob('job-id', '/managed', '/work/path')
+    expect(electronMock.invoke).toHaveBeenCalledWith('jobs:start', 'job-id', '/managed', '/work/path')
+    await desktopApi.cancelJob('job-id', 'attempt-id')
+    expect(electronMock.invoke).toHaveBeenCalledWith('jobs:cancel', 'job-id', 'attempt-id')
+    const listener = vi.fn()
+    const unsub = desktopApi.onJobEvent(listener)
+    expect(electronMock.on).toHaveBeenCalledWith('jobs:event', expect.any(Function))
+    unsub()
+    expect(electronMock.off).toHaveBeenCalledWith('jobs:event', expect.any(Function))
   })
 
   it('wires exactly one desktopApi namespace through contextBridge', async () => {
@@ -124,7 +140,10 @@ describe('desktopApi bridge surface', () => {
       'updateResource',
       'selectResourceFile',
       'listCompletedJobs',
-      'openResultFolder'
+      'openResultFolder',
+      'startJob',
+      'cancelJob',
+      'onJobEvent'
     ])
     expect(Object.isFrozen(exposedValue)).toBe(true)
   })

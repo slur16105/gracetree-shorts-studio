@@ -1,22 +1,29 @@
 import type {
   DesktopApi,
+  EngineEvent,
   INPUT_ASSIGN_ROLE_CHANNEL,
   INPUT_REGISTER_CHANNEL,
   INPUT_REMOVE_CHANNEL,
   INPUT_REPLACE_CHANNEL,
   INPUT_SELECT_CHANNEL,
   InputFileCandidate,
+  JOB_CANCEL_CHANNEL,
+  JOB_EVENT_CHANNEL,
+  JOB_GET_OR_CREATE_CHANNEL,
+  JOB_START_CHANNEL,
   JOBS_LIST_COMPLETED_CHANNEL,
   JOBS_OPEN_RESULT_CHANNEL,
-  JOB_GET_OR_CREATE_CHANNEL,
   RESOURCE_GET_CHANNEL,
   RESOURCE_SELECT_FILE_CHANNEL,
   RESOURCE_UPDATE_CHANNEL,
   SCRIPT_VALIDATE_CHANNEL
 } from '@gracetree/contracts/desktop-api'
-import { ipcRenderer, webUtils } from 'electron'
+import { ipcRenderer, type IpcRendererEvent, webUtils } from 'electron'
 
 const jobGetOrCreateChannel: typeof JOB_GET_OR_CREATE_CHANNEL = 'jobs:get-or-create-for-date'
+const jobStartChannel: typeof JOB_START_CHANNEL = 'jobs:start'
+const jobCancelChannel: typeof JOB_CANCEL_CHANNEL = 'jobs:cancel'
+const jobEventChannel: typeof JOB_EVENT_CHANNEL = 'jobs:event'
 const inputSelectChannel: typeof INPUT_SELECT_CHANNEL = 'inputs:select-files'
 const inputRegisterChannel: typeof INPUT_REGISTER_CHANNEL = 'inputs:register-files'
 const inputAssignRoleChannel: typeof INPUT_ASSIGN_ROLE_CHANNEL = 'inputs:assign-role'
@@ -62,5 +69,13 @@ export const desktopApi = Object.freeze({
   selectResourceFile: (resourceType) => ipcRenderer.invoke(resourceSelectFileChannel, resourceType),
   listCompletedJobs: (managedRoot) => ipcRenderer.invoke(jobsListCompletedChannel, managedRoot),
   openResultFolder: (jobId, resultPath) =>
-    ipcRenderer.invoke(jobsOpenResultChannel, jobId, resultPath)
+    ipcRenderer.invoke(jobsOpenResultChannel, jobId, resultPath),
+  startJob: (jobId, managedRoot, workPath) =>
+    ipcRenderer.invoke(jobStartChannel, jobId, managedRoot, workPath),
+  cancelJob: (jobId, attemptId) => ipcRenderer.invoke(jobCancelChannel, jobId, attemptId),
+  onJobEvent: (listener) => {
+    const wrapper = (_: IpcRendererEvent, event: EngineEvent) => listener(event)
+    ipcRenderer.on(jobEventChannel, wrapper)
+    return () => ipcRenderer.off(jobEventChannel, wrapper)
+  }
 }) satisfies DesktopApi

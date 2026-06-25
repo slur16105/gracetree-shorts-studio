@@ -8,6 +8,8 @@ import { registerJobHandlers } from './ipc/register-job-handlers'
 import { registerFileHandlers } from './ipc/register-file-handlers'
 import { registerResourceHandlers } from './ipc/register-resource-handlers'
 import { EngineClient } from './jobs/engine-client'
+import { EngineProcess } from './jobs/engine-process'
+import { JobService } from './jobs/job-service'
 import { createManagedJobPaths } from './files/managed-paths'
 
 const projectRoot = resolve(__dirname, '../../../..')
@@ -49,10 +51,16 @@ app.whenReady().then(() => {
   const userDataPath = app.getPath('userData')
   const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
   engineClient = new EngineClient(projectRoot, managedRoot)
-  registerJobHandlers(userDataPath, (command) => {
-    if (!engineClient) throw new Error('Python engine is unavailable')
-    return engineClient.request(command)
-  })
+  const engineProcess = new EngineProcess(engineClient)
+  const jobService = new JobService(engineProcess)
+  registerJobHandlers(
+    userDataPath,
+    (command) => {
+      if (!engineClient) throw new Error('Python engine is unavailable')
+      return engineClient.request(command)
+    },
+    jobService
+  )
   registerFileHandlers(managedRoot, (command) => {
     if (!engineClient) throw new Error('Python engine is unavailable')
     return engineClient.request(command)

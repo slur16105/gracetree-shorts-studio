@@ -23,6 +23,8 @@ describe('App shell', () => {
         })),
         getResources: vi.fn(async () => []),
         listCompletedJobs: vi.fn(async () => []),
+        startJob: vi.fn(async () => {}),
+        onJobEvent: vi.fn(() => () => {}),
       },
     })
   })

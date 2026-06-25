@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from ..inputs.classifier import INPUT_ROLES, classify_input, resolve_input_states
 from .migrations import apply_migrations, connect_database
+from ..utils import utc_now as _utc_now
 
 SUPPORTED_EXTENSIONS = {
     ".mp4",
@@ -27,14 +28,6 @@ SUPPORTED_EXTENSIONS = {
 MAX_INPUT_BYTES = 4 * 1024 * 1024 * 1024
 
 
-def _utc_now() -> str:
-    from datetime import datetime, timezone
-
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
 
 
 def _valid_uuid(value: str) -> bool:

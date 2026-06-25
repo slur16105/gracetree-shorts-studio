@@ -361,6 +361,149 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "job_accepted" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "stage_started" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId", "stageId", "stageName"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" },
+            "stageId": { "enum": ["vertical_slice"] },
+            "stageName": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "progress" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId", "stageId", "percent"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" },
+            "stageId": { "enum": ["vertical_slice"] },
+            "percent": { "type": "integer", "minimum": 0, "maximum": 99 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "artifact_created" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId", "artifactPath", "artifactName"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" },
+            "artifactPath": { "type": "string", "minLength": 1 },
+            "artifactName": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "job_completed" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId", "artifactPath", "artifactName"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" },
+            "artifactPath": { "type": "string", "minLength": 1 },
+            "artifactName": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "job_failed" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId", "errorCode", "stageId"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" },
+            "errorCode": { "type": "string", "minLength": 1 },
+            "stageId": { "oneOf": [{ "enum": ["vertical_slice"] }, { "type": "null" }] }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "job_cancelled" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" }
+          }
+        }
+      }
     }
   ],
   "$defs": {

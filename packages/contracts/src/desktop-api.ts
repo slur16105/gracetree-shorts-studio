@@ -1,5 +1,6 @@
 import type {
   CompletedJobDto,
+  EngineEvent,
   InputRegistrationResult,
   InputRole,
   JobDto,
@@ -12,6 +13,9 @@ import type {
 export const DESKTOP_API_KEY = "desktopApi" as const;
 
 export const JOB_GET_OR_CREATE_CHANNEL = "jobs:get-or-create-for-date" as const;
+export const JOB_START_CHANNEL = "jobs:start" as const;
+export const JOB_CANCEL_CHANNEL = "jobs:cancel" as const;
+export const JOB_EVENT_CHANNEL = "jobs:event" as const;
 export const INPUT_SELECT_CHANNEL = "inputs:select-files" as const;
 export const INPUT_REGISTER_CHANNEL = "inputs:register-files" as const;
 export const INPUT_ASSIGN_ROLE_CHANNEL = "inputs:assign-role" as const;
@@ -72,6 +76,9 @@ export interface DesktopApi {
   selectResourceFile(resourceType: ResourceType): Promise<SelectedInputFile | null>;
   listCompletedJobs(managedRoot: string): Promise<CompletedJobSummary[]>;
   openResultFolder(jobId: string, resultPath: string): Promise<void>;
+  startJob(jobId: string, managedRoot: string, workPath: string): Promise<void>;
+  cancelJob(jobId: string, attemptId: string): Promise<void>;
+  onJobEvent(listener: (event: EngineEvent) => void): () => void;
 }
 
 export interface ResourceUpdateResult {
@@ -83,4 +90,4 @@ export interface CompletedJobSummary extends CompletedJobDto {
   resultExists: boolean;
 }
 
-export type { ScriptValidationDto, ResourceDto, ResourceType, CompletedJobDto };
+export type { ScriptValidationDto, ResourceDto, ResourceType, CompletedJobDto, EngineEvent };

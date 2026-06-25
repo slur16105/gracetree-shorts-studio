@@ -1,4 +1,4 @@
-import type { EngineCommand, EngineEvent } from '@gracetree/contracts'
+import type { EngineCommand, EngineEvent, StartJobCommand } from '@gracetree/contracts'
 import { isEngineEvent } from '@gracetree/contracts'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createInterface, type Interface } from 'node:readline'
@@ -9,13 +9,22 @@ interface PendingRequest {
   timeout: NodeJS.Timeout
 }
 
+interface StreamListener {
+  onEvent: (event: EngineEvent) => void
+  resolve: () => void
+  reject: (error: Error) => void
+  timeout: NodeJS.Timeout
+}
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000
 const INPUT_REGISTRATION_TIMEOUT_MS = 30 * 60 * 1_000
+const GENERATION_TIMEOUT_MS = 10 * 60 * 1_000
 
 export class EngineClient {
   private child: ChildProcessWithoutNullStreams | null = null
   private lines: Interface | null = null
   private readonly pending = new Map<string, PendingRequest>()
+  private readonly streamListeners = new Map<string, StreamListener>()
 
   constructor(
     private readonly projectRoot: string,
@@ -42,6 +51,25 @@ export class EngineClient {
         this.terminateChild(child, new Error('Python engine request timed out'))
       }, timeoutMs)
       this.pending.set(command.jobId, { resolve, reject, timeout })
+      child.stdin.write(`${JSON.stringify(command)}\n`)
+    })
+  }
+
+  streamJob(command: StartJobCommand, onEvent: (event: EngineEvent) => void): Promise<void> {
+    if (this.streamListeners.has(command.jobId)) {
+      throw new Error(`Python engine stream for job ${command.jobId} is already active`)
+    }
+    this.ensureStarted()
+    const child = this.child
+    if (!child) throw new Error('Python engine did not start')
+    return new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (!this.streamListeners.has(command.jobId)) return
+        this.streamListeners.delete(command.jobId)
+        reject(new Error('start_job stream timed out'))
+        this.terminateCurrentChild(new Error('start_job stream timed out'))
+      }, GENERATION_TIMEOUT_MS)
+      this.streamListeners.set(command.jobId, { onEvent, resolve, reject, timeout })
       child.stdin.write(`${JSON.stringify(command)}\n`)
     })
   }
@@ -93,6 +121,27 @@ export class EngineClient {
       this.terminateCurrentChild(new Error('Python engine emitted an invalid event'))
       return
     }
+    const streamListener = this.streamListeners.get(value.jobId)
+    if (streamListener) {
+      streamListener.onEvent(value)
+      if (
+        value.type === 'job_completed' ||
+        value.type === 'job_failed' ||
+        value.type === 'job_cancelled'
+      ) {
+        clearTimeout(streamListener.timeout)
+        this.streamListeners.delete(value.jobId)
+        streamListener.resolve()
+        // cancel_job IPC caller may be waiting in pending for this same event
+        const cancelPending = this.pending.get(value.jobId)
+        if (cancelPending) {
+          clearTimeout(cancelPending.timeout)
+          this.pending.delete(value.jobId)
+          cancelPending.resolve(value)
+        }
+      }
+      return
+    }
     const pending = this.pending.get(value.jobId)
     if (!pending) return
     clearTimeout(pending.timeout)
@@ -133,5 +182,10 @@ export class EngineClient {
       pending.reject(error)
     }
     this.pending.clear()
+    for (const listener of this.streamListeners.values()) {
+      clearTimeout(listener.timeout)
+      listener.reject(error)
+    }
+    this.streamListeners.clear()
   }
 }

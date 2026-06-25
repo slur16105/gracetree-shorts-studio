@@ -205,6 +205,45 @@
           }
         }
       }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "start_job" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["managedRoot", "workPath"],
+          "properties": {
+            "managedRoot": { "type": "string", "minLength": 1 },
+            "workPath": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocolVersion", "type", "jobId", "timestamp", "payload"],
+      "properties": {
+        "protocolVersion": { "const": 1 },
+        "type": { "const": "cancel_job" },
+        "jobId": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attemptId"],
+          "properties": {
+            "attemptId": { "type": "string", "format": "uuid" }
+          }
+        }
+      }
     }
   ]
 }

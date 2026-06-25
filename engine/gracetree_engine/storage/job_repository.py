@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime, timezone
+from datetime import date
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 from .migrations import apply_migrations, connect_database
+from ..utils import utc_now as _utc_now
 
 JobDto = dict[str, Any]
 
@@ -31,12 +32,6 @@ def _validate_job_id(value: str) -> str:
     return value
 
 
-def _utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
 
 
 def _require_canonical_absolute_path(path: Path, label: str) -> Path:

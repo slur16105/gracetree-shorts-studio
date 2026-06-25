@@ -7,6 +7,10 @@ import { InputDropZone } from './InputDropZone'
 import { JobSummary } from './JobSummary'
 import { ReadinessProgress } from './ReadinessProgress'
 import { computeReadiness } from './readiness'
+import {
+  setCurrentJobId,
+  useIsRunning,
+} from '../job-progress/job-progress-store'
 
 interface JobEditorProps {
   managedRoot: string
@@ -20,8 +24,10 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
   const [scriptValidation, setScriptValidation] = useState<ScriptValidationDto | null>(null)
   const [isParsing, setIsParsing] = useState(false)
   const [resources, setResources] = useState<ResourceDto[]>([])
+  const [isStarting, setIsStarting] = useState(false)
   const validationRef = useRef<{ jobId: string; inputId: string; inputVersion: string } | null>(null)
   const onManagedRootResolvedRef = useRef(onManagedRootResolved)
+  const isRunning = useIsRunning()
 
   useEffect(() => {
     onManagedRootResolvedRef.current = onManagedRootResolved
@@ -32,7 +38,9 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
     setInputs(loadedJob?.inputMetadata ?? [])
     setScriptValidation(null)
     setIsParsing(false)
+    setIsStarting(false)
     validationRef.current = null
+    setCurrentJobId(loadedJob?.id ?? null)
 
     if (loadedJob) {
       // Derive managedRoot from workPath: /GraceTreeData/jobs/2026-06-20 → /GraceTreeData
@@ -127,6 +135,18 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
 
   const readiness = computeReadiness(inputs, scriptValidation, resources)
 
+  const handleStartGeneration = useCallback(async () => {
+    if (!job || !managedRoot || isRunning || isStarting) return
+    setIsStarting(true)
+    try {
+      await window.desktopApi.startJob(job.id, managedRoot, job.workPath)
+    } finally {
+      setIsStarting(false)
+    }
+  }, [job, managedRoot, isRunning, isStarting])
+
+  const canGenerate = Boolean(job && managedRoot && readiness.isReady && !isRunning && !isStarting)
+
   return (
     <>
       <DatePicker onJobLoaded={handleJobLoaded} />
@@ -139,6 +159,14 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
         <>
           <ReadinessProgress isParsing={isParsing} onOpenSettings={onOpenSettings} readiness={readiness} />
           <JobSummary isParsing={isParsing} scriptValidation={scriptValidation} />
+          <button
+            aria-busy={isStarting || isRunning}
+            disabled={!canGenerate}
+            onClick={handleStartGeneration}
+            type="button"
+          >
+            {isRunning ? '생성 중...' : isStarting ? '시작 중...' : '생성 시작'}
+          </button>
         </>
       ) : null}
     </>

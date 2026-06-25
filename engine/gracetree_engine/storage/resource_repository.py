@@ -2,16 +2,10 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
 from typing import Any
 
+from ..utils import utc_now as _utc_now
 
-def _utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
 
 
 def _to_dto(row: Any) -> dict[str, Any]:

@@ -223,6 +223,46 @@ def _script_validated(command: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
+def _job_cancelled(command: dict[str, Any]) -> dict[str, Any]:
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value:
+        raise ValueError("approved managed root is unavailable")
+    approved_root = Path(approved_root_value)
+    database_path = approved_root / "studio.db"
+    apply_migrations(database_path)
+    from .jobs.attempt_repository import AttemptRepository
+    attempt_id = command["payload"]["attemptId"]
+    AttemptRepository(database_path).cancel_attempt(attempt_id=attempt_id)
+    event = {
+        "protocolVersion": 1,
+        "type": "job_cancelled",
+        "jobId": command["jobId"],
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+        "payload": {"attemptId": attempt_id},
+    }
+    EVENT_VALIDATOR.validate(event)
+    return event
+
+
+def _handle_start_job_streaming(command: dict[str, Any], stdout: TextIO) -> None:
+    """start_job을 처리하며 여러 이벤트를 직접 stdout에 기록한다."""
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value:
+        raise ValueError("approved managed root is unavailable")
+
+    def _emit(event: dict[str, Any]) -> None:
+        EVENT_VALIDATOR.validate(event)
+        stdout.write(json.dumps(event, separators=(",", ":")) + "\n")
+        stdout.flush()
+
+    from .jobs.orchestrator import start_job as _start_job
+    _start_job(
+        command=command,
+        approved_root=Path(approved_root_value),
+        emit=_emit,
+    )
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
     had_error = False
 
@@ -249,7 +289,10 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
             continue
 
         try:
-            if command["type"] == "check_health":
+            if command["type"] == "start_job":
+                _handle_start_job_streaming(command, stdout)
+                continue
+            elif command["type"] == "check_health":
                 event = _health_checked(command["jobId"])
             elif command["type"] == "get_or_create_job":
                 event = _job_loaded(command)
@@ -263,6 +306,8 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 event = _resource_updated(command)
             elif command["type"] == "list_completed_jobs":
                 event = _completed_jobs_listed(command)
+            elif command["type"] == "cancel_job":
+                event = _job_cancelled(command)
             else:
                 event = _input_state_changed(command)
         except (ValidationError, ValueError) as error:

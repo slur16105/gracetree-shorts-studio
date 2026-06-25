@@ -1,4 +1,4 @@
-import type { EngineCommand, EngineEvent } from '@gracetree/contracts'
+import type { EngineCommand, EngineEvent, StartJobCommand } from '@gracetree/contracts'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -203,6 +203,142 @@ describe('EngineClient', () => {
     replacementChild.stdout.write(`${JSON.stringify(event('job-2'))}\n`)
     await expect(next).resolves.toEqual(event('job-2'))
     expect(spawnMock).toHaveBeenCalledTimes(2)
+    client.stop()
+  })
+})
+
+function startJobCommand(jobId: string): StartJobCommand {
+  return {
+    protocolVersion: 1,
+    type: 'start_job',
+    jobId,
+    timestamp: '2026-06-25T00:00:00.000Z',
+    payload: { managedRoot: '/managed/GraceTreeData', workPath: '/managed/GraceTreeData/jobs/2026-06-25' }
+  }
+}
+
+const ATTEMPT_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+const JOB_UUID_GEN = '11111111-2222-4333-8444-555555555501'
+const JOB_UUID_FAIL = '11111111-2222-4333-8444-555555555502'
+const JOB_UUID_CANCEL = '11111111-2222-4333-8444-555555555503'
+const JOB_UUID_STREAM = '11111111-2222-4333-8444-555555555504'
+const JOB_UUID_STOP = '11111111-2222-4333-8444-555555555505'
+const JOB_UUID_TIMEOUT = '11111111-2222-4333-8444-555555555506'
+
+function generationEvent(type: string, jobId: string, extra: Record<string, unknown> = {}): EngineEvent {
+  return {
+    protocolVersion: 1,
+    type: type as EngineEvent['type'],
+    jobId,
+    timestamp: '2026-06-25T00:00:00.000Z',
+    payload: { attemptId: ATTEMPT_UUID, ...extra }
+  } as EngineEvent
+}
+
+describe('EngineClient.streamJob', () => {
+  beforeEach(() => {
+    spawnMock.mockReset()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('calls onEvent for every event until job_completed and resolves', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+    const received: EngineEvent[] = []
+
+    const done = client.streamJob(startJobCommand(JOB_UUID_GEN), (e) => received.push(e))
+
+    const events = [
+      generationEvent('job_accepted', JOB_UUID_GEN),
+      generationEvent('stage_started', JOB_UUID_GEN, { stageId: 'vertical_slice', stageName: '수직' }),
+      generationEvent('progress', JOB_UUID_GEN, { stageId: 'vertical_slice', percent: 30 }),
+      generationEvent('job_completed', JOB_UUID_GEN, { artifactPath: '/p/a.mp4', artifactName: 'a.mp4' })
+    ]
+    for (const ev of events) {
+      child.stdout.write(`${JSON.stringify(ev)}\n`)
+    }
+
+    await expect(done).resolves.toBeUndefined()
+    expect(received).toHaveLength(4)
+    expect(received.map((e) => e.type)).toEqual([
+      'job_accepted', 'stage_started', 'progress', 'job_completed'
+    ])
+    client.stop()
+  })
+
+  it('resolves on job_failed', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+
+    const done = client.streamJob(startJobCommand(JOB_UUID_FAIL), () => {})
+    child.stdout.write(
+      `${JSON.stringify(generationEvent('job_accepted', JOB_UUID_FAIL))}\n`
+    )
+    child.stdout.write(
+      `${JSON.stringify(generationEvent('job_failed', JOB_UUID_FAIL, { errorCode: 'PROCESS_FAILED', stageId: 'vertical_slice' }))}\n`
+    )
+    await expect(done).resolves.toBeUndefined()
+    client.stop()
+  })
+
+  it('resolves on job_cancelled', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+
+    const done = client.streamJob(startJobCommand(JOB_UUID_CANCEL), () => {})
+    child.stdout.write(
+      `${JSON.stringify(generationEvent('job_cancelled', JOB_UUID_CANCEL))}\n`
+    )
+    await expect(done).resolves.toBeUndefined()
+    client.stop()
+  })
+
+  it('stream and pending listeners coexist independently', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+
+    const health = client.request(command('health-1'))
+    const streamReceived: string[] = []
+    const gen = client.streamJob(startJobCommand(JOB_UUID_STREAM), (e) => streamReceived.push(e.type))
+
+    child.stdout.write(`${JSON.stringify(event('health-1'))}\n`)
+    await expect(health).resolves.toMatchObject({ type: 'health_checked' })
+
+    child.stdout.write(
+      `${JSON.stringify(generationEvent('job_completed', JOB_UUID_STREAM, { artifactPath: '/a.mp4', artifactName: 'a.mp4' }))}\n`
+    )
+    await expect(gen).resolves.toBeUndefined()
+    expect(streamReceived).toEqual(['job_completed'])
+    client.stop()
+  })
+
+  it('rejects all stream listeners when child process is stopped', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+
+    const gen = client.streamJob(startJobCommand(JOB_UUID_STOP), () => {})
+    client.stop()
+    await expect(gen).rejects.toThrow('stopped')
+  })
+
+  it('rejects with timeout after GENERATION_TIMEOUT_MS', async () => {
+    vi.useFakeTimers()
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+
+    const gen = client.streamJob(startJobCommand(JOB_UUID_TIMEOUT), () => {})
+    const rejection = expect(gen).rejects.toThrow('timed out')
+    await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 1)
+    await rejection
     client.stop()
   })
 })

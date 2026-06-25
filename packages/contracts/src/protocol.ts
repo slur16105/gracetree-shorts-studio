@@ -236,6 +236,114 @@ export interface ScriptValidatedEvent {
   payload: ScriptValidationDto;
 }
 
+// ── Story 2.1: Generation vertical slice ─────────────────────────────────
+
+export const GENERATION_STAGES = [
+  "vertical_slice",
+] as const;
+export type GenerationStage = (typeof GENERATION_STAGES)[number];
+
+export interface StartJobCommand {
+  protocolVersion: 1;
+  type: "start_job";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    managedRoot: string;
+    workPath: string;
+  };
+}
+
+export interface JobAcceptedEvent {
+  protocolVersion: 1;
+  type: "job_accepted";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+  };
+}
+
+export interface StageStartedEvent {
+  protocolVersion: 1;
+  type: "stage_started";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+    stageId: GenerationStage;
+    stageName: string;
+  };
+}
+
+export interface ProgressEvent {
+  protocolVersion: 1;
+  type: "progress";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+    stageId: GenerationStage;
+    percent: number;
+  };
+}
+
+export interface ArtifactCreatedEvent {
+  protocolVersion: 1;
+  type: "artifact_created";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+    artifactPath: string;
+    artifactName: string;
+  };
+}
+
+export interface JobCompletedEvent {
+  protocolVersion: 1;
+  type: "job_completed";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+    artifactPath: string;
+    artifactName: string;
+  };
+}
+
+export interface JobFailedEvent {
+  protocolVersion: 1;
+  type: "job_failed";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+    errorCode: string;
+    stageId: GenerationStage | null;
+  };
+}
+
+export interface CancelJobCommand {
+  protocolVersion: 1;
+  type: "cancel_job";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+  };
+}
+
+export interface JobCancelledEvent {
+  protocolVersion: 1;
+  type: "job_cancelled";
+  jobId: string;
+  timestamp: string;
+  payload: {
+    attemptId: string;
+  };
+}
+
 export type EngineCommand =
   | CheckHealthCommand
   | GetOrCreateJobCommand
@@ -244,7 +352,9 @@ export type EngineCommand =
   | ValidateScriptCommand
   | GetResourcesCommand
   | UpdateResourceCommand
-  | ListCompletedJobsCommand;
+  | ListCompletedJobsCommand
+  | StartJobCommand
+  | CancelJobCommand;
 export type EngineEvent =
   | HealthCheckedEvent
   | JobLoadedEvent
@@ -253,7 +363,14 @@ export type EngineEvent =
   | ScriptValidatedEvent
   | ResourcesLoadedEvent
   | ResourceUpdatedEvent
-  | CompletedJobsListedEvent;
+  | CompletedJobsListedEvent
+  | JobAcceptedEvent
+  | StageStartedEvent
+  | ProgressEvent
+  | ArtifactCreatedEvent
+  | JobCompletedEvent
+  | JobFailedEvent
+  | JobCancelledEvent;
 
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 const addFormats = (addFormatsModule.default ??
@@ -456,4 +573,57 @@ export function commandValidationErrors(): ErrorObject[] | null | undefined {
 
 export function eventValidationErrors(): ErrorObject[] | null | undefined {
   return validateEvent.errors;
+}
+
+// ── Story 2.1: Generation event guards ───────────────────────────────────
+
+export function isStartJobCommand(value: unknown): value is StartJobCommand {
+  return validateCommand(value) && value.type === "start_job";
+}
+
+export function isCancelJobCommand(value: unknown): value is CancelJobCommand {
+  return validateCommand(value) && value.type === "cancel_job";
+}
+
+export function isJobAcceptedEvent(value: unknown): value is JobAcceptedEvent {
+  return validateEvent(value) && value.type === "job_accepted";
+}
+
+export function isStageStartedEvent(value: unknown): value is StageStartedEvent {
+  return validateEvent(value) && value.type === "stage_started";
+}
+
+export function isProgressEvent(value: unknown): value is ProgressEvent {
+  return validateEvent(value) && value.type === "progress";
+}
+
+export function isArtifactCreatedEvent(value: unknown): value is ArtifactCreatedEvent {
+  return validateEvent(value) && value.type === "artifact_created";
+}
+
+export function isJobCompletedEvent(value: unknown): value is JobCompletedEvent {
+  return validateEvent(value) && value.type === "job_completed";
+}
+
+export function isJobFailedEvent(value: unknown): value is JobFailedEvent {
+  return validateEvent(value) && value.type === "job_failed";
+}
+
+export function isJobCancelledEvent(value: unknown): value is JobCancelledEvent {
+  return validateEvent(value) && value.type === "job_cancelled";
+}
+
+export function isGenerationEvent(
+  value: unknown,
+): value is JobAcceptedEvent | StageStartedEvent | ProgressEvent | ArtifactCreatedEvent | JobCompletedEvent | JobFailedEvent | JobCancelledEvent {
+  if (!isEngineEvent(value)) return false;
+  return (
+    value.type === "job_accepted" ||
+    value.type === "stage_started" ||
+    value.type === "progress" ||
+    value.type === "artifact_created" ||
+    value.type === "job_completed" ||
+    value.type === "job_failed" ||
+    value.type === "job_cancelled"
+  );
 }

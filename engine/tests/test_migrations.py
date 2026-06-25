@@ -11,7 +11,7 @@ from gracetree_engine.storage.migrations import apply_migrations, connect_databa
 def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
     database_path = tmp_path / "studio.db"
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5]
     assert apply_migrations(database_path) == []
 
     with connect_database(database_path) as connection:
@@ -21,7 +21,7 @@ def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()
         columns = connection.execute("PRAGMA table_info(jobs)").fetchall()
 
-    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,)]
+    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,)]
     assert tuple(foreign_keys) == (1,)
     assert {column[1] for column in columns} >= {
         "id",
@@ -32,6 +32,7 @@ def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
         "result_path",
         "created_at",
         "updated_at",
+        "running_attempt_id",
     }
 
 
@@ -42,7 +43,7 @@ def test_upgrades_a_previous_schema_database(tmp_path: Path) -> None:
             "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
         )
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5]
 
 
 def test_applies_002_to_a_story_1_3_database(tmp_path: Path) -> None:
@@ -209,6 +210,80 @@ def test_applies_004_to_a_story_1_5_database_and_preserves_rows(
         assert row["updated_at"].endswith("Z"), (
             f"resource seed row updated_at must end with 'Z', got: {row['updated_at']!r}"
         )
+
+
+def test_applies_005_to_story_2_1_database_and_preserves_rows(
+    tmp_path: Path,
+) -> None:
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    source_dir = Path(__file__).resolve().parents[1] / "migrations"
+    for name in (
+        "001_create_jobs.sql",
+        "002_create_job_inputs.sql",
+        "003_classify_job_inputs.sql",
+        "004_create_resources.sql",
+    ):
+        (migrations_dir / name).write_text(
+            (source_dir / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    database_path = tmp_path / "studio.db"
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [1, 2, 3, 4]
+
+    job_id = "11111111-1111-4111-8111-111111111111"
+    with connect_database(database_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO jobs (
+                id, publish_date, status, title, work_path, result_path,
+                created_at, updated_at
+            ) VALUES (?, '2026-06-20', 'draft', NULL, ?, ?, ?, ?)
+            """,
+            (
+                job_id,
+                str(tmp_path / "jobs" / "2026-06-20"),
+                str(tmp_path / "jobs" / "2026-06-20" / "output"),
+                "2026-06-20T00:00:00.000Z",
+                "2026-06-20T00:00:00.000Z",
+            ),
+        )
+
+    (migrations_dir / "005_create_job_attempts.sql").write_text(
+        (source_dir / "005_create_job_attempts.sql").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [5]
+
+    with connect_database(database_path) as connection:
+        job_row = connection.execute("SELECT id, running_attempt_id FROM jobs").fetchone()
+        attempt_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(job_attempts)").fetchall()
+        }
+        connection.execute(
+            """
+            INSERT INTO job_attempts (
+                id, job_id, snapshot_json, status, started_at
+            ) VALUES (?, ?, ?, 'running', ?)
+            """,
+            (
+                "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                job_id,
+                '{"inputs": []}',
+                "2026-06-25T00:00:00.000Z",
+            ),
+        )
+        connection.execute(
+            "UPDATE jobs SET running_attempt_id = ? WHERE id = ?",
+            ("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", job_id),
+        )
+        updated_job = connection.execute("SELECT running_attempt_id FROM jobs WHERE id = ?", (job_id,)).fetchone()
+
+    assert job_row is not None
+    assert job_row["running_attempt_id"] is None
+    assert attempt_columns >= {"id", "job_id", "snapshot_json", "status", "started_at", "ended_at", "artifact_path", "error_code"}
+    assert updated_job["running_attempt_id"] == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
 
 def test_rejects_duplicate_migration_versions_before_opening_database(

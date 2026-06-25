@@ -1,15 +1,18 @@
 import type {
+  CancelJobCommand,
   CompletedJobDto,
   EngineEvent,
   GetOrCreateJobCommand,
   JobDto,
   ListCompletedJobsCommand
 } from '@gracetree/contracts'
-import { isCompletedJobsListedEvent, isJobLoadedEvent } from '@gracetree/contracts'
+import { isCompletedJobsListedEvent, isJobCancelledEvent, isJobLoadedEvent } from '@gracetree/contracts'
 import {
+  JOB_CANCEL_CHANNEL,
+  JOB_GET_OR_CREATE_CHANNEL,
+  JOB_START_CHANNEL,
   JOBS_LIST_COMPLETED_CHANNEL,
   JOBS_OPEN_RESULT_CHANNEL,
-  JOB_GET_OR_CREATE_CHANNEL,
   type CompletedJobSummary
 } from '@gracetree/contracts/desktop-api'
 import { shell, ipcMain } from 'electron'
@@ -18,8 +21,11 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { createManagedJobPaths, isValidJobId, isValidPublishDate } from '../files/managed-paths'
+import type { JobService } from '../jobs/job-service'
 
-type RequestEngine = (command: GetOrCreateJobCommand | ListCompletedJobsCommand) => Promise<EngineEvent>
+type RequestEngine = (
+  command: GetOrCreateJobCommand | ListCompletedJobsCommand | CancelJobCommand
+) => Promise<EngineEvent>
 
 interface PathResolver {
   resolve(...paths: string[]): string
@@ -122,7 +128,11 @@ export function createOpenResultFolderHandler(
   }
 }
 
-export function registerJobHandlers(userDataPath: string, requestEngine: RequestEngine): void {
+export function registerJobHandlers(
+  userDataPath: string,
+  requestEngine: RequestEngine,
+  jobService: JobService
+): void {
   const getOrCreateJob = createGetOrCreateJobHandler(userDataPath, requestEngine)
   ipcMain.handle(JOB_GET_OR_CREATE_CHANNEL, (_event, publishDate: unknown) => {
     if (typeof publishDate !== 'string') {
@@ -146,5 +156,36 @@ export function registerJobHandlers(userDataPath: string, requestEngine: Request
       throw new Error('Open result folder request is invalid')
     }
     return openResultFolder(jobId, resultPath)
+  })
+
+  ipcMain.handle(
+    JOB_START_CHANNEL,
+    (event, jobId: unknown, jobManagedRoot: unknown, workPath: unknown) => {
+      if (
+        typeof jobId !== 'string' ||
+        typeof jobManagedRoot !== 'string' ||
+        typeof workPath !== 'string'
+      ) {
+        throw new Error('startJob args invalid')
+      }
+      return jobService.startJob(event.sender, jobId, jobManagedRoot, workPath)
+    }
+  )
+
+  ipcMain.handle(JOB_CANCEL_CHANNEL, async (_event, jobId: unknown, attemptId: unknown) => {
+    if (typeof jobId !== 'string' || typeof attemptId !== 'string') {
+      throw new Error('cancelJob args invalid')
+    }
+    const command: CancelJobCommand = {
+      protocolVersion: 1,
+      type: 'cancel_job',
+      jobId,
+      timestamp: new Date().toISOString(),
+      payload: { attemptId }
+    }
+    const event = await requestEngine(command)
+    if (!isJobCancelledEvent(event) || event.jobId !== jobId) {
+      throw new Error('Python engine cancel response is invalid')
+    }
   })
 }

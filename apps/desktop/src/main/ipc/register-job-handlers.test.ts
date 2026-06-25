@@ -1,7 +1,7 @@
 import type {
   CompletedJobDto,
+  EngineCommand,
   EngineEvent,
-  GetOrCreateJobCommand,
   JobDto
 } from '@gracetree/contracts'
 import { win32 } from 'node:path'
@@ -35,10 +35,12 @@ const completedJob: CompletedJobDto = {
   resultPath: '/Users/test/AppData/GraceTreeData/jobs/2026-06-15/output'
 }
 
+type MockRequestEngine = (command: EngineCommand) => Promise<EngineEvent>
+
 describe('getOrCreateJobForDate handler', () => {
   it('validates and maps the renderer request to the engine command', async () => {
-    const requestEngine = vi.fn(
-      async (command: GetOrCreateJobCommand): Promise<EngineEvent> => ({
+    const requestEngine = vi.fn<MockRequestEngine>(
+      async (command) => ({
         protocolVersion: 1,
         type: 'job_loaded',
         jobId: command.jobId,
@@ -131,7 +133,7 @@ describe('listCompletedJobs handler', () => {
   const managedRoot = '/Users/test/AppData/GraceTreeData'
 
   it('sends list_completed_jobs command and returns summaries with resultExists=true', async () => {
-    const requestEngine = vi.fn(async (command: GetOrCreateJobCommand): Promise<EngineEvent> => ({
+    const requestEngine = vi.fn(async (command: EngineCommand): Promise<EngineEvent> => ({
       protocolVersion: 1,
       type: 'completed_jobs_listed',
       jobId: command.jobId,
@@ -159,7 +161,7 @@ describe('listCompletedJobs handler', () => {
   })
 
   it('returns resultExists=false when result folder is missing', async () => {
-    const requestEngine = vi.fn(async (command: GetOrCreateJobCommand): Promise<EngineEvent> => ({
+    const requestEngine = vi.fn(async (command: EngineCommand): Promise<EngineEvent> => ({
       protocolVersion: 1,
       type: 'completed_jobs_listed',
       jobId: command.jobId,
@@ -180,7 +182,7 @@ describe('listCompletedJobs handler', () => {
   })
 
   it('returns empty array when no completed jobs', async () => {
-    const requestEngine = vi.fn(async (command: GetOrCreateJobCommand): Promise<EngineEvent> => ({
+    const requestEngine = vi.fn(async (command: EngineCommand): Promise<EngineEvent> => ({
       protocolVersion: 1,
       type: 'completed_jobs_listed',
       jobId: command.jobId,
