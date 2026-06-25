@@ -233,3 +233,32 @@ def test_non_utf8_binary_file_returns_file_unreadable(tmp_path: Path) -> None:
 
     assert result["status"] == "invalid"
     assert any(e["code"] == "FILE_UNREADABLE" for e in result["errors"])
+
+
+# ---------------------------------------------------------------------------
+# AST field (Story 2.2)
+# ---------------------------------------------------------------------------
+
+
+def test_valid_script_embeds_ast(tmp_path: Path) -> None:
+    p = _write(tmp_path, VALID_SCRIPT)
+    result = validate_script(str(p), INPUT_ID, INPUT_VERSION)
+
+    assert result["status"] == "valid"
+    assert "ast" in result
+    ast = result["ast"]
+    assert ast is not None
+    assert ast["title"] == "은혜의 나무 쇼츠"
+    assert "요한복음" in ast["scripture"]
+    blocks = ast["subtitleBlocks"]
+    assert len(blocks) >= 1
+    assert "감사합니다" in blocks[0]["text"]
+
+
+def test_invalid_script_has_no_ast(tmp_path: Path) -> None:
+    content = "[말씀]\n내용\n[기도]\n기도"
+    p = _write(tmp_path, content)
+    result = validate_script(str(p), INPUT_ID, INPUT_VERSION)
+
+    assert result["status"] == "invalid"
+    assert result.get("ast") is None

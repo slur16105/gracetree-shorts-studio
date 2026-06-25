@@ -203,6 +203,18 @@ export interface ScriptSectionError {
   message: string;
 }
 
+export interface SubtitleBlockDto {
+  index: number;
+  text: string;
+  lines: string[];
+}
+
+export interface ScriptAstDto {
+  title: string;
+  scripture: string;
+  subtitleBlocks: SubtitleBlockDto[];
+}
+
 export interface ScriptValidationDto {
   inputId: string;
   inputVersion: string;
@@ -214,6 +226,7 @@ export interface ScriptValidationDto {
     prayer: string | null;
   };
   errors: ScriptSectionError[];
+  ast?: ScriptAstDto | null;
 }
 
 export interface ValidateScriptCommand {

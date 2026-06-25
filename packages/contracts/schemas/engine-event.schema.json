@@ -357,6 +357,33 @@
                   "message": { "type": "string", "minLength": 1 }
                 }
               }
+            },
+            "ast": {
+              "oneOf": [
+                { "type": "null" },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["title", "scripture", "subtitleBlocks"],
+                  "properties": {
+                    "title": { "type": "string" },
+                    "scripture": { "type": "string" },
+                    "subtitleBlocks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["index", "text", "lines"],
+                        "properties": {
+                          "index": { "type": "integer", "minimum": 0 },
+                          "text": { "type": "string" },
+                          "lines": { "type": "array", "items": { "type": "string" } }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
             }
           }
         }

@@ -10,6 +10,7 @@ from uuid import uuid4
 from ..storage.migrations import apply_migrations, connect_database
 from ..storage.job_repository import JobRepository
 from ..utils import utc_now as _utc_now
+from ..scripts.parser import parse_script as _parse_script
 from .attempt_repository import AttemptRepository
 
 _CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "packages" / "contracts"
@@ -80,17 +81,41 @@ def _verify_mp4(artifact_path: Path) -> bool:
     return has_video and duration > 0
 
 
+def _read_script_ast(managed_path: str, approved_root: Path) -> dict[str, Any] | None:
+    """스크립트 파일을 읽어 AST를 반환한다. 읽기 실패 시 None."""
+    script_path = Path(managed_path).resolve()
+    if not script_path.is_relative_to(approved_root.resolve()):
+        return None
+    try:
+        raw = script_path.read_bytes()
+        text = raw.decode("utf-8-sig")
+    except (OSError, UnicodeDecodeError):
+        # 파일이 없거나 인코딩 오류 시 AST 없이 계속 진행. scriptAst는 None으로 저장.
+        return None
+    parsed = _parse_script(text)
+    return parsed["ast"] if parsed["status"] == "valid" else None
+
+
 def _take_job_snapshot(job_id: str, approved_root: Path) -> dict[str, Any]:
-    """현재 job의 입력 슬롯과 리소스 상태를 스냅샷으로 만든다."""
+    """현재 job의 입력 슬롯, 리소스 상태, 스크립트 AST를 스냅샷으로 만든다."""
     db_path = approved_root / "studio.db"
     with connect_database(db_path) as conn:
         inputs = conn.execute(
-            "SELECT id, role, managed_path, status FROM job_inputs WHERE job_id = ?",
+            # ORDER BY id ensures deterministic selection when multiple rows exist.
+            "SELECT id, role, managed_path, status FROM job_inputs WHERE job_id = ? ORDER BY id",
             (job_id,),
         ).fetchall()
         resources = conn.execute(
             "SELECT resource_type, managed_path, status FROM resources"
         ).fetchall()
+
+    script_ast = None
+    for row in inputs:
+        if str(row["role"]) == "script" and str(row["status"]) == "ready":
+            if row["managed_path"]:
+                script_ast = _read_script_ast(str(row["managed_path"]), approved_root)
+            break
+
     return {
         "inputs": [
             {
@@ -108,6 +133,7 @@ def _take_job_snapshot(job_id: str, approved_root: Path) -> dict[str, Any]:
             }
             for row in resources
         },
+        "scriptAst": script_ast,
     }
 
 
