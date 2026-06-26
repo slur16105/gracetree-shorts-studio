@@ -36,13 +36,13 @@ class AlignmentError(Exception):
 
 # ─────────────────────── text matching ────────────────────────
 
-def _normalize(text: str) -> str:
+def normalize(text: str) -> str:
     """NFC normalization; strip whitespace and common punctuation."""
     text = unicodedata.normalize("NFC", text)
     return re.sub(r"[\s\.,!?;:·…—\-『』「」《》\n]", "", text)
 
 
-def _lcs_ratio(source: str, target: str) -> float:
+def lcs_ratio(source: str, target: str) -> float:
     """Fraction of `target` that appears as a subsequence in `source`."""
     if not target:
         return 1.0
@@ -73,7 +73,7 @@ def find_prayer_boundary(
     Returns a list: len 0 → not found, len 1 → unique, len N → ambiguous.
     """
     first_line = first_block["lines"][0] if first_block.get("lines") else first_block.get("text", "")
-    target = _normalize(first_line)
+    target = normalize(first_line)
     if not target:
         return []
 
@@ -81,15 +81,15 @@ def find_prayer_boundary(
     seen: set[int] = set()
     n = len(segments)
     for idx in range(n):
-        seg_norm = _normalize(segments[idx].text)
-        if _lcs_ratio(seg_norm, target) >= 0.7:
+        seg_norm = normalize(segments[idx].text)
+        if lcs_ratio(seg_norm, target) >= 0.7:
             if idx not in seen:
                 candidates.append(idx)
                 seen.add(idx)
-        elif idx + 1 < n and _lcs_ratio(seg_norm, target) >= 0.25:
+        elif idx + 1 < n and lcs_ratio(seg_norm, target) >= 0.25:
             # Pair check: only when the first segment meaningfully starts the line.
-            combined = _normalize(segments[idx].text + segments[idx + 1].text)
-            if _lcs_ratio(combined, target) >= 0.7:
+            combined = normalize(segments[idx].text + segments[idx + 1].text)
+            if lcs_ratio(combined, target) >= 0.7:
                 # Boundary is at idx+1 (end of pair); deduplicate with seen.
                 if idx + 1 not in seen:
                     candidates.append(idx + 1)
@@ -112,12 +112,12 @@ def _default_transcribe(voice_path: Path, config: SpeechConfig) -> list[Segment]
     if config.model_dir is not None:
         model_kwargs["download_root"] = config.model_dir
 
-    model = WhisperModel(config.model_size, local_files_only=True, **model_kwargs)
+    model = WhisperModel(config.model_size, local_files_only=config.local_files_only, **model_kwargs)
     raw_segments, _ = model.transcribe(
         str(voice_path),
         language=config.language,
         beam_size=config.beam_size,
-        vad_filter=False,
+        vad_filter=config.vad_filter,
     )
     return [Segment(s.start, s.end, s.text) for s in raw_segments]
 

@@ -23,6 +23,8 @@ class SpeechConfig:
     cpu_threads: int = 4          # macOS arm64: 4; Windows x64: 4 (benchmark-confirmed)
     beam_size: int = 1            # greedy; accuracy/speed trade-off confirmed by 2.4
     num_workers: int = 1          # single audio file per generation job
+    local_files_only: bool = True  # disallow network fetch; set False for initial dev download
+    vad_filter: bool = False       # VAD pre-filtering; benchmark shows no accuracy gain on Korean prayer corpus
 
 
 DEFAULT_SPEECH_CONFIG = SpeechConfig()

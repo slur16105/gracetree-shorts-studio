@@ -43,6 +43,12 @@ class TestPinnedDefaultConfig:
     def test_num_workers_is_pinned(self):
         assert DEFAULT_SPEECH_CONFIG.num_workers == 1
 
+    def test_local_files_only_defaults_true(self):
+        assert DEFAULT_SPEECH_CONFIG.local_files_only is True
+
+    def test_vad_filter_defaults_false(self):
+        assert DEFAULT_SPEECH_CONFIG.vad_filter is False
+
     def test_config_is_immutable(self):
         with pytest.raises((AttributeError, TypeError)):
             DEFAULT_SPEECH_CONFIG.model_size = "large"  # type: ignore[misc]
@@ -69,6 +75,32 @@ def _make_wav(path: Path, duration: float = 3.0) -> Path:
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "media"
 
 
+def _make_manifest(
+    tmp_path: Path,
+    *,
+    sample_id: str = "test-01",
+    file: str = "test.wav",
+    reference_text: str = "주님 감사합니다",
+    duration: float = 3.0,
+) -> Path:
+    manifest = {
+        "version": 1,
+        "description": "test",
+        "samples": [
+            {
+                "id": sample_id,
+                "file": file,
+                "reference_text": reference_text,
+                "duration_seconds": duration,
+                "language": "ko",
+            }
+        ],
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
 class TestBenchmarkHarness:
     def test_manifest_is_valid_json(self):
         manifest_path = FIXTURES_DIR / "benchmark-manifest.json"
@@ -90,28 +122,13 @@ class TestBenchmarkHarness:
     def test_run_benchmark_with_mock_transcription(self, tmp_path):
         from gracetree_engine.speech.benchmark import run_benchmark
 
-        manifest_path = tmp_path / "manifest.json"
-        wav_path = _make_wav(tmp_path / "test.wav")
-        manifest = {
-            "version": 1,
-            "description": "test",
-            "samples": [
-                {
-                    "id": "test-01",
-                    "file": "test.wav",
-                    "reference_text": "주님 감사합니다",
-                    "duration_seconds": 3.0,
-                    "language": "ko",
-                }
-            ],
-        }
-        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        _make_wav(tmp_path / "test.wav")
+        manifest_path = _make_manifest(tmp_path)
 
         def _mock_transcribe(path, config):
             return [Segment(0.0, 2.5, "주님 감사합니다")]
 
-        configs = [DEFAULT_SPEECH_CONFIG]
-        report = run_benchmark(manifest_path, configs, transcribe_fn=_mock_transcribe)
+        report = run_benchmark(manifest_path, [DEFAULT_SPEECH_CONFIG], transcribe_fn=_mock_transcribe)
 
         assert report["version"] == 1
         assert "platform" in report
@@ -126,22 +143,8 @@ class TestBenchmarkHarness:
     def test_run_benchmark_compares_multiple_configs(self, tmp_path):
         from gracetree_engine.speech.benchmark import run_benchmark
 
-        manifest_path = tmp_path / "manifest.json"
-        wav_path = _make_wav(tmp_path / "test.wav")
-        manifest = {
-            "version": 1,
-            "description": "test",
-            "samples": [
-                {
-                    "id": "test-01",
-                    "file": "test.wav",
-                    "reference_text": "주님 감사합니다",
-                    "duration_seconds": 3.0,
-                    "language": "ko",
-                }
-            ],
-        }
-        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        _make_wav(tmp_path / "test.wav")
+        manifest_path = _make_manifest(tmp_path)
 
         def _mock_transcribe(path, config):
             return [Segment(0.0, 2.5, "주님 감사합니다")]
@@ -159,44 +162,20 @@ class TestBenchmarkHarness:
     def test_run_benchmark_skips_missing_audio_file(self, tmp_path):
         from gracetree_engine.speech.benchmark import run_benchmark
 
-        manifest_path = tmp_path / "manifest.json"
-        manifest = {
-            "version": 1,
-            "description": "test",
-            "samples": [
-                {
-                    "id": "missing",
-                    "file": "nonexistent.wav",
-                    "reference_text": "주님",
-                    "duration_seconds": 1.0,
-                    "language": "ko",
-                }
-            ],
-        }
-        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-
+        manifest_path = _make_manifest(
+            tmp_path, sample_id="missing", file="nonexistent.wav",
+            reference_text="주님", duration=1.0,
+        )
         report = run_benchmark(manifest_path, [DEFAULT_SPEECH_CONFIG])
         assert report["runs"] == []
 
     def test_report_includes_platform_metadata(self, tmp_path):
         from gracetree_engine.speech.benchmark import run_benchmark
 
-        manifest_path = tmp_path / "manifest.json"
         _make_wav(tmp_path / "test.wav")
-        manifest = {
-            "version": 1,
-            "description": "test",
-            "samples": [
-                {
-                    "id": "t",
-                    "file": "test.wav",
-                    "reference_text": "주님",
-                    "duration_seconds": 1.0,
-                    "language": "ko",
-                }
-            ],
-        }
-        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        manifest_path = _make_manifest(
+            tmp_path, sample_id="t", reference_text="주님", duration=1.0,
+        )
 
         def _mock_transcribe(path, config):
             return [Segment(0.0, 1.0, "주님")]
