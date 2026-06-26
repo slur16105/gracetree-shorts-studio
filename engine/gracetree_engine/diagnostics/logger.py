@@ -13,7 +13,7 @@ from typing import Generator
 # ─────────────────────── path redaction ────────────────────────
 
 # Matches multi-segment Unix paths (/a/b/c) AND root-level paths (/file.ext)
-_UNIX_PATH_RE = re.compile(r"/(?:[^\s,\"'\\]+/)*([^\s,\"'\\]+)")
+_UNIX_PATH_RE = re.compile(r"(?<!\S)/(?:[^\s,\"'\\]+/)*([^\s,\"'\\]+)")
 _WIN_PATH_RE = re.compile(r"[A-Za-z]:\\(?:[^\s,\"'\\]+\\)+([^\s,\"'\\]+)")
 
 
@@ -40,7 +40,7 @@ class PipelineDiagnostics:
     attempt_dir: Path
     stages: list[StageResult] = field(default_factory=list)
 
-    def record_stage(
+    def _record_stage(
         self,
         name: str,
         wall_time: float,
@@ -57,7 +57,7 @@ class PipelineDiagnostics:
             yield
         finally:
             wall_time = time.perf_counter() - t0
-            self.record_stage(name, wall_time, cmd)
+            self._record_stage(name, wall_time, cmd)
 
     @property
     def total_wall_time(self) -> float:

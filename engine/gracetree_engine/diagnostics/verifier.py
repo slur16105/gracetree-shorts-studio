@@ -19,7 +19,7 @@ def probe_file(path: Path) -> dict[str, Any]:
     """Run ffprobe on path and return parsed JSON.
 
     Raises VerificationError(FILE_NOT_FOUND) if path is absent.
-    Raises VerificationError(PROBE_FAILED) if ffprobe fails.
+    Raises VerificationError(PROBE_FAILED) if ffprobe fails or returns invalid JSON.
     """
     if not path.exists():
         raise VerificationError("FILE_NOT_FOUND", f"파일을 찾을 수 없습니다: {path.name}")
@@ -40,7 +40,10 @@ def probe_file(path: Path) -> dict[str, Any]:
             "PROBE_FAILED",
             f"ffprobe 실패: {redact_paths(result.stderr[:200])}",
         )
-    return json.loads(result.stdout)
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise VerificationError("PROBE_FAILED", f"ffprobe JSON 파싱 실패: {exc}") from exc
 
 
 def verify_streams(
@@ -80,28 +83,33 @@ def verify_duration(actual: float, minimum: float) -> None:
         )
 
 
+def _run_ffmpeg_detection(cmd: list[str], error_code: str):
+    """Run an ffmpeg detection filter; raise VerificationError on RunnerError or non-zero exit."""
+    try:
+        result = run_safe(cmd)
+    except RunnerError as exc:
+        raise VerificationError(error_code, redact_paths(str(exc))) from exc
+    if result.returncode != 0:
+        raise VerificationError(
+            error_code,
+            f"ffmpeg 실패: {redact_paths(result.stderr[:200])}",
+        )
+    return result
+
+
 def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float]]:
     """Run ffmpeg blackdetect and return list of black intervals.
 
     Each interval: {"start": float, "end": float, "duration": float}
-    Returns [] if ffmpeg is unavailable or the input has no black frames.
-    Raises VerificationError on non-zero ffmpeg exit.
+    Raises VerificationError on RunnerError or non-zero ffmpeg exit.
+    Intervals with missing black_end or black_duration are silently skipped.
     """
     cmd = [
         "ffmpeg", "-i", str(path),
         "-vf", f"blackdetect=d=0.1:pix_th={threshold}",
         "-an", "-f", "null", "-",
     ]
-    try:
-        result = run_safe(cmd)
-    except RunnerError:
-        return []
-
-    if result.returncode != 0:
-        raise VerificationError(
-            "BLACKDETECT_FAILED",
-            f"blackdetect 실패: {redact_paths(result.stderr[:200])}",
-        )
+    result = _run_ffmpeg_detection(cmd, "BLACKDETECT_FAILED")
 
     intervals = []
     for line in result.stderr.splitlines():
@@ -115,10 +123,12 @@ def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float
                     except ValueError:
                         pass
             if "black_start" in parts:
+                if "black_end" not in parts or "black_duration" not in parts:
+                    continue
                 intervals.append({
-                    "start": parts.get("black_start", 0.0),
-                    "end": parts.get("black_end", 0.0),
-                    "duration": parts.get("black_duration", 0.0),
+                    "start": parts["black_start"],
+                    "end": parts["black_end"],
+                    "duration": parts["black_duration"],
                 })
     return intervals
 
@@ -126,24 +136,16 @@ def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float
 def run_freezedetect(path: Path, noise: float = -60.0, duration: float = 2.0) -> list[dict]:
     """Run ffmpeg freezedetect and return list of frozen intervals.
 
-    Each interval: {"start": float, "end": float}
-    Raises VerificationError on non-zero ffmpeg exit.
+    Each interval: {"start": float, "end": float | None}
+    end is None when the freeze extends to EOF (ffmpeg emits no freeze_end).
+    Raises VerificationError on RunnerError or non-zero ffmpeg exit.
     """
     cmd = [
         "ffmpeg", "-i", str(path),
         "-vf", f"freezedetect=noise={noise}dB:duration={duration}",
         "-an", "-f", "null", "-",
     ]
-    try:
-        result = run_safe(cmd)
-    except RunnerError:
-        return []
-
-    if result.returncode != 0:
-        raise VerificationError(
-            "FREEZEDETECT_FAILED",
-            f"freezedetect 실패: {redact_paths(result.stderr[:200])}",
-        )
+    result = _run_ffmpeg_detection(cmd, "FREEZEDETECT_FAILED")
 
     # ffmpeg emits tokens like "freeze_start: 1.23" (value is the NEXT whitespace-separated token)
     intervals = []
@@ -163,4 +165,7 @@ def run_freezedetect(path: Path, noise: float = -60.0, duration: float = 2.0) ->
                     freeze_start = None
                 except ValueError:
                     pass
+    if freeze_start is not None:
+        # Freeze extends to EOF — ffmpeg did not emit freeze_end.
+        intervals.append({"start": freeze_start, "end": None})
     return intervals

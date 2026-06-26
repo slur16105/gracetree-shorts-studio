@@ -43,11 +43,15 @@ class TestRedactPaths:
         result = redact_paths(text)
         assert r"C:\Users\user\AppData" not in result
 
+    def test_redact_paths_does_not_corrupt_na_tokens(self):
+        result = redact_paths("N/A kbits/s ratio=1/25")
+        assert result == "N/A kbits/s ratio=1/25"
+
 
 class TestPipelineDiagnostics:
     def test_record_stage_captures_wall_time(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("parse_script", wall_time=0.05)
+        diag._record_stage("parse_script", wall_time=0.05)
         stages = diag.stages
         assert len(stages) == 1
         assert stages[0].name == "parse_script"
@@ -55,19 +59,19 @@ class TestPipelineDiagnostics:
 
     def test_record_stage_redacts_cmd(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("compose", wall_time=1.0,
+        diag._record_stage("compose", wall_time=1.0,
                           cmd=["ffmpeg", "-i", "/home/user/intro.mp4", "out.mp4"])
         assert diag.stages[0].redacted_cmd is not None
         assert "/home/user" not in diag.stages[0].redacted_cmd
 
     def test_record_stage_none_cmd_stays_none(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("align", wall_time=2.3)
+        diag._record_stage("align", wall_time=2.3)
         assert diag.stages[0].redacted_cmd is None
 
     def test_write_log_creates_json_file(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("parse_script", wall_time=0.01)
+        diag._record_stage("parse_script", wall_time=0.01)
         diag.write_log()
         log_file = tmp_path / "pipeline-diagnostics.json"
         assert log_file.exists()
@@ -77,8 +81,8 @@ class TestPipelineDiagnostics:
 
     def test_total_wall_time_is_sum_of_stages(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("a", wall_time=1.0)
-        diag.record_stage("b", wall_time=2.0)
+        diag._record_stage("a", wall_time=1.0)
+        diag._record_stage("b", wall_time=2.0)
         assert diag.total_wall_time == pytest.approx(3.0)
 
     def test_context_manager_measures_time(self, tmp_path):
@@ -89,9 +93,9 @@ class TestPipelineDiagnostics:
 
     def test_multiple_stages_recorded(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("stage1", wall_time=0.1)
-        diag.record_stage("stage2", wall_time=0.2)
-        diag.record_stage("stage3", wall_time=0.3)
+        diag._record_stage("stage1", wall_time=0.1)
+        diag._record_stage("stage2", wall_time=0.2)
+        diag._record_stage("stage3", wall_time=0.3)
         assert len(diag.stages) == 3
         assert diag.stages[2].name == "stage3"
 
@@ -99,20 +103,19 @@ class TestPipelineDiagnostics:
 # ─────────────────────── Task 1: 픽스처 세트 ────────────────────────
 
 class TestFixtureGeneration:
+    _MANIFEST_PATH = Path(__file__).parent / "fixtures" / "integration" / "fixture-manifest.json"
+
     def test_fixture_manifest_exists(self):
-        manifest_path = Path(__file__).parent / "fixtures" / "integration" / "fixture-manifest.json"
-        assert manifest_path.exists(), "fixture-manifest.json이 없습니다"
+        assert self._MANIFEST_PATH.exists(), "fixture-manifest.json이 없습니다"
 
     def test_fixture_manifest_has_required_fields(self):
-        manifest_path = Path(__file__).parent / "fixtures" / "integration" / "fixture-manifest.json"
-        data = json.loads(manifest_path.read_text())
+        data = json.loads(self._MANIFEST_PATH.read_text())
         assert "description" in data
         assert "license" in data
         assert "fixtures" in data
 
     def test_fixture_manifest_lists_all_required_types(self):
-        manifest_path = Path(__file__).parent / "fixtures" / "integration" / "fixture-manifest.json"
-        data = json.loads(manifest_path.read_text())
+        data = json.loads(self._MANIFEST_PATH.read_text())
         fixture_types = {f["type"] for f in data["fixtures"]}
         required = {"script", "voice", "thumbnail", "bgm", "intro_video", "loop_video"}
         assert required.issubset(fixture_types)
@@ -224,7 +227,7 @@ class TestReviewFixes:
     def test_write_log_is_atomic(self, tmp_path):
         """write_log()은 .tmp를 거쳐 atomic replace한다 — 중간 파일이 남으면 안 된다."""
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
-        diag.record_stage("stage1", wall_time=0.1)
+        diag._record_stage("stage1", wall_time=0.1)
         diag.write_log()
         tmp_file = tmp_path / "pipeline-diagnostics.json.tmp"
         assert not tmp_file.exists(), ".tmp 파일이 남아 있으면 안 됩니다"
@@ -243,6 +246,58 @@ class TestReviewFixes:
             probe_file(Path("/no/such/file.mp4"))
         assert exc.value.error_code == "FILE_NOT_FOUND"
 
+    def test_probe_file_raises_on_invalid_json_output(self):
+        """probe_file()은 ffprobe stdout이 JSON이 아닐 때 VerificationError(PROBE_FAILED)를 발생시켜야 한다."""
+        from gracetree_engine.diagnostics.verifier import VerificationError, probe_file
+        from unittest.mock import MagicMock, patch
+        mock_result = MagicMock(returncode=0, stdout="not-json", stderr="")
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", return_value=mock_result):
+            with pytest.raises(VerificationError) as exc:
+                probe_file(Path(__file__))
+        assert exc.value.error_code == "PROBE_FAILED"
+
+    def test_blackdetect_raises_on_runner_error(self):
+        """run_blackdetect()은 RunnerError를 삼키지 않고 VerificationError(BLACKDETECT_FAILED)로 변환해야 한다."""
+        from gracetree_engine.diagnostics.verifier import VerificationError, run_blackdetect
+        from gracetree_engine.media.runner import RunnerError
+        from unittest.mock import patch
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", side_effect=RunnerError("TIMEOUT", "timed out")):
+            with pytest.raises(VerificationError) as exc:
+                run_blackdetect(Path("/fake/video.mp4"))
+        assert exc.value.error_code == "BLACKDETECT_FAILED"
+
+    def test_freezedetect_raises_on_runner_error(self):
+        """run_freezedetect()은 RunnerError를 삼키지 않고 VerificationError(FREEZEDETECT_FAILED)로 변환해야 한다."""
+        from gracetree_engine.diagnostics.verifier import VerificationError, run_freezedetect
+        from gracetree_engine.media.runner import RunnerError
+        from unittest.mock import patch
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", side_effect=RunnerError("TIMEOUT", "timed out")):
+            with pytest.raises(VerificationError) as exc:
+                run_freezedetect(Path("/fake/video.mp4"))
+        assert exc.value.error_code == "FREEZEDETECT_FAILED"
+
+    def test_freezedetect_handles_eof_freeze(self):
+        """freeze_end 없이 끝난 freeze는 end=None으로 인터벌에 추가되어야 한다."""
+        from gracetree_engine.diagnostics.verifier import run_freezedetect
+        from unittest.mock import MagicMock, patch
+        fake_stderr = "[freezedetect @ 0x...] freeze_start: 3.000000\n"
+        mock_result = MagicMock(returncode=0, stdout="", stderr=fake_stderr)
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", return_value=mock_result):
+            intervals = run_freezedetect(Path("/fake/video.mp4"))
+        assert len(intervals) == 1
+        assert intervals[0]["start"] == pytest.approx(3.0)
+        assert intervals[0]["end"] is None
+
+    def test_blackdetect_skips_incomplete_interval(self):
+        """black_end 또는 black_duration이 없는 인터벌은 조용히 무시해야 한다."""
+        from gracetree_engine.diagnostics.verifier import run_blackdetect
+        from unittest.mock import MagicMock, patch
+        fake_stderr = "[blackdetect @ 0x...] black_start:1.0\n"
+        mock_result = MagicMock(returncode=0, stdout="", stderr=fake_stderr)
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", return_value=mock_result):
+            intervals = run_blackdetect(Path("/fake/video.mp4"))
+        assert intervals == []
+
     def test_freezedetect_tokenizer_parses_space_separated_value(self):
         """run_freezedetect가 'freeze_start: 1.23' 형태(값이 다음 토큰)를 올바르게 파싱한다."""
         from gracetree_engine.diagnostics.verifier import run_freezedetect
@@ -254,7 +309,7 @@ class TestReviewFixes:
             "[freezedetect @ 0x...] freeze_end: 5.000000 freeze_duration: 3.000000\n"
         )
         mock_result = MagicMock(returncode=0, stdout="", stderr=fake_stderr)
-        with patch("subprocess.run", return_value=mock_result):
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", return_value=mock_result):
             intervals = run_freezedetect(Path("/fake/video.mp4"))
         assert len(intervals) == 1
         assert intervals[0]["start"] == pytest.approx(2.0)

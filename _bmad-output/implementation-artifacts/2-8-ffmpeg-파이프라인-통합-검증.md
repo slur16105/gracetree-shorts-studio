@@ -4,7 +4,7 @@ baseline_commit: b1a6475
 
 # Story 2.8: FFmpeg 파이프라인 통합 검증
 
-Status: review
+Status: done
 
 ## Story
 
