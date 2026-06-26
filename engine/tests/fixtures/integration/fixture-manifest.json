@@ -1,0 +1,43 @@
+{
+  "description": "Story 2.8 통합 테스트용 최소 픽스처 세트 — 라이선스 안전, 합성 생성",
+  "license": "synthetic — programmatically generated, no copyright",
+  "generated_by": "gracetree_engine/tests/integration/generate_fixtures.py",
+  "fixtures": [
+    {
+      "type": "script",
+      "filename": "sample-script.txt",
+      "description": "최소 한국어 기도 스크립트 (제목·말씀·기도 1블록)",
+      "source": "generated"
+    },
+    {
+      "type": "voice",
+      "filename": "sample-voice.wav",
+      "description": "3초 무음 WAV 16kHz mono",
+      "source": "generated"
+    },
+    {
+      "type": "thumbnail",
+      "filename": "sample-thumbnail.png",
+      "description": "1080×1920 검정 PNG",
+      "source": "generated"
+    },
+    {
+      "type": "bgm",
+      "filename": "sample-bgm.wav",
+      "description": "10초 무음 WAV 44100Hz stereo",
+      "source": "generated"
+    },
+    {
+      "type": "intro_video",
+      "filename": "sample-intro.mp4",
+      "description": "1080×1920 5초 검정 영상 (ffmpeg lavfi, 30fps)",
+      "source": "generated — requires ffmpeg"
+    },
+    {
+      "type": "loop_video",
+      "filename": "sample-loop.mp4",
+      "description": "1080×1920 8초 검정 영상 (ffmpeg lavfi, 30fps)",
+      "source": "generated — requires ffmpeg"
+    }
+  ]
+}
