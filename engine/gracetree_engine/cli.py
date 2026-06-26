@@ -21,8 +21,16 @@ CONTRACTS_DIR = _contracts_dir()
 
 
 def _load_schema(name: str) -> dict[str, Any]:
-    with (CONTRACTS_DIR / "schemas" / name).open(encoding="utf-8") as schema_file:
-        schema = json.load(schema_file)
+    schema_path = CONTRACTS_DIR / "schemas" / name
+    try:
+        with schema_path.open(encoding="utf-8") as schema_file:
+            schema = json.load(schema_file)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Engine schema file not found: {schema_path}\n"
+            "Ensure the contracts package is present (source tree) or "
+            "that this is a complete PyInstaller bundle."
+        ) from exc
     Draft202012Validator.check_schema(schema)
     return schema
 

@@ -14,8 +14,9 @@ from ..scripts.parser import parse_script as _parse_script
 from ..speech.aligner import AlignmentError, align_speech as _align_speech
 from ..speech.config import DEFAULT_SPEECH_CONFIG
 from .attempt_repository import AttemptRepository
+from ..resource_resolver import contracts_dir as _contracts_dir
 
-_CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "packages" / "contracts"
+_CONTRACTS_DIR = _contracts_dir()
 
 
 def _make_event(type_: str, job_id: str, payload: dict[str, Any]) -> dict[str, Any]:

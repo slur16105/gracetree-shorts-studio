@@ -88,7 +88,7 @@ def test_verify_manifest_fails_wrong_checksum(tmp_path: Path, sample_file: Path)
 
 
 def test_verify_manifest_fails_missing_version(tmp_path: Path):
-    manifest = {"platform": "darwin", "files": []}
+    manifest = {"platform": "darwin", "files": [{"path": "f.txt", "sha256": "x"}]}
     mp = tmp_path / "bundle-manifest.json"
     mp.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ManifestError, match="engine_version"):
@@ -99,4 +99,64 @@ def test_verify_manifest_fails_invalid_json(tmp_path: Path):
     mp = tmp_path / "bundle-manifest.json"
     mp.write_bytes(b"not json")
     with pytest.raises(ManifestError, match="JSON"):
+        verify_manifest(mp, base_dir=tmp_path)
+
+
+def test_verify_manifest_fails_empty_files_list(tmp_path: Path):
+    manifest = {"engine_version": "0.1.0", "platform": "darwin", "files": []}
+    mp = tmp_path / "bundle-manifest.json"
+    mp.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ManifestError, match="empty"):
+        verify_manifest(mp, base_dir=tmp_path)
+
+
+def test_verify_manifest_fails_absent_files_key(tmp_path: Path):
+    manifest = {"engine_version": "0.1.0", "platform": "darwin"}
+    mp = tmp_path / "bundle-manifest.json"
+    mp.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ManifestError, match="empty"):
+        verify_manifest(mp, base_dir=tmp_path)
+
+
+def test_verify_manifest_rejects_absolute_path(tmp_path: Path, sample_file: Path):
+    """Absolute path in manifest entry must be rejected (path traversal guard)."""
+    digest = hashlib.sha256(sample_file.read_bytes()).hexdigest()
+    manifest = {
+        "engine_version": "0.1.0",
+        "platform": "darwin",
+        "files": [
+            {
+                "path": str(sample_file),  # absolute path
+                "sha256": digest,
+                "license": "MIT",
+            }
+        ],
+    }
+    mp = tmp_path / "bundle-manifest.json"
+    mp.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ManifestError, match="absolute"):
+        verify_manifest(mp, base_dir=tmp_path)
+
+
+def test_verify_manifest_fails_missing_path_field(tmp_path: Path):
+    manifest = {
+        "engine_version": "0.1.0",
+        "platform": "darwin",
+        "files": [{"sha256": "abc", "license": "MIT"}],
+    }
+    mp = tmp_path / "bundle-manifest.json"
+    mp.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ManifestError, match="path"):
+        verify_manifest(mp, base_dir=tmp_path)
+
+
+def test_verify_manifest_fails_missing_sha256_field(tmp_path: Path, sample_file: Path):
+    manifest = {
+        "engine_version": "0.1.0",
+        "platform": "darwin",
+        "files": [{"path": sample_file.name, "license": "MIT"}],
+    }
+    mp = tmp_path / "bundle-manifest.json"
+    mp.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ManifestError, match="sha256"):
         verify_manifest(mp, base_dir=tmp_path)

@@ -6,7 +6,7 @@ checksums, and license labels.
 
 Usage (post-build):
     from gracetree_engine.packaging.verifier import verify_manifest
-    verify_manifest(Path("dist/gracetree-engine/bundle-manifest.json"),
+    verify_manifest(Path("engine/packaging/bundle-manifest.json"),
                     base_dir=Path("dist/gracetree-engine"))
 """
 from __future__ import annotations
@@ -33,6 +33,14 @@ def verify_manifest(manifest_path: Path, *, base_dir: Path) -> None:
     """Verify *manifest_path* against files in *base_dir*.
 
     Raises ManifestError with a descriptive message on the first violation.
+    Guarantees:
+      - manifest JSON is valid
+      - engine_version field is present and non-empty
+      - files list is non-empty (at least one file was checksummed)
+      - every entry has non-empty 'path' and 'sha256' fields
+      - every entry's path is relative (no absolute-path traversal)
+      - every file exists under base_dir
+      - every file's SHA-256 matches the recorded digest
     """
     try:
         raw = manifest_path.read_text(encoding="utf-8")
@@ -44,12 +52,33 @@ def verify_manifest(manifest_path: Path, *, base_dir: Path) -> None:
     except json.JSONDecodeError as exc:
         raise ManifestError(f"invalid JSON in manifest: {exc}") from exc
 
-    if "engine_version" not in manifest:
+    if not manifest.get("engine_version"):
         raise ManifestError("manifest missing required field: engine_version")
 
-    for entry in manifest.get("files", []):
+    files = manifest.get("files")
+    if not files:
+        raise ManifestError("manifest has no file entries — bundle appears empty")
+
+    for entry in files:
         rel_path = entry.get("path", "")
         expected_digest = entry.get("sha256", "")
+
+        if not rel_path:
+            raise ManifestError(
+                f"manifest entry missing required 'path' field: {entry!r}"
+            )
+        if not expected_digest:
+            raise ManifestError(
+                f"manifest entry missing required 'sha256' field: {entry!r}"
+            )
+
+        # Guard against absolute-path traversal attacks (Path.__truediv__ discards
+        # base_dir when the right operand is absolute).
+        if Path(rel_path).is_absolute():
+            raise ManifestError(
+                f"manifest entry has absolute path — only relative paths are allowed: {rel_path!r}"
+            )
+
         file_path = base_dir / rel_path
 
         if not file_path.is_file():

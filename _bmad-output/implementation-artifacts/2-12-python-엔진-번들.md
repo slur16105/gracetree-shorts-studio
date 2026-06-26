@@ -4,7 +4,7 @@ baseline_commit: 8ba345bd60ad3647b106439a3b151777ba4a0021
 
 # Story 2.12: Python 엔진 번들
 
-Status: review
+Status: done
 
 ## Story
 
@@ -53,6 +53,24 @@ GPT-5 Codex
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
 
+### Senior Developer Review (AI)
+
+**Review Date:** 2026-06-26
+**Outcome:** Changes Requested (10건)
+
+#### Review Follow-ups (AI)
+
+- [x] [AI-Review][High] #1 verifier.py: 절대 경로 path traversal 취약점 → is_absolute() 체크 추가
+- [x] [AI-Review][High] #2 verifier.py: files 빈 목록/키 없으면 silently pass → non-empty guard 추가
+- [x] [AI-Review][High] #3 build-engine.mjs: fileEntries 빈 배열 guard 없음 → 빈 번들 시 die()
+- [x] [AI-Review][High] #4 build-engine.mjs: verify_manifest 미호출 → Step 4 post-build 검증 추가
+- [x] [AI-Review][Med] #5 build-engine.mjs: result.error 미체크 → spawnChecked() 헬퍼로 통합
+- [x] [AI-Review][Med] #6 cli.py: 스키마 파일 누락 시 FileNotFoundError → RuntimeError로 래핑·안내 메시지
+- [x] [AI-Review][Med] #7 verifier.py: sha256 필드 누락 시 오해 메시지 → 필드 존재 선검사
+- [x] [AI-Review][Med] #8 verifier.py: path 필드 누락 시 오해 메시지 → 필드 존재 선검사
+- [x] [AI-Review][Low] #9 verifier.py: docstring 경로 오류 → engine/packaging/bundle-manifest.json으로 수정
+- [x] [AI-Review][Low] #10 orchestrator.py: 하드코딩 경로 → resource_resolver.contracts_dir() 사용
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/2-12-python-엔진-번들.md`
@@ -62,6 +80,7 @@ GPT-5 Codex
 - `engine/gracetree_engine/packaging/verifier.py`
 - `engine/gracetree_engine/cli.py`
 - `engine/gracetree_engine/storage/migrations.py`
+- `engine/gracetree_engine/jobs/orchestrator.py`
 - `engine/packaging/gracetree-engine.spec`
 - `engine/tests/test_resource_resolver.py`
 - `engine/tests/test_bundle_smoke.py`

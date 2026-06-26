@@ -65,7 +65,7 @@ development_status:
   2-9-최종-산출물-검증과-원자적-커밋: done
   2-10-완료-ui와-최근-결과-열기: done
   2-11-게시-가능-품질-게이트: done
-  2-12-python-엔진-번들: review
+  2-12-python-엔진-번들: done
   2-13-windows-설치-패키지: ready-for-dev
   2-14-macos-설치-패키지: ready-for-dev
   2-15-오프라인-설치-스모크-테스트: ready-for-dev

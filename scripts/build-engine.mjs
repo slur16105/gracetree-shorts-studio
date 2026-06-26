@@ -6,8 +6,9 @@
  *
  * Steps:
  *   1. Run PyInstaller with engine/packaging/gracetree-engine.spec
- *   2. Compute SHA-256 checksums of key bundle files
+ *   2. Compute SHA-256 checksums of all bundle files
  *   3. Write engine/packaging/bundle-manifest.json with version, checksums, licenses
+ *   4. Post-build: re-verify every checksum against the written manifest
  *
  * The resulting bundle is at:
  *   dist/gracetree-engine/          (macOS / Linux)
@@ -22,7 +23,8 @@
 
 import { createReadStream } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { readFile, writeFile, readdir } from 'node:fs/promises'
+import { readFile, writeFile, readdir, access } from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
@@ -58,17 +60,28 @@ async function readVersion() {
   return m[1]
 }
 
-async function collectFiles(dir, base = dir, results = []) {
+async function collectFiles(dir, results = []) {
   const entries = await readdir(dir, { withFileTypes: true })
   for (const e of entries) {
     const full = join(dir, e.name)
     if (e.isDirectory()) {
-      await collectFiles(full, base, results)
+      await collectFiles(full, results)
     } else {
       results.push(full)
     }
   }
   return results
+}
+
+function spawnChecked(command, args, opts) {
+  const result = spawnSync(command, args, opts)
+  if (result.error) {
+    die(`Failed to spawn ${command}: ${result.error.message}`)
+  }
+  if (result.status !== 0) {
+    die(`${command} exited with code ${result.status ?? '(signal)'}`)
+  }
+  return result
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -90,7 +103,7 @@ const pyinstallerArgs = [
 ]
 console.log(`\n▶  ${command} ${pyinstallerArgs.join(' ')}\n`)
 
-const result = spawnSync(command, pyinstallerArgs, {
+spawnChecked(command, pyinstallerArgs, {
   cwd: ROOT,
   stdio: 'inherit',
   env: {
@@ -99,15 +112,22 @@ const result = spawnSync(command, pyinstallerArgs, {
   },
 })
 
-if (result.status !== 0) {
-  die(`PyInstaller exited with code ${result.status ?? '(signal)'}`)
-}
-
 // Step 2: Checksum all files in the bundle
 console.log('\n🔍  Computing checksums…')
-const allFiles = await collectFiles(DIST)
-const fileEntries = []
 
+// Verify that PyInstaller actually produced output (not an empty directory)
+let allFiles
+try {
+  allFiles = await collectFiles(DIST)
+} catch (err) {
+  die(`Bundle output directory not found after build: ${DIST}\n  ${err.message}`)
+}
+
+if (allFiles.length === 0) {
+  die(`PyInstaller produced an empty bundle at ${DIST} — aborting`)
+}
+
+const fileEntries = []
 for (const f of allFiles) {
   const rel = f.slice(DIST.length + 1).replace(/\\/g, '/')
   const digest = await sha256(f)
@@ -133,7 +153,27 @@ const manifest = {
 
 await writeFile(MANIFEST_OUT, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
 console.log(`\n✅  Bundle manifest → ${MANIFEST_OUT}`)
+
+// Step 4: Post-build verification — re-verify every checksum via the Python verifier.
+// This cross-validates that the manifest we just wrote is consistent with the bundle.
+console.log('\n🔒  Post-build integrity verification…')
+const verifyScript = [
+  'from pathlib import Path',
+  'from gracetree_engine.packaging.verifier import verify_manifest',
+  `verify_manifest(Path(r"${MANIFEST_OUT}"), base_dir=Path(r"${DIST}"))`,
+  'print("integrity OK")',
+].join('; ')
+
+spawnChecked(command, [...prefixArgs, '-c', verifyScript], {
+  cwd: ROOT,
+  stdio: 'inherit',
+  env: {
+    ...process.env,
+    PYTHONPATH: join(ROOT, 'engine'),
+  },
+})
+
+console.log(`\n📦  Bundle output → ${DIST}`)
 console.log(`    engine_version: ${version}`)
 console.log(`    platform:       ${platform}`)
 console.log(`    files:          ${fileEntries.length}`)
-console.log(`\n📦  Bundle output → ${DIST}`)
