@@ -15,8 +15,9 @@ from .inputs.input_service import InputService
 from .storage.resource_repository import get_all_resources
 from .inputs.resource_service import update_resource
 from .storage.migrations import apply_migrations, connect_database
+from .resource_resolver import contracts_dir as _contracts_dir
 
-CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "packages" / "contracts"
+CONTRACTS_DIR = _contracts_dir()
 
 
 def _load_schema(name: str) -> dict[str, Any]:

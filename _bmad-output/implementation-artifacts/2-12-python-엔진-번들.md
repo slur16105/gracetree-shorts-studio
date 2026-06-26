@@ -1,6 +1,10 @@
+---
+baseline_commit: 8ba345bd60ad3647b106439a3b151777ba4a0021
+---
+
 # Story 2.12: Python 엔진 번들
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -14,11 +18,11 @@ so that 실제 제작 PC에서 설치 부담 없이 사용할 수 있다.
 
 ## Tasks / Subtasks
 
-- [ ] production entrypoint·hidden imports·native libraries·model data를 PyInstaller spec에 명시한다. (AC: 1)
-- [ ] 플랫폼별 onedir build script와 deterministic metadata manifest를 구현한다. (AC: 1)
-- [ ] 개발 module path와 packaged executable path를 resource resolver 뒤에 격리한다. (AC: 1)
-- [ ] clean Python-missing 환경에서 health와 최소 수직 슬라이스를 실행한다. (AC: 1)
-- [ ] 포함 파일의 version/checksum/license와 누락·변조 실패 테스트를 추가한다. (AC: 1)
+- [x] production entrypoint·hidden imports·native libraries·model data를 PyInstaller spec에 명시한다. (AC: 1)
+- [x] 플랫폼별 onedir build script와 deterministic metadata manifest를 구현한다. (AC: 1)
+- [x] 개발 module path와 packaged executable path를 resource resolver 뒤에 격리한다. (AC: 1)
+- [x] clean Python-missing 환경에서 health와 최소 수직 슬라이스를 실행한다. (AC: 1)
+- [x] 포함 파일의 version/checksum/license와 누락·변조 실패 테스트를 추가한다. (AC: 1)
 
 ## Dev Notes
 
@@ -53,3 +57,14 @@ GPT-5 Codex
 
 - `_bmad-output/implementation-artifacts/2-12-python-엔진-번들.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `engine/gracetree_engine/resource_resolver.py`
+- `engine/gracetree_engine/packaging/__init__.py`
+- `engine/gracetree_engine/packaging/verifier.py`
+- `engine/gracetree_engine/cli.py`
+- `engine/gracetree_engine/storage/migrations.py`
+- `engine/packaging/gracetree-engine.spec`
+- `engine/tests/test_resource_resolver.py`
+- `engine/tests/test_bundle_smoke.py`
+- `engine/tests/test_bundle_manifest.py`
+- `scripts/build-engine.mjs`
+- `resources/licenses/THIRD_PARTY.txt`

@@ -4,7 +4,9 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
+from ..resource_resolver import migrations_dir as _migrations_dir
+
+MIGRATIONS_DIR = _migrations_dir()
 
 
 def connect_database(database_path: Path) -> sqlite3.Connection:
