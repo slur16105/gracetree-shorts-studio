@@ -252,6 +252,7 @@ export interface ScriptValidatedEvent {
 // ── Story 2.1: Generation vertical slice ─────────────────────────────────
 
 export const GENERATION_STAGES = [
+  "speech_alignment",
   "vertical_slice",
 ] as const;
 export type GenerationStage = (typeof GENERATION_STAGES)[number];

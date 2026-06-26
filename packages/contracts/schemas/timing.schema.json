@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gracetree.local/schemas/timing.schema.json",
+  "title": "Timing",
+  "description": "Schema for timing.json written by Story 2.3 speech aligner.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "voiceOffset", "leadingSilenceSeconds", "subtitleBlocks"],
+  "properties": {
+    "version": { "const": 1 },
+    "voiceOffset": { "type": "number", "minimum": 0 },
+    "leadingSilenceSeconds": { "type": "number", "minimum": 0 },
+    "subtitleBlocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "text", "lines", "startTime", "endTime"],
+        "properties": {
+          "index": { "type": "integer", "minimum": 0 },
+          "text": { "type": "string" },
+          "lines": { "type": "array", "items": { "type": "string" } },
+          "startTime": { "type": "number" },
+          "endTime": { "type": "number" }
+        }
+      }
+    }
+  }
+}

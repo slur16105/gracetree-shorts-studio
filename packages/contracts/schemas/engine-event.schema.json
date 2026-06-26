@@ -423,7 +423,7 @@
           "required": ["attemptId", "stageId", "stageName"],
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
-            "stageId": { "enum": ["vertical_slice"] },
+            "stageId": { "enum": ["speech_alignment", "vertical_slice"] },
             "stageName": { "type": "string", "minLength": 1 }
           }
         }
@@ -444,7 +444,7 @@
           "required": ["attemptId", "stageId", "percent"],
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
-            "stageId": { "enum": ["vertical_slice"] },
+            "stageId": { "enum": ["speech_alignment", "vertical_slice"] },
             "percent": { "type": "integer", "minimum": 0, "maximum": 99 }
           }
         }
@@ -508,7 +508,7 @@
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
             "errorCode": { "type": "string", "minLength": 1 },
-            "stageId": { "oneOf": [{ "enum": ["vertical_slice"] }, { "type": "null" }] }
+            "stageId": { "oneOf": [{ "enum": ["speech_alignment", "vertical_slice"] }, { "type": "null" }] }
           }
         }
       }

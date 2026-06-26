@@ -11,6 +11,8 @@ from ..storage.migrations import apply_migrations, connect_database
 from ..storage.job_repository import JobRepository
 from ..utils import utc_now as _utc_now
 from ..scripts.parser import parse_script as _parse_script
+from ..speech.aligner import AlignmentError, align_speech as _align_speech
+from ..speech.config import DEFAULT_SPEECH_CONFIG
 from .attempt_repository import AttemptRepository
 
 _CONTRACTS_DIR = Path(__file__).resolve().parents[3] / "packages" / "contracts"
@@ -121,7 +123,8 @@ def _take_job_snapshot(job_id: str, approved_root: Path) -> dict[str, Any]:
             {
                 "id": str(row["id"]),
                 "role": str(row["role"]),
-                "managedPath": str(row["managed_path"]),
+                # Preserve None; str(None) → 'None' which is truthy and invalid as a path.
+                "managedPath": str(row["managed_path"]) if row["managed_path"] is not None else None,
                 "status": str(row["status"]),
             }
             for row in inputs
@@ -137,6 +140,14 @@ def _take_job_snapshot(job_id: str, approved_root: Path) -> dict[str, Any]:
     }
 
 
+def _find_voice_path(snapshot: dict[str, Any]) -> str | None:
+    """스냅샷 inputs에서 role=voice, status=ready인 첫 번째 managed_path를 반환한다."""
+    for inp in snapshot.get("inputs", []):
+        if inp.get("role") == "voice" and inp.get("status") == "ready":
+            return inp.get("managedPath")
+    return None
+
+
 Emit = Callable[[dict[str, Any]], None]
 
 
@@ -145,6 +156,7 @@ def start_job(
     command: dict[str, Any],
     approved_root: Path,
     emit: Emit,
+    _align: Callable | None = None,
 ) -> None:
     """start_job 커맨드를 처리해 수직 슬라이스 진단 MP4를 생성하고 이벤트를 순차 방출한다."""
     job_id = command["jobId"]
@@ -175,6 +187,63 @@ def start_job(
         return
 
     emit(_make_event("job_accepted", job_id, {"attemptId": attempt_id}))
+
+    attempt_dir = work_path / "temp" / "attempts" / attempt_id
+    attempt_dir.mkdir(parents=True, exist_ok=True)
+
+    voice_path_str = _find_voice_path(snapshot)
+    script_ast = snapshot.get("scriptAst")
+
+    if voice_path_str and script_ast:
+        voice_path = Path(voice_path_str).resolve()
+        if not voice_path.is_relative_to(approved_root.resolve()):
+            repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
+            emit(_make_event("job_failed", job_id, {
+                "attemptId": attempt_id,
+                "errorCode": "PROCESS_FAILED",
+                "stageId": "speech_alignment",
+            }))
+            return
+        align_fn = _align if _align is not None else _align_speech
+        emit(_make_event("stage_started", job_id, {
+            "attemptId": attempt_id,
+            "stageId": "speech_alignment",
+            "stageName": "음성 정렬",
+        }))
+        emit(_make_event("progress", job_id, {
+            "attemptId": attempt_id,
+            "stageId": "speech_alignment",
+            "percent": 5,
+        }))
+        try:
+            align_fn(
+                voice_path=voice_path,
+                script_ast=script_ast,
+                attempt_dir=attempt_dir,
+                config=DEFAULT_SPEECH_CONFIG,
+            )
+        except AlignmentError as exc:
+            repo.fail_attempt(attempt_id=attempt_id, error_code=exc.error_code)
+            emit(_make_event("job_failed", job_id, {
+                "attemptId": attempt_id,
+                "errorCode": exc.error_code,
+                "stageId": "speech_alignment",
+            }))
+            return
+        except Exception:
+            repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
+            emit(_make_event("job_failed", job_id, {
+                "attemptId": attempt_id,
+                "errorCode": "PROCESS_FAILED",
+                "stageId": "speech_alignment",
+            }))
+            return
+        emit(_make_event("progress", job_id, {
+            "attemptId": attempt_id,
+            "stageId": "speech_alignment",
+            "percent": 25,
+        }))
+
     emit(_make_event("stage_started", job_id, {
         "attemptId": attempt_id,
         "stageId": "vertical_slice",
@@ -183,11 +252,8 @@ def start_job(
     emit(_make_event("progress", job_id, {
         "attemptId": attempt_id,
         "stageId": "vertical_slice",
-        "percent": 10,
+        "percent": 30,
     }))
-
-    attempt_dir = work_path / "temp" / "attempts" / attempt_id
-    attempt_dir.mkdir(parents=True, exist_ok=True)
     artifact_path = attempt_dir / "vertical-slice.mp4"
 
     ffmpeg_args = [
@@ -205,7 +271,7 @@ def start_job(
     emit(_make_event("progress", job_id, {
         "attemptId": attempt_id,
         "stageId": "vertical_slice",
-        "percent": 30,
+        "percent": 50,
     }))
 
     try:

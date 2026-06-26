@@ -55,8 +55,8 @@ development_status:
 
   epic-2: in-progress
   2-1-최소-생성-수직-슬라이스와-진행-상태: done
-  2-2-스크립트-구조화와-타이밍-계약: in-progress
-  2-3-로컬-음성-정렬과-타이밍-생성: ready-for-dev
+  2-2-스크립트-구조화와-타이밍-계약: done
+  2-3-로컬-음성-정렬과-타이밍-생성: review
   2-4-음성-모델-성능-기준-확정: ready-for-dev
   2-5-스타일-ass-자막-생성: ready-for-dev
   2-6-배경-영상-구성: ready-for-dev

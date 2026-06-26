@@ -344,3 +344,247 @@ class TestStartJobIntegration:
         assert completed is not None
         artifact = Path(completed["payload"]["artifactPath"])
         assert _verify_mp4(artifact), "ffprobe should confirm valid video stream and positive duration"
+
+
+# ──────────────────────────── speech alignment integration ──────────────────
+
+import struct
+
+from gracetree_engine.speech.aligner import AlignmentError, Segment
+
+
+def _make_wav(path: Path) -> Path:
+    sample_rate, num_samples = 16000, 16000
+    data_size = num_samples * 2
+    with open(path, "wb") as f:
+        f.write(b"RIFF")
+        f.write(struct.pack("<I", 36 + data_size))
+        f.write(b"WAVE")
+        f.write(b"fmt ")
+        f.write(struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16))
+        f.write(b"data")
+        f.write(struct.pack("<I", data_size))
+        f.write(b"\x00" * data_size)
+    return path
+
+
+def _setup_db_with_voice(tmp_path: Path, managed_root: Path) -> tuple[str, Path]:
+    """job + voice input 행을 DB에 삽입하고 (job_id, voice_path)를 반환한다."""
+    voice_path = managed_root / "voice.wav"
+    _make_wav(voice_path)
+    db_path, job_id = _setup_db(managed_root)
+    with connect_database(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO job_inputs (id, job_id, role, original_name, managed_path, status, created_at, updated_at)
+            VALUES (?, ?, 'voice', 'voice.wav', ?, 'ready', '2026-06-25T00:00:00.000Z', '2026-06-25T00:00:00.000Z')
+            """,
+            (str(uuid4()), job_id, str(voice_path)),
+        )
+    return job_id, voice_path
+
+
+_AST_ONE_BLOCK = {
+    "title": "오늘의 기도",
+    "scripture": "주를 사랑하고 이웃을 사랑하라.",
+    "subtitleBlocks": [
+        {
+            "index": 0,
+            "text": "주님 감사합니다.\n오늘도 지켜주세요.",
+            "lines": ["주님 감사합니다.", "오늘도 지켜주세요."],
+        }
+    ],
+}
+
+
+def _fake_run_ffmpeg(args, **kwargs):
+    if args and "ffmpeg" in str(args[0]):
+        out = Path(args[-1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"\x00" * 128)
+        return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+    if args and "ffprobe" in str(args[0]):
+        info = {"streams": [{"codec_type": "video"}], "format": {"duration": "2.0"}}
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(info).encode(), stderr=b"")
+    return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+
+
+class TestSpeechAlignmentIntegration:
+    """음성 정렬 stage가 orchestrator 파이프라인에 올바르게 통합되는지 검증한다."""
+
+    def test_skips_speech_alignment_when_no_voice_input(self, tmp_path):
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        stage_ids = [
+            e["payload"].get("stageId")
+            for e in emitted
+            if e["type"] == "stage_started"
+        ]
+        assert "speech_alignment" not in stage_ids
+        assert "vertical_slice" in stage_ids
+
+    def _run_with_snapshot_override(self, tmp_path, snapshot_override, align_fn):
+        """_take_job_snapshot을 모킹해서 scriptAst를 포함한 스냅샷을 반환하는 헬퍼."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        job_id, voice_path = _setup_db_with_voice(tmp_path, managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        base_snapshot = {
+            "inputs": [{"id": "x", "role": "voice", "managedPath": str(voice_path), "status": "ready"}],
+            "resources": {},
+            "scriptAst": _AST_ONE_BLOCK,
+        }
+        base_snapshot.update(snapshot_override)
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg), \
+             mock.patch(
+                 "gracetree_engine.jobs.orchestrator._take_job_snapshot",
+                 return_value=base_snapshot,
+             ):
+            start_job(
+                command=command,
+                approved_root=managed_root,
+                emit=emitted.append,
+                _align=align_fn,
+            )
+        return emitted
+
+    def test_emits_speech_alignment_stage_when_voice_and_ast_present(self, tmp_path):
+        def _mock_align(voice_path, script_ast, attempt_dir, config):
+            timing = {
+                "version": 1,
+                "voiceOffset": 2.0,
+                "leadingSilenceSeconds": 0.0,
+                "subtitleBlocks": [{"index": 0, "text": "주님", "lines": ["주님"], "startTime": 2.0, "endTime": 3.0}],
+            }
+            (attempt_dir / "timing.json").write_text(json.dumps(timing), encoding="utf-8")
+
+        emitted = self._run_with_snapshot_override(tmp_path, {}, _mock_align)
+
+        stage_ids = [
+            e["payload"].get("stageId")
+            for e in emitted
+            if e["type"] in ("stage_started", "progress")
+        ]
+        assert "speech_alignment" in stage_ids
+        assert "vertical_slice" in stage_ids
+        assert emitted[-1]["type"] == "job_completed"
+
+    def test_emits_job_failed_on_alignment_error(self, tmp_path):
+        def _failing_align(voice_path, script_ast, attempt_dir, config):
+            raise AlignmentError("PRAYER_BOUNDARY_AMBIGUOUS", "후보 없음")
+
+        emitted = self._run_with_snapshot_override(tmp_path, {}, _failing_align)
+
+        assert emitted[-1]["type"] == "job_failed"
+        assert emitted[-1]["payload"]["errorCode"] == "PRAYER_BOUNDARY_AMBIGUOUS"
+        assert emitted[-1]["payload"]["stageId"] == "speech_alignment"
+
+    def test_speech_alignment_before_vertical_slice(self, tmp_path):
+        def _mock_align(voice_path, script_ast, attempt_dir, config):
+            timing = {
+                "version": 1,
+                "voiceOffset": 2.0,
+                "leadingSilenceSeconds": 0.0,
+                "subtitleBlocks": [{"index": 0, "text": "주님", "lines": ["주님"], "startTime": 2.0, "endTime": 3.0}],
+            }
+            (attempt_dir / "timing.json").write_text(json.dumps(timing), encoding="utf-8")
+
+        emitted = self._run_with_snapshot_override(tmp_path, {}, _mock_align)
+
+        stage_starts = [e for e in emitted if e["type"] == "stage_started"]
+        stage_ids = [e["payload"]["stageId"] for e in stage_starts]
+        speech_idx = stage_ids.index("speech_alignment")
+        vertical_idx = stage_ids.index("vertical_slice")
+        assert speech_idx < vertical_idx
+
+    def test_progress_is_monotone_across_both_stages(self, tmp_path):
+        def _mock_align(voice_path, script_ast, attempt_dir, config):
+            timing = {
+                "version": 1,
+                "voiceOffset": 2.0,
+                "leadingSilenceSeconds": 0.0,
+                "subtitleBlocks": [{"index": 0, "text": "주님", "lines": ["주님"], "startTime": 2.0, "endTime": 3.0}],
+            }
+            (attempt_dir / "timing.json").write_text(json.dumps(timing), encoding="utf-8")
+
+        emitted = self._run_with_snapshot_override(tmp_path, {}, _mock_align)
+
+        percents = [e["payload"]["percent"] for e in emitted if e["type"] == "progress"]
+        assert percents == sorted(percents), f"Progress must be monotone, got {percents}"
+
+    def test_emits_job_failed_on_unexpected_exception_during_alignment(self, tmp_path):
+        def _raise_oserror(voice_path, script_ast, attempt_dir, config):
+            raise OSError("voice file missing from disk")
+
+        emitted = self._run_with_snapshot_override(tmp_path, {}, _raise_oserror)
+
+        assert emitted[-1]["type"] == "job_failed"
+        assert emitted[-1]["payload"]["errorCode"] == "PROCESS_FAILED"
+        assert emitted[-1]["payload"]["stageId"] == "speech_alignment"
+
+    def test_skips_speech_alignment_when_no_script_ast(self, tmp_path):
+        """음성이 있어도 scriptAst가 None이면 speech_alignment 스테이지를 건너뛰어야 한다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        job_id, voice_path = _setup_db_with_voice(tmp_path, managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        snapshot_no_ast = {
+            "inputs": [{"id": "x", "role": "voice", "managedPath": str(voice_path), "status": "ready"}],
+            "resources": {},
+            "scriptAst": None,
+        }
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg), \
+             mock.patch(
+                 "gracetree_engine.jobs.orchestrator._take_job_snapshot",
+                 return_value=snapshot_no_ast,
+             ):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        stage_ids = [e["payload"].get("stageId") for e in emitted if e["type"] == "stage_started"]
+        assert "speech_alignment" not in stage_ids
+        assert "vertical_slice" in stage_ids
+
+    def test_rejects_voice_path_outside_managed_root(self, tmp_path):
+        """voice path가 approved_root 밖이면 job_failed를 방출해야 한다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        job_id, _ = _setup_db_with_voice(tmp_path, managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        snapshot_outside = {
+            "inputs": [{"id": "x", "role": "voice", "managedPath": "/etc/passwd", "status": "ready"}],
+            "resources": {},
+            "scriptAst": _AST_ONE_BLOCK,
+        }
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg), \
+             mock.patch(
+                 "gracetree_engine.jobs.orchestrator._take_job_snapshot",
+                 return_value=snapshot_outside,
+             ):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        assert emitted[-1]["type"] == "job_failed"
+        assert emitted[-1]["payload"]["stageId"] == "speech_alignment"
