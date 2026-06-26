@@ -105,12 +105,8 @@ describe('desktopApi bridge surface', () => {
     expect(electronMock.invoke).toHaveBeenCalledWith('resources:select-file', 'default_bgm')
     await desktopApi.listCompletedJobs('/managed')
     expect(electronMock.invoke).toHaveBeenCalledWith('jobs:list-completed', '/managed')
-    await desktopApi.openResultFolder('job-id', '/managed/output')
-    expect(electronMock.invoke).toHaveBeenCalledWith(
-      'jobs:open-result',
-      'job-id',
-      '/managed/output'
-    )
+    await desktopApi.openResultFolder('job-id')
+    expect(electronMock.invoke).toHaveBeenCalledWith('jobs:open-result', 'job-id')
     await desktopApi.startJob('job-id', '/managed', '/work/path')
     expect(electronMock.invoke).toHaveBeenCalledWith('jobs:start', 'job-id', '/managed', '/work/path')
     await desktopApi.cancelJob('job-id', 'attempt-id')

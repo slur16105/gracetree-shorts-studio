@@ -135,7 +135,7 @@ describe('CompletionList', () => {
     await user.click(openButton)
 
     expect(openResultFolder).toHaveBeenCalledOnce()
-    expect(openResultFolder).toHaveBeenCalledWith(job.id, job.resultPath)
+    expect(openResultFolder).toHaveBeenCalledWith(job.id)
     expect(onJobSelected).not.toHaveBeenCalled()
   })
 
@@ -202,5 +202,19 @@ describe('CompletionList', () => {
         screen.getByText('완료 목록을 불러오지 못했습니다. 새로고침을 눌러 다시 시도하세요.')
       ).toBeVisible()
     })
+  })
+
+  it('refreshKey 변경 시 listCompletedJobs를 다시 호출한다', async () => {
+    listCompletedJobs.mockResolvedValue([])
+    const { rerender } = render(<CompletionList managedRoot={MANAGED_ROOT} refreshKey={0} />)
+
+    await waitFor(() => expect(listCompletedJobs).toHaveBeenCalledTimes(1))
+
+    const newJob = makeJob()
+    listCompletedJobs.mockResolvedValue([newJob])
+    rerender(<CompletionList managedRoot={MANAGED_ROOT} refreshKey={1} />)
+
+    await waitFor(() => expect(listCompletedJobs).toHaveBeenCalledTimes(2))
+    await screen.findByRole('option')
   })
 })

@@ -18,7 +18,7 @@ import {
 import { shell, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, sep } from 'node:path'
 
 import { createManagedJobPaths, isValidJobId, isValidPublishDate } from '../files/managed-paths'
 import type { JobService } from '../jobs/job-service'
@@ -114,14 +114,46 @@ export function createListCompletedJobsHandler(
 }
 
 export function createOpenResultFolderHandler(
+  managedRoot: string,
+  requestEngine: RequestEngine,
+  idFactory: () => string = randomUUID,
   fsExistsSync: (path: string) => boolean = existsSync,
   shellOpenPath: (path: string) => Promise<string> = shell.openPath.bind(shell)
-): (jobId: string, resultPath: string) => Promise<void> {
-  return async (_jobId: string, resultPath: string): Promise<void> => {
-    if (!fsExistsSync(resultPath)) {
-      throw new Error(`Result folder does not exist: ${resultPath}`)
+): (jobId: string) => Promise<void> {
+  return async (jobId: string): Promise<void> => {
+    // 1. Authoritative path lookup from DB — renderer cannot supply arbitrary paths
+    const requestId = idFactory()
+    const command: ListCompletedJobsCommand = {
+      protocolVersion: 1,
+      type: 'list_completed_jobs',
+      jobId: requestId,
+      timestamp: new Date().toISOString(),
+      payload: { managedRoot }
     }
-    const openError = await shellOpenPath(resultPath)
+    const event = await requestEngine(command)
+    if (!isCompletedJobsListedEvent(event) || event.jobId !== requestId) {
+      throw new Error('Python engine response is invalid')
+    }
+
+    const job = event.payload.jobs.find((j: CompletedJobDto) => j.id === jobId)
+    if (!job) {
+      throw new Error(`Job not found: ${jobId}`)
+    }
+
+    // 2. Validate path is within managedRoot (prevents symlink or path escape)
+    const canonicalManaged = resolve(managedRoot)
+    const canonicalResult = resolve(job.resultPath)
+    if (!canonicalResult.startsWith(canonicalManaged + sep)) {
+      throw new Error(`Result path is outside managed root: ${job.resultPath}`)
+    }
+
+    // 3. Existence check
+    if (!fsExistsSync(job.resultPath)) {
+      throw new Error(`Result folder does not exist: ${job.resultPath}`)
+    }
+
+    // 4. Open in OS file explorer
+    const openError = await shellOpenPath(job.resultPath)
     if (openError) {
       throw new Error(`Failed to open result folder: ${openError}`)
     }
@@ -150,12 +182,12 @@ export function registerJobHandlers(
     return listCompletedJobs(managedRootArg)
   })
 
-  const openResultFolder = createOpenResultFolderHandler()
-  ipcMain.handle(JOBS_OPEN_RESULT_CHANNEL, (_event, jobId: unknown, resultPath: unknown) => {
-    if (typeof jobId !== 'string' || typeof resultPath !== 'string') {
+  const openResultFolder = createOpenResultFolderHandler(managedRoot, requestEngine)
+  ipcMain.handle(JOBS_OPEN_RESULT_CHANNEL, (_event, jobId: unknown) => {
+    if (typeof jobId !== 'string') {
       throw new Error('Open result folder request is invalid')
     }
-    return openResultFolder(jobId, resultPath)
+    return openResultFolder(jobId)
   })
 
   ipcMain.handle(

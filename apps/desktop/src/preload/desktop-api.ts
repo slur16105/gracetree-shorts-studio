@@ -68,8 +68,8 @@ export const desktopApi = Object.freeze({
     ipcRenderer.invoke(resourceUpdateChannel, resourceType, sourcePath, managedRoot),
   selectResourceFile: (resourceType) => ipcRenderer.invoke(resourceSelectFileChannel, resourceType),
   listCompletedJobs: (managedRoot) => ipcRenderer.invoke(jobsListCompletedChannel, managedRoot),
-  openResultFolder: (jobId, resultPath) =>
-    ipcRenderer.invoke(jobsOpenResultChannel, jobId, resultPath),
+  openResultFolder: (jobId) =>
+    ipcRenderer.invoke(jobsOpenResultChannel, jobId),
   startJob: (jobId, managedRoot, workPath) =>
     ipcRenderer.invoke(jobStartChannel, jobId, managedRoot, workPath),
   cancelJob: (jobId, attemptId) => ipcRenderer.invoke(jobCancelChannel, jobId, attemptId),

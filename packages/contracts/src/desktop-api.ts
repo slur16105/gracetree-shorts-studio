@@ -75,7 +75,7 @@ export interface DesktopApi {
   ): Promise<ResourceUpdateResult>;
   selectResourceFile(resourceType: ResourceType): Promise<SelectedInputFile | null>;
   listCompletedJobs(managedRoot: string): Promise<CompletedJobSummary[]>;
-  openResultFolder(jobId: string, resultPath: string): Promise<void>;
+  openResultFolder(jobId: string): Promise<void>;
   startJob(jobId: string, managedRoot: string, workPath: string): Promise<void>;
   cancelJob(jobId: string, attemptId: string): Promise<void>;
   onJobEvent(listener: (event: EngineEvent) => void): () => void;

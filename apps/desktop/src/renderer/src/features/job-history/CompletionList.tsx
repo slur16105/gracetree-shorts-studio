@@ -5,6 +5,7 @@ import styles from './CompletionList.module.css'
 
 interface CompletionListProps {
   managedRoot: string
+  refreshKey?: number
   onJobSelected?: (jobId: string) => void
 }
 
@@ -18,6 +19,7 @@ function formatDate(isoString: string): string {
 
 export function CompletionList({
   managedRoot,
+  refreshKey,
   onJobSelected
 }: CompletionListProps): React.JSX.Element {
   const [jobs, setJobs] = useState<CompletedJobSummary[]>([])
@@ -45,7 +47,7 @@ export function CompletionList({
 
   useEffect(() => {
     void load()
-  }, [load, managedRoot])
+  }, [load, managedRoot, refreshKey])
 
   function handleRowClick(jobId: string): void {
     setSelectedJobId(jobId)
@@ -61,7 +63,7 @@ export function CompletionList({
 
   function handleOpenClick(event: React.MouseEvent, job: CompletedJobSummary): void {
     event.stopPropagation()
-    void window.desktopApi.openResultFolder(job.id, job.resultPath)
+    void window.desktopApi.openResultFolder(job.id)
   }
 
   const isLoading = loadState === 'loading'

@@ -5,7 +5,9 @@ import { SidebarIcon } from './components/SidebarIcon'
 import { GuideView } from './features/guide/GuideView'
 import { CompletionList } from './features/job-history/CompletionList'
 import { JobEditor } from './features/job-editor/JobEditor'
+import { ResultDialog } from './features/job-progress/ResultDialog'
 import { INITIAL_JOB_RUN_STATE } from '@gracetree/contracts/job-state'
+import type { CompletedJobSummary } from '@gracetree/contracts/desktop-api'
 import {
   dispatchJobEvent,
   useJobRunState,
@@ -30,8 +32,12 @@ function App(): React.JSX.Element {
   const [view, setView] = useState<View>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [managedRoot, setManagedRoot] = useState('')
+  const [completionRefreshKey, setCompletionRefreshKey] = useState(0)
+  const [resultDialogJob, setResultDialogJob] = useState<CompletedJobSummary | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsWasOpen = useRef(false)
+  const resultDialogPrevFocusRef = useRef<Element | null>(null)
+  const loadedForJobIdRef = useRef<string | null>(null)
   const jobState = useJobRunState() ?? INITIAL_JOB_RUN_STATE
 
   // live region: 1초 스로틀 — cleanup 없이 타이머가 자연히 실행되어야 한다
@@ -66,6 +72,26 @@ function App(): React.JSX.Element {
     return window.desktopApi.onJobEvent(dispatchJobEvent)
   }, [])
 
+  // 작업 완료 시 완료 목록 갱신 및 결과 다이얼로그 표시
+  useEffect(() => {
+    if (jobState.status === 'completed') {
+      if (loadedForJobIdRef.current !== jobState.jobId) {
+        loadedForJobIdRef.current = jobState.jobId
+        setCompletionRefreshKey((k) => k + 1)
+        resultDialogPrevFocusRef.current = document.activeElement
+        if (managedRoot) {
+          void window.desktopApi.listCompletedJobs(managedRoot).then((jobs) => {
+            const job = jobs.find((j) => j.id === jobState.jobId)
+            if (job) setResultDialogJob(job)
+          })
+        }
+      }
+    } else {
+      loadedForJobIdRef.current = null
+      setResultDialogJob(null)
+    }
+  }, [jobState, managedRoot])
+
   useEffect(() => {
     if (settingsWasOpen.current && !settingsOpen) {
       settingsButtonRef.current?.focus()
@@ -75,6 +101,14 @@ function App(): React.JSX.Element {
 
   const handleManagedRootResolved = useCallback((resolved: string) => {
     setManagedRoot((current) => (current === resolved ? current : resolved))
+  }, [])
+
+  const handleResultDialogClose = useCallback(() => {
+    setResultDialogJob(null)
+    const prev = resultDialogPrevFocusRef.current
+    if (prev instanceof HTMLElement) {
+      prev.focus()
+    }
   }, [])
 
   return (
@@ -133,7 +167,10 @@ function App(): React.JSX.Element {
               <aside aria-labelledby="completed-title" className={styles.completedRegion}>
                 <h2 id="completed-title">완료 목록</h2>
                 {managedRoot ? (
-                  <CompletionList managedRoot={managedRoot} />
+                  <CompletionList
+                    managedRoot={managedRoot}
+                    refreshKey={completionRefreshKey}
+                  />
                 ) : (
                   <div className={styles.compactEmptyState}>
                     <p>완료된 영상이 없습니다.</p>
@@ -172,6 +209,16 @@ function App(): React.JSX.Element {
 
       {settingsOpen ? (
         <SettingsDialog managedRoot={managedRoot} onClose={() => setSettingsOpen(false)} />
+      ) : null}
+
+      {resultDialogJob ? (
+        <ResultDialog
+          completedAt={resultDialogJob.completedAt}
+          onClose={handleResultDialogClose}
+          publishDate={resultDialogJob.publishDate}
+          resultPath={resultDialogJob.resultPath}
+          title={resultDialogJob.title}
+        />
       ) : null}
     </div>
   )
