@@ -20,6 +20,7 @@ interface StreamListener {
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000
 const INPUT_REGISTRATION_TIMEOUT_MS = 30 * 60 * 1_000
 const GENERATION_TIMEOUT_MS = 10 * 60 * 1_000
+const CANCEL_TIMEOUT_MS = 30_000
 
 export class EngineClient {
   private child: ChildProcessWithoutNullStreams | null = null
@@ -45,15 +46,27 @@ export class EngineClient {
     const child = this.child
     if (!child) throw new Error('Python engine did not start')
 
+    const isCancelCommand = command.type === 'cancel_job'
     return new Promise<EngineEvent>((resolve, reject) => {
       const timeoutMs =
         command.type === 'register_input_files' ||
         (command.type === 'manage_input' && command.payload.action === 'replace')
           ? INPUT_REGISTRATION_TIMEOUT_MS
-          : DEFAULT_REQUEST_TIMEOUT_MS
+          : isCancelCommand
+            ? CANCEL_TIMEOUT_MS
+            : DEFAULT_REQUEST_TIMEOUT_MS
       const timeout = setTimeout(() => {
         if (!this.pending.has(command.jobId)) return
-        this.terminateChild(child, new Error('Python engine request timed out'))
+        if (isCancelCommand) {
+          // Don't kill the engine — the background thread may still be in a
+          // non-interruptible section. The stream listener remains alive and will
+          // receive job_cancelled once the thread reaches a cancel checkpoint.
+          const pendingEntry = this.pending.get(command.jobId)!
+          this.pending.delete(command.jobId)
+          pendingEntry.reject(new Error('cancel_job acknowledgment timed out'))
+        } else {
+          this.terminateChild(child, new Error('Python engine request timed out'))
+        }
       }, timeoutMs)
       this.pending.set(command.jobId, { resolve, reject, timeout })
       child.stdin.write(`${JSON.stringify(command)}\n`)

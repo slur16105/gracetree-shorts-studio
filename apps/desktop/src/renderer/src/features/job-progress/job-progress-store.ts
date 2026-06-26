@@ -58,7 +58,32 @@ export function useJobRunState(): JobRunState {
   return useSyncExternalStore(_subscribe, _getRunState);
 }
 
+export function setJobCancelling(): void {
+  const { currentJobId, runState } = _state;
+  if (!currentJobId) return;
+  if (runState.status !== "running") return;
+  _state = {
+    currentJobId,
+    runState: {
+      status: "cancelling",
+      jobId: runState.jobId,
+      attemptId: runState.attemptId,
+    },
+  };
+  _notify();
+}
+
+export function revertJobCancellingToRunning(
+  prevState: Extract<JobRunState, { status: "running" }>
+): void {
+  const { currentJobId, runState } = _state;
+  if (!currentJobId) return;
+  if (runState.status !== "cancelling") return;
+  _state = { currentJobId, runState: prevState };
+  _notify();
+}
+
 export function useIsRunning(): boolean {
   const state = useJobRunState();
-  return state.status === "running";
+  return state.status === "running" || state.status === "cancelling";
 }

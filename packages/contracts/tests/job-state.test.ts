@@ -170,10 +170,40 @@ describe("applyJobEvent — terminal events", () => {
     expect(s).toMatchObject({ status: "failed", errorCode: "PROCESS_FAILED" });
   });
 
-  it("job_cancelled transitions to cancelled", () => {
+  it("job_cancelled from running transitions to cancelled", () => {
     let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID);
     s = applyJobEvent(s, cancelled(), JOB_ID);
     expect(s).toMatchObject({ status: "cancelled" });
+  });
+
+  it("job_cancelled from cancelling transitions to cancelled", () => {
+    let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID) as Extract<JobRunState, { status: "running" }>;
+    // Simulate cancelling state (set directly as it's a UI-only transition)
+    const cancelling: JobRunState = { status: "cancelling", jobId: s.jobId, attemptId: s.attemptId };
+    const after = applyJobEvent(cancelling, cancelled(), JOB_ID);
+    expect(after).toMatchObject({ status: "cancelled" });
+  });
+
+  it("job_completed from cancelling transitions to completed (job wins race)", () => {
+    const running = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID) as Extract<JobRunState, { status: "running" }>;
+    const cancelling: JobRunState = { status: "cancelling", jobId: running.jobId, attemptId: running.attemptId };
+    const after = applyJobEvent(cancelling, completed(), JOB_ID);
+    expect(after).toMatchObject({ status: "completed", artifactPath: expect.any(String) });
+  });
+
+  it("job_failed from cancelling transitions to failed (engine fails during cancel)", () => {
+    const running = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID) as Extract<JobRunState, { status: "running" }>;
+    const cancelling: JobRunState = { status: "cancelling", jobId: running.jobId, attemptId: running.attemptId };
+    const after = applyJobEvent(cancelling, failed(), JOB_ID);
+    expect(after).toMatchObject({ status: "failed", errorCode: "PROCESS_FAILED" });
+  });
+
+  it("job_cancelled is ignored when already completed (late cancel)", () => {
+    let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID);
+    s = applyJobEvent(s, completed(), JOB_ID);
+    const before = s;
+    s = applyJobEvent(s, cancelled(), JOB_ID);
+    expect(s).toBe(before);
   });
 
   it("ignores further events after terminal", () => {

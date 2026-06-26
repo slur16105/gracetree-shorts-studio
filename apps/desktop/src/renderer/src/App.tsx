@@ -22,6 +22,7 @@ function getStatusLabel(state: ReturnType<typeof useJobRunState>): string {
     const stage = state.stageName ?? '처리 중'
     return `${stage} ${percent}%`
   }
+  if (state.status === 'cancelling') return '취소 중...'
   if (state.status === 'completed') return '생성 완료'
   if (state.status === 'failed') return `오류: ${state.errorCode}`
   if (state.status === 'cancelled') return '취소됨'
@@ -216,7 +217,7 @@ function App(): React.JSX.Element {
       <footer className={styles.statusBar}>
         <span
           className={styles.statusIndicator}
-          data-running={jobState.status === 'running' ? '' : undefined}
+          data-running={jobState.status === 'running' || jobState.status === 'cancelling' ? '' : undefined}
         />
         <span>{getStatusLabel(jobState)}</span>
         {jobState.status === 'running' ? (

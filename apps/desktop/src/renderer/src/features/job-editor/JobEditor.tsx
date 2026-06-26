@@ -7,9 +7,13 @@ import { InputDropZone } from './InputDropZone'
 import { JobSummary } from './JobSummary'
 import { ReadinessProgress } from './ReadinessProgress'
 import { computeReadiness } from './readiness'
+import { CancelConfirmDialog } from '../job-progress/CancelConfirmDialog'
 import {
+  revertJobCancellingToRunning,
   setCurrentJobId,
+  setJobCancelling,
   useIsRunning,
+  useJobRunState,
 } from '../job-progress/job-progress-store'
 
 interface JobEditorProps {
@@ -25,9 +29,16 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
   const [isParsing, setIsParsing] = useState(false)
   const [resources, setResources] = useState<ResourceDto[]>([])
   const [isStarting, setIsStarting] = useState(false)
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+  const cancelButtonRef = useRef<HTMLButtonElement>(null)
   const validationRef = useRef<{ jobId: string; inputId: string; inputVersion: string } | null>(null)
   const onManagedRootResolvedRef = useRef(onManagedRootResolved)
   const isRunning = useIsRunning()
+  const jobRunState = useJobRunState()
+  const attemptId =
+    jobRunState.status === 'running' || jobRunState.status === 'cancelling'
+      ? jobRunState.attemptId
+      : null
 
   useEffect(() => {
     onManagedRootResolvedRef.current = onManagedRootResolved
@@ -146,6 +157,31 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
   }, [job, managedRoot, isRunning, isStarting])
 
   const canGenerate = Boolean(job && managedRoot && readiness.isReady && !isRunning && !isStarting)
+  const isCancelling = jobRunState.status === 'cancelling'
+
+  const handleCancelClick = useCallback(() => {
+    setCancelConfirmOpen(true)
+  }, [])
+
+  const handleCancelDialogClose = useCallback(() => {
+    setCancelConfirmOpen(false)
+    cancelButtonRef.current?.focus()
+  }, [])
+
+  const handleCancelConfirm = useCallback(async () => {
+    if (!job || !attemptId || jobRunState.status !== 'running') return
+    const prevRunState = jobRunState
+    setCancelConfirmOpen(false)
+    setJobCancelling()
+    try {
+      await window.desktopApi.cancelJob(job.id, attemptId)
+    } catch {
+      // IPC rejected immediately (engine not running) — revert so the user can retry.
+      // If IPC merely timed out (engine slow), job_cancelled will still arrive via
+      // the stream listener and transition the state machine normally.
+      revertJobCancellingToRunning(prevRunState)
+    }
+  }, [job, attemptId, jobRunState])
 
   return (
     <>
@@ -159,15 +195,30 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
         <>
           <ReadinessProgress isParsing={isParsing} onOpenSettings={onOpenSettings} readiness={readiness} />
           <JobSummary isParsing={isParsing} scriptValidation={scriptValidation} />
-          <button
-            aria-busy={isStarting || isRunning}
-            disabled={!canGenerate}
-            onClick={handleStartGeneration}
-            type="button"
-          >
-            {isRunning ? '생성 중...' : isStarting ? '시작 중...' : '생성 시작'}
-          </button>
+          {isRunning ? (
+            <button
+              disabled={isCancelling}
+              onClick={handleCancelClick}
+              ref={cancelButtonRef}
+              type="button"
+            >
+              {isCancelling ? '취소 중...' : '취소'}
+            </button>
+          ) : (
+            <button
+              aria-busy={isStarting}
+              disabled={!canGenerate}
+              onClick={handleStartGeneration}
+              type="button"
+            >
+              {isStarting ? '시작 중...' : '생성 시작'}
+            </button>
+          )}
         </>
+      ) : null}
+
+      {cancelConfirmOpen ? (
+        <CancelConfirmDialog onClose={handleCancelDialogClose} onConfirm={handleCancelConfirm} />
       ) : null}
     </>
   )

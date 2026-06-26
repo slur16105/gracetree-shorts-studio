@@ -1,14 +1,5 @@
 import { isGenerationEvent } from "./protocol.js";
-import type {
-  ArtifactCreatedEvent,
-  EngineEvent,
-  JobAcceptedEvent,
-  JobCancelledEvent,
-  JobCompletedEvent,
-  JobFailedEvent,
-  ProgressEvent,
-  StageStartedEvent,
-} from "./protocol.js";
+import type { EngineEvent } from "./protocol.js";
 
 export type JobRunState =
   | { status: "idle" }
@@ -19,6 +10,11 @@ export type JobRunState =
       stageId: string | null;
       stageName: string | null;
       percent: number;
+    }
+  | {
+      status: "cancelling";
+      jobId: string;
+      attemptId: string;
     }
   | {
       status: "completed";
@@ -41,15 +37,6 @@ export type JobRunState =
     };
 
 export const INITIAL_JOB_RUN_STATE: JobRunState = { status: "idle" };
-
-type GenerationEvent =
-  | JobAcceptedEvent
-  | StageStartedEvent
-  | ProgressEvent
-  | ArtifactCreatedEvent
-  | JobCompletedEvent
-  | JobFailedEvent
-  | JobCancelledEvent;
 
 export function applyJobEvent(
   state: JobRunState,
@@ -92,13 +79,13 @@ export function applyJobEvent(
     }
 
     case "artifact_created": {
-      if (state.status !== "running") return state;
+      if (state.status !== "running" && state.status !== "cancelling") return state;
       if (state.attemptId !== event.payload.attemptId) return state;
       return state;
     }
 
     case "job_completed": {
-      if (state.status !== "running") return state;
+      if (state.status !== "running" && state.status !== "cancelling") return state;
       if (state.attemptId !== event.payload.attemptId) return state;
       return {
         status: "completed",
@@ -110,7 +97,7 @@ export function applyJobEvent(
     }
 
     case "job_failed": {
-      if (state.status !== "running") return state;
+      if (state.status !== "running" && state.status !== "cancelling") return state;
       if (state.attemptId !== event.payload.attemptId) return state;
       return {
         status: "failed",
@@ -122,7 +109,7 @@ export function applyJobEvent(
     }
 
     case "job_cancelled": {
-      if (state.status !== "running") return state;
+      if (state.status !== "running" && state.status !== "cancelling") return state;
       if (state.attemptId !== event.payload.attemptId) return state;
       return {
         status: "cancelled",

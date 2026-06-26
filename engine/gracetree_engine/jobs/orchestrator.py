@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, Callable
 from uuid import uuid4
 
 from ..storage.migrations import apply_migrations, connect_database
@@ -17,6 +20,58 @@ from .attempt_repository import AttemptRepository
 from ..resource_resolver import contracts_dir as _contracts_dir
 
 _CONTRACTS_DIR = _contracts_dir()
+
+
+class JobCancelledError(Exception):
+    """취소 이벤트로 인해 generation이 중단됨."""
+
+
+def _check_cancel(cancel_event: threading.Event | None) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise JobCancelledError()
+
+
+def _run_ffmpeg_cancellable(
+    args: list[str],
+    cancel_event: threading.Event | None,
+    timeout: float = 120.0,
+) -> subprocess.CompletedProcess:
+    """FFmpeg를 인자 배열로 실행한다. cancel_event가 set되거나 timeout 초 경과 시 프로세스를 kill한다."""
+    if cancel_event is None:
+        return _run_ffmpeg(args)
+    ffmpeg = _resolve_ffmpeg()
+    proc = subprocess.Popen(
+        [ffmpeg, *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            if cancel_event.is_set():
+                proc.kill()
+                proc.wait()
+                raise JobCancelledError()
+            if time.monotonic() >= deadline:
+                proc.kill()
+                proc.wait()
+                raise subprocess.TimeoutExpired(cmd=args, timeout=timeout)
+            try:
+                stdout, stderr = proc.communicate(timeout=0.1)
+                return subprocess.CompletedProcess(
+                    args=[ffmpeg, *args],
+                    returncode=proc.returncode,
+                    stdout=stdout,
+                    stderr=stderr,
+                )
+            except subprocess.TimeoutExpired:
+                continue
+    except (JobCancelledError, subprocess.TimeoutExpired):
+        raise
+    except Exception:
+        proc.kill()
+        proc.wait()
+        raise
 
 
 def _make_event(type_: str, job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -157,6 +212,7 @@ def start_job(
     command: dict[str, Any],
     approved_root: Path,
     emit: Emit,
+    cancel_event: threading.Event | None = None,
     _align: Callable | None = None,
 ) -> None:
     """start_job 커맨드를 처리해 수직 슬라이스 진단 MP4를 생성하고 이벤트를 순차 방출한다."""
@@ -192,10 +248,42 @@ def start_job(
     attempt_dir = work_path / "temp" / "attempts" / attempt_id
     attempt_dir.mkdir(parents=True, exist_ok=True)
 
+    try:
+        _run_start_job_stages(
+            job_id=job_id,
+            attempt_id=attempt_id,
+            attempt_dir=attempt_dir,
+            approved_root=approved_root,
+            snapshot=snapshot,
+            repo=repo,
+            emit=emit,
+            cancel_event=cancel_event,
+            _align=_align,
+        )
+    except JobCancelledError:
+        repo.cancel_attempt(attempt_id=attempt_id)
+        shutil.rmtree(attempt_dir, ignore_errors=True)
+        emit(_make_event("job_cancelled", job_id, {"attemptId": attempt_id}))
+
+
+def _run_start_job_stages(
+    *,
+    job_id: str,
+    attempt_id: str,
+    attempt_dir: Path,
+    approved_root: Path,
+    snapshot: dict[str, Any],
+    repo: AttemptRepository,
+    emit: Emit,
+    cancel_event: threading.Event | None,
+    _align: Callable | None,
+) -> None:
+    """각 단계를 순서대로 실행한다. 취소 시 JobCancelledError를 발생시킨다."""
     voice_path_str = _find_voice_path(snapshot)
     script_ast = snapshot.get("scriptAst")
 
     if voice_path_str and script_ast:
+        _check_cancel(cancel_event)
         voice_path = Path(voice_path_str).resolve()
         if not voice_path.is_relative_to(approved_root.resolve()):
             repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
@@ -239,12 +327,14 @@ def start_job(
                 "stageId": "speech_alignment",
             }))
             return
+        _check_cancel(cancel_event)
         emit(_make_event("progress", job_id, {
             "attemptId": attempt_id,
             "stageId": "speech_alignment",
             "percent": 25,
         }))
 
+    _check_cancel(cancel_event)
     emit(_make_event("stage_started", job_id, {
         "attemptId": attempt_id,
         "stageId": "vertical_slice",
@@ -276,8 +366,10 @@ def start_job(
     }))
 
     try:
-        result = _run_ffmpeg(ffmpeg_args)
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        result = _run_ffmpeg_cancellable(ffmpeg_args, cancel_event)
+    except JobCancelledError:
+        raise
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
         emit(_make_event("job_failed", job_id, {
             "attemptId": attempt_id,
@@ -285,6 +377,8 @@ def start_job(
             "stageId": "vertical_slice",
         }))
         return
+
+    _check_cancel(cancel_event)
 
     emit(_make_event("progress", job_id, {
         "attemptId": attempt_id,

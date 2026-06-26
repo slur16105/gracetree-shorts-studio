@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TextIO
@@ -253,27 +254,42 @@ def _job_cancelled(command: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
-def _handle_start_job_streaming(command: dict[str, Any], stdout: TextIO) -> None:
-    """start_job을 처리하며 여러 이벤트를 직접 stdout에 기록한다."""
+def _handle_start_job_streaming(
+    command: dict[str, Any],
+    stdout: TextIO,
+    lock: threading.Lock,
+    cancel_event: threading.Event,
+) -> None:
+    """start_job을 처리하며 여러 이벤트를 thread-safe하게 stdout에 기록한다."""
     approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
     if not approved_root_value:
         raise ValueError("approved managed root is unavailable")
 
     def _emit(event: dict[str, Any]) -> None:
         EVENT_VALIDATOR.validate(event)
-        stdout.write(json.dumps(event, separators=(",", ":")) + "\n")
-        stdout.flush()
+        with lock:
+            stdout.write(json.dumps(event, separators=(",", ":")) + "\n")
+            stdout.flush()
 
     from .jobs.orchestrator import start_job as _start_job
     _start_job(
         command=command,
         approved_root=Path(approved_root_value),
         emit=_emit,
+        cancel_event=cancel_event,
     )
 
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
     had_error = False
+    lock = threading.Lock()
+    # job_id -> cancel_event; populated while start_job thread is active
+    active_cancel_events: dict[str, threading.Event] = {}
+
+    def _write_event(event: dict[str, Any]) -> None:
+        with lock:
+            stdout.write(json.dumps(event, separators=(",", ":")) + "\n")
+            stdout.flush()
 
     for raw_line in stdin:
         try:
@@ -299,8 +315,40 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
 
         try:
             if command["type"] == "start_job":
-                _handle_start_job_streaming(command, stdout)
+                job_id = command["jobId"]
+                cancel_event = threading.Event()
+                with lock:
+                    active_cancel_events[job_id] = cancel_event
+
+                def _run_start_job(cmd=command, jid=job_id, ce=cancel_event) -> None:
+                    try:
+                        _handle_start_job_streaming(cmd, stdout, lock, ce)
+                    except Exception:
+                        print(
+                            "UNHANDLED_ERROR: start_job thread failed unexpectedly",
+                            file=stderr,
+                            flush=True,
+                        )
+                    finally:
+                        with lock:
+                            active_cancel_events.pop(jid, None)
+
+                t = threading.Thread(target=_run_start_job, daemon=True)
+                t.start()
                 continue
+
+            elif command["type"] == "cancel_job":
+                job_id = command["jobId"]
+                with lock:
+                    cancel_event = active_cancel_events.get(job_id)
+                if cancel_event is not None:
+                    # Signal the generation thread; it will emit job_cancelled
+                    cancel_event.set()
+                    continue
+                else:
+                    # Job already completed or never started — acknowledge directly
+                    event = _job_cancelled(command)
+
             elif command["type"] == "check_health":
                 event = _health_checked(command["jobId"])
             elif command["type"] == "get_or_create_job":
@@ -315,8 +363,6 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 event = _resource_updated(command)
             elif command["type"] == "list_completed_jobs":
                 event = _completed_jobs_listed(command)
-            elif command["type"] == "cancel_job":
-                event = _job_cancelled(command)
             else:
                 event = _input_state_changed(command)
         except (ValidationError, ValueError) as error:
@@ -338,8 +384,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
             )
             return 1
 
-        stdout.write(json.dumps(event, separators=(",", ":")) + "\n")
-        stdout.flush()
+        _write_event(event)
 
     return 1 if had_error else 0
 

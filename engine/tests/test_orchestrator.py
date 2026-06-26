@@ -588,3 +588,255 @@ class TestSpeechAlignmentIntegration:
 
         assert emitted[-1]["type"] == "job_failed"
         assert emitted[-1]["payload"]["stageId"] == "speech_alignment"
+
+
+# ──────────────────────────── cancellation tests ─────────────────────────────
+
+import threading
+
+from gracetree_engine.jobs.orchestrator import JobCancelledError
+
+
+class TestStartJobCancellation:
+    """취소 흐름: cancel_event 신호 → job_cancelled 방출, temp 정리, DB 갱신."""
+
+    def _run_with_cancel(
+        self,
+        tmp_path,
+        cancel_event: threading.Event,
+        fake_run=None,
+    ) -> tuple[list[dict], Path]:
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        if fake_run is None:
+            def fake_run(args, **kwargs):
+                out = Path(args[-1])
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(b"\x00" * 128)
+                return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+
+        with mock.patch("subprocess.run", side_effect=fake_run):
+            start_job(
+                command=command,
+                approved_root=managed_root,
+                emit=emitted.append,
+                cancel_event=cancel_event,
+            )
+
+        return emitted, db_path
+
+    def test_cancel_before_ffmpeg_emits_job_cancelled(self, tmp_path):
+        """cancel_event가 사전에 set되면 FFmpeg 실행 전에 job_cancelled를 방출한다."""
+        cancel_event = threading.Event()
+        cancel_event.set()
+
+        emitted, _ = self._run_with_cancel(tmp_path, cancel_event)
+        types = [e["type"] for e in emitted]
+        assert types[0] == "job_accepted"
+        assert types[-1] == "job_cancelled"
+        assert "job_completed" not in types
+        assert "job_failed" not in types
+
+    def test_cancel_during_ffmpeg_emits_job_cancelled(self, tmp_path):
+        """FFmpeg 실행 중 cancel_event가 set되면 kill 후 job_cancelled를 방출한다."""
+        cancel_event = threading.Event()
+
+        proc_mock = mock.MagicMock()
+        proc_mock.returncode = 0
+
+        call_count = 0
+
+        def fake_communicate(timeout=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # First poll: signal cancel and raise TimeoutExpired to simulate running process
+                cancel_event.set()
+                raise subprocess.TimeoutExpired(cmd="ffmpeg", timeout=0.1)
+            return b"", b""
+
+        proc_mock.communicate.side_effect = fake_communicate
+
+        with mock.patch("subprocess.Popen", return_value=proc_mock):
+            managed_root = tmp_path / "managed"
+            managed_root.mkdir()
+            work_path = managed_root / "jobs" / "2026-06-25"
+            work_path.mkdir(parents=True)
+            db_path, job_id = _setup_db(managed_root)
+            command = _make_command(job_id, managed_root, work_path)
+            emitted: list[dict] = []
+
+            start_job(
+                command=command,
+                approved_root=managed_root,
+                emit=emitted.append,
+                cancel_event=cancel_event,
+            )
+
+        types = [e["type"] for e in emitted]
+        assert types[-1] == "job_cancelled"
+        assert "job_completed" not in types
+        proc_mock.kill.assert_called()
+
+    def test_cancel_cleans_up_temp_dir(self, tmp_path):
+        """취소 후 attempt temp 디렉토리가 삭제된다."""
+        cancel_event = threading.Event()
+        cancel_event.set()
+
+        emitted, _ = self._run_with_cancel(tmp_path, cancel_event)
+
+        cancelled = next((e for e in emitted if e["type"] == "job_cancelled"), None)
+        assert cancelled is not None
+        attempt_id = cancelled["payload"]["attemptId"]
+        work_path = tmp_path / "managed" / "jobs" / "2026-06-25"
+        attempt_dir = work_path / "temp" / "attempts" / attempt_id
+        assert not attempt_dir.exists(), "temp dir should be removed after cancel"
+
+    def test_cancel_marks_attempt_cancelled_in_db(self, tmp_path):
+        """취소 후 DB의 attempt status가 cancelled가 된다."""
+        cancel_event = threading.Event()
+        cancel_event.set()
+
+        emitted, db_path = self._run_with_cancel(tmp_path, cancel_event)
+
+        cancelled = next((e for e in emitted if e["type"] == "job_cancelled"), None)
+        assert cancelled is not None
+        attempt_id = cancelled["payload"]["attemptId"]
+        with connect_database(db_path) as conn:
+            row = conn.execute(
+                "SELECT status FROM job_attempts WHERE id = ?", (attempt_id,)
+            ).fetchone()
+        assert row is not None
+        assert row["status"] == "cancelled"
+
+    def test_cancel_does_not_overwrite_existing_completed_artifact(self, tmp_path):
+        """기존 완료 artifact와 DB 레코드는 취소로 인해 변경되지 않는다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+
+        # Pre-existing completed artifact (different attempt)
+        existing_artifact = managed_root / "output" / "previous.mp4"
+        existing_artifact.parent.mkdir(parents=True, exist_ok=True)
+        existing_artifact.write_bytes(b"\x00" * 512)
+
+        cancel_event = threading.Event()
+        cancel_event.set()
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, b"", b"")):
+            start_job(
+                command=command,
+                approved_root=managed_root,
+                emit=emitted.append,
+                cancel_event=cancel_event,
+            )
+
+        assert existing_artifact.exists(), "existing artifact must not be deleted on cancel"
+
+    def test_repeated_cancel_emits_single_job_cancelled(self, tmp_path):
+        """cancel_event가 반복 set되더라도 job_cancelled는 단 한 번만 방출된다."""
+        cancel_event = threading.Event()
+        cancel_event.set()
+
+        emitted, _ = self._run_with_cancel(tmp_path, cancel_event)
+        # Set again to simulate repeated cancel call
+        cancel_event.set()
+
+        cancelled_count = sum(1 for e in emitted if e["type"] == "job_cancelled")
+        assert cancelled_count == 1
+
+    def test_no_cancel_event_completes_normally(self, tmp_path):
+        """cancel_event가 None이면 정상 완료 경로를 사용한다."""
+        def fake_run(args, **kwargs):
+            if "ffmpeg" in str(args[0]):
+                out = Path(args[-1])
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(b"\x00" * 128)
+                return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+            info = {"streams": [{"codec_type": "video"}], "format": {"duration": "2.0"}}
+            return subprocess.CompletedProcess(args, 0, stdout=json.dumps(info).encode(), stderr=b"")
+
+        emitted, _ = self._run_with_cancel(tmp_path, None, fake_run=fake_run)
+        assert emitted[-1]["type"] == "job_completed"
+
+    def test_ffmpeg_wall_clock_timeout_emits_job_failed(self, tmp_path):
+        """_run_ffmpeg_cancellable의 전체 타임아웃이 초과되면 job_failed를 방출한다."""
+        cancel_event = threading.Event()
+
+        proc_mock = mock.MagicMock()
+        proc_mock.communicate.side_effect = subprocess.TimeoutExpired(cmd="ffmpeg", timeout=0.1)
+
+        with mock.patch("subprocess.Popen", return_value=proc_mock):
+            with mock.patch("time.monotonic", side_effect=[0.0, 0.0, 200.0]):
+                managed_root = tmp_path / "managed"
+                managed_root.mkdir()
+                work_path = managed_root / "jobs" / "2026-06-25"
+                work_path.mkdir(parents=True)
+                _, job_id = _setup_db(managed_root)
+                command = _make_command(job_id, managed_root, work_path)
+                emitted: list[dict] = []
+
+                start_job(
+                    command=command,
+                    approved_root=managed_root,
+                    emit=emitted.append,
+                    cancel_event=cancel_event,
+                )
+
+        types = [e["type"] for e in emitted]
+        assert "job_failed" in types
+        assert "job_completed" not in types
+        assert "job_cancelled" not in types
+
+    def test_ffmpeg_timeout_expired_without_cancel_event_emits_job_failed(self, tmp_path):
+        """cancel_event 없이 ffmpeg가 120초를 초과하면 job_failed를 방출한다 (TimeoutExpired 복원)."""
+        def fake_run_timeout(args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd=args, timeout=120)
+
+        emitted, _ = self._run_with_cancel(tmp_path, None, fake_run=fake_run_timeout)
+        types = [e["type"] for e in emitted]
+        assert "job_failed" in types
+        assert "job_completed" not in types
+
+    def test_cancel_after_ffmpeg_completes_emits_job_cancelled(self, tmp_path):
+        """FFmpeg 완료 직후 cancel이 set되면 _check_cancel이 작업을 중단한다."""
+        cancel_event = threading.Event()
+
+        proc_mock = mock.MagicMock()
+        proc_mock.returncode = 0
+
+        def fake_communicate(timeout=None):
+            cancel_event.set()
+            return b"", b""
+
+        proc_mock.communicate.side_effect = fake_communicate
+
+        with mock.patch("subprocess.Popen", return_value=proc_mock):
+            managed_root = tmp_path / "managed"
+            managed_root.mkdir()
+            work_path = managed_root / "jobs" / "2026-06-25"
+            work_path.mkdir(parents=True)
+            _, job_id = _setup_db(managed_root)
+            command = _make_command(job_id, managed_root, work_path)
+            emitted: list[dict] = []
+
+            start_job(
+                command=command,
+                approved_root=managed_root,
+                emit=emitted.append,
+                cancel_event=cancel_event,
+            )
+
+        types = [e["type"] for e in emitted]
+        assert "job_cancelled" in types
+        assert "job_completed" not in types
