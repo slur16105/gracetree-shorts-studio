@@ -97,6 +97,21 @@ describe("applyJobEvent — idle → running", () => {
     const next = applyJobEvent(running, accepted(), JOB_ID);
     expect(next).toBe(running);
   });
+
+  it("job_accepted from completed transitions to running for regeneration", () => {
+    let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID);
+    s = applyJobEvent(s, completed(), JOB_ID);
+    expect(s.status).toBe("completed");
+    const regen = applyJobEvent(s, accepted(), JOB_ID);
+    expect(regen).toEqual({
+      status: "running",
+      jobId: JOB_ID,
+      attemptId: ATTEMPT_ID,
+      stageId: null,
+      stageName: null,
+      percent: 0,
+    });
+  });
 });
 
 describe("applyJobEvent — stage_started", () => {

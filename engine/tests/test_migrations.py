@@ -11,7 +11,7 @@ from gracetree_engine.storage.migrations import apply_migrations, connect_databa
 def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
     database_path = tmp_path / "studio.db"
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6, 7]
     assert apply_migrations(database_path) == []
 
     with connect_database(database_path) as connection:
@@ -21,7 +21,7 @@ def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()
         columns = connection.execute("PRAGMA table_info(jobs)").fetchall()
 
-    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,), (6,)]
+    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
     assert tuple(foreign_keys) == (1,)
     assert {column[1] for column in columns} >= {
         "id",
@@ -43,7 +43,7 @@ def test_upgrades_a_previous_schema_database(tmp_path: Path) -> None:
             "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
         )
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6, 7]
 
 
 def test_applies_002_to_a_story_1_3_database(tmp_path: Path) -> None:
@@ -339,6 +339,46 @@ def test_applies_006_adds_interrupted_status_and_new_columns(
     assert attempt["status"] == "interrupted"
     assert attempt["error_stage_id"] is None
     assert attempt["log_path"] is None
+
+
+def test_applies_007_adds_regeneration_support_columns(
+    tmp_path: Path,
+) -> None:
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    source_dir = Path(__file__).resolve().parents[1] / "migrations"
+    for name in (
+        "001_create_jobs.sql",
+        "002_create_job_inputs.sql",
+        "003_classify_job_inputs.sql",
+        "004_create_resources.sql",
+        "005_create_job_attempts.sql",
+        "006_add_interrupted_status.sql",
+    ):
+        (migrations_dir / name).write_text(
+            (source_dir / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    database_path = tmp_path / "studio.db"
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [1, 2, 3, 4, 5, 6]
+
+    (migrations_dir / "007_add_regeneration_support.sql").write_text(
+        (source_dir / "007_add_regeneration_support.sql").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [7]
+
+    with connect_database(database_path) as connection:
+        attempt_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(job_attempts)").fetchall()
+        }
+        job_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+        }
+
+    assert "is_regeneration" in attempt_columns
+    assert "pending_artifact_path" in job_columns
 
 
 def test_rejects_duplicate_migration_versions_before_opening_database(

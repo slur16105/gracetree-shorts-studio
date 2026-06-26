@@ -221,7 +221,8 @@
           "required": ["managedRoot", "workPath"],
           "properties": {
             "managedRoot": { "type": "string", "minLength": 1 },
-            "workPath": { "type": "string", "minLength": 1 }
+            "workPath": { "type": "string", "minLength": 1 },
+            "regenerate": { "type": "boolean" }
           }
         }
       }

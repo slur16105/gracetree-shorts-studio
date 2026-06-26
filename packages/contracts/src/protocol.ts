@@ -265,6 +265,7 @@ export interface StartJobCommand {
   payload: {
     managedRoot: string;
     workPath: string;
+    regenerate?: boolean;
   };
 }
 

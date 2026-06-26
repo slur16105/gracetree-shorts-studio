@@ -8,6 +8,7 @@ import { JobSummary } from './JobSummary'
 import { ReadinessProgress } from './ReadinessProgress'
 import { computeReadiness } from './readiness'
 import { CancelConfirmDialog } from '../job-progress/CancelConfirmDialog'
+import { RegenerateConfirmDialog } from '../job-progress/RegenerateConfirmDialog'
 import {
   revertJobCancellingToRunning,
   setCurrentJobId,
@@ -30,7 +31,9 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
   const [resources, setResources] = useState<ResourceDto[]>([])
   const [isStarting, setIsStarting] = useState(false)
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
+  const [regenerateConfirmOpen, setRegenerateConfirmOpen] = useState(false)
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
+  const regenerateButtonRef = useRef<HTMLButtonElement>(null)
   const validationRef = useRef<{ jobId: string; inputId: string; inputVersion: string } | null>(null)
   const onManagedRootResolvedRef = useRef(onManagedRootResolved)
   const isRunning = useIsRunning()
@@ -156,7 +159,28 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
     }
   }, [job, managedRoot, isRunning, isStarting])
 
-  const canGenerate = Boolean(job && managedRoot && readiness.isReady && !isRunning && !isStarting)
+  const handleRegenerateClick = useCallback(() => {
+    setRegenerateConfirmOpen(true)
+  }, [])
+
+  const handleRegenerateDialogClose = useCallback(() => {
+    setRegenerateConfirmOpen(false)
+    regenerateButtonRef.current?.focus()
+  }, [])
+
+  const handleRegenerateConfirm = useCallback(async () => {
+    if (!job || !managedRoot || isRunning || isStarting) return
+    setRegenerateConfirmOpen(false)
+    setIsStarting(true)
+    try {
+      await window.desktopApi.startJob(job.id, managedRoot, job.workPath, true)
+    } finally {
+      setIsStarting(false)
+    }
+  }, [job, managedRoot, isRunning, isStarting])
+
+  const isJobCompleted = job?.status === 'completed'
+  const canGenerate = Boolean(job && managedRoot && readiness.isReady && !isRunning && !isStarting && !isJobCompleted)
   const isCancelling = jobRunState.status === 'cancelling'
 
   const handleCancelClick = useCallback(() => {
@@ -204,6 +228,25 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
             >
               {isCancelling ? '취소 중...' : '취소'}
             </button>
+          ) : isJobCompleted ? (
+            <div>
+              <p>이미 생성됨</p>
+              <button
+                onClick={() => window.desktopApi.openResultFolder(job!.id).catch(() => {})}
+                type="button"
+              >
+                결과 폴더 열기
+              </button>
+              <button
+                aria-busy={isStarting}
+                disabled={isStarting || isRunning}
+                onClick={handleRegenerateClick}
+                ref={regenerateButtonRef}
+                type="button"
+              >
+                {isStarting ? '시작 중...' : '다시 생성'}
+              </button>
+            </div>
           ) : (
             <button
               aria-busy={isStarting}
@@ -219,6 +262,10 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
 
       {cancelConfirmOpen ? (
         <CancelConfirmDialog onClose={handleCancelDialogClose} onConfirm={handleCancelConfirm} />
+      ) : null}
+
+      {regenerateConfirmOpen ? (
+        <RegenerateConfirmDialog onClose={handleRegenerateDialogClose} onConfirm={handleRegenerateConfirm} />
       ) : null}
     </>
   )

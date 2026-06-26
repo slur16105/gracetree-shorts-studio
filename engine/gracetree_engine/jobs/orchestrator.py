@@ -242,6 +242,7 @@ def start_job(
     """start_job 커맨드를 처리해 수직 슬라이스 진단 MP4를 생성하고 이벤트를 순차 방출한다."""
     job_id = command["jobId"]
     work_path = Path(command["payload"]["workPath"]).resolve()
+    is_regeneration: bool = bool(command["payload"].get("regenerate", False))
 
     if not work_path.is_relative_to(approved_root.resolve()):
         raise ValueError(f"workPath '{work_path}' is outside the approved managed root")
@@ -260,6 +261,7 @@ def start_job(
             attempt_id=attempt_id,
             job_id=job_id,
             snapshot=snapshot,
+            is_regeneration=is_regeneration,
         )
     except (ValueError, RuntimeError) as exc:
         try:
@@ -450,17 +452,29 @@ def _run_start_job_stages(
         _fail("PROCESS_FAILED", "vertical_slice", False, None, "생성된 MP4 파일 검증 실패.")
         return
 
-    artifact_name = artifact_path.name
-    repo.complete_attempt(attempt_id=attempt_id, artifact_path=str(artifact_path))
+    # AC 4: output 디렉터리로 원자적 이동 (pending 마커 → os.replace → DB 완료)
+    output_dir = work_path / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / artifact_path.name
+    try:
+        repo.mark_artifact_commit_pending(job_id=job_id, artifact_path=str(artifact_path))
+        os.replace(str(artifact_path), str(output_path))
+        repo.complete_attempt(attempt_id=attempt_id, artifact_path=str(output_path))
+    except OSError as exc:
+        _fail("PROCESS_FAILED", "vertical_slice", False, None, f"산출물 저장 실패: {exc}")
+        return
 
+    shutil.rmtree(attempt_dir, ignore_errors=True)
+
+    artifact_name = output_path.name
     emit(_make_event("artifact_created", job_id, {
         "attemptId": attempt_id,
-        "artifactPath": str(artifact_path),
+        "artifactPath": str(output_path),
         "artifactName": artifact_name,
     }))
 
     emit(_make_event("job_completed", job_id, {
         "attemptId": attempt_id,
-        "artifactPath": str(artifact_path),
+        "artifactPath": str(output_path),
         "artifactName": artifact_name,
     }))

@@ -291,7 +291,9 @@ def _startup_reconciliation() -> None:
     try:
         from .jobs.attempt_repository import AttemptRepository
         apply_migrations(database_path)
-        AttemptRepository(database_path).interrupt_running_attempts()
+        repo = AttemptRepository(database_path)
+        repo.reconcile_pending_artifacts()
+        repo.interrupt_running_attempts()
     except Exception as exc:
         print(f"STARTUP_RECONCILIATION_FAILED: {exc}", file=sys.stderr, flush=True)
 

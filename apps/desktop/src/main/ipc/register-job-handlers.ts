@@ -243,7 +243,7 @@ export function registerJobHandlers(
 
   ipcMain.handle(
     JOB_START_CHANNEL,
-    (event, jobId: unknown, jobManagedRoot: unknown, workPath: unknown) => {
+    (event, jobId: unknown, jobManagedRoot: unknown, workPath: unknown, regenerate: unknown) => {
       if (
         typeof jobId !== 'string' ||
         typeof jobManagedRoot !== 'string' ||
@@ -251,8 +251,9 @@ export function registerJobHandlers(
       ) {
         throw new Error('startJob args invalid')
       }
+      const isRegenerate = regenerate === true
       jobWorkPaths.set(jobId, workPath)
-      return jobService.startJob(event.sender, jobId, jobManagedRoot, workPath)
+      return jobService.startJob(event.sender, jobId, jobManagedRoot, workPath, isRegenerate)
     }
   )
 

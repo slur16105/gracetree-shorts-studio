@@ -273,7 +273,7 @@ class TestStartJobUnit:
         # Must be a list/tuple, not a string
         assert isinstance(ffmpeg_calls[0], list)
 
-    def test_artifact_placed_under_temp_attempts_dir(self, tmp_path):
+    def test_artifact_committed_to_output_dir(self, tmp_path):
         managed_root = tmp_path / "managed"
         managed_root.mkdir()
         work_path = managed_root / "jobs" / "2026-06-25"
@@ -297,7 +297,7 @@ class TestStartJobUnit:
         completed = next((e for e in emitted if e["type"] == "job_completed"), None)
         assert completed is not None
         artifact = completed["payload"]["artifactPath"]
-        assert "temp/attempts" in artifact.replace("\\", "/")
+        assert "/output/" in artifact.replace("\\", "/")
         assert artifact.endswith("vertical-slice.mp4")
 
 
@@ -327,7 +327,7 @@ class TestStartJobIntegration:
         assert artifact.is_file()
         assert artifact.stat().st_size > 0
         assert artifact.name == "vertical-slice.mp4"
-        assert "temp/attempts" in str(artifact).replace("\\", "/")
+        assert "/output/" in str(artifact).replace("\\", "/")
 
     def test_artifact_passes_ffprobe_verification(self, tmp_path):
         managed_root = tmp_path / "managed"
@@ -977,3 +977,153 @@ class TestFailureDiagnostics:
         accepted_idx = types.index("job_accepted")
         failed_idx = types.index("job_failed")
         assert accepted_idx < failed_idx, "job_accepted must precede job_failed"
+
+
+# ──────────────── Story 3.3: 재생성 fault injection 테스트 ────────────────
+
+def _setup_db_completed(tmp_path: Path) -> tuple[Path, str]:
+    """완료 상태의 job을 만들어 (db_path, job_id)를 반환한다."""
+    db_path = tmp_path / "studio.db"
+    apply_migrations(db_path)
+    job_id = str(uuid4())
+    today = "2026-06-25"
+    work_path = str(tmp_path / "work")
+    with connect_database(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO jobs (id, status, publish_date, work_path, result_path, created_at, updated_at)
+            VALUES (?, 'completed', ?, ?, ?, '2026-06-25T00:00:00.000Z', '2026-06-25T12:00:00.000Z')
+            """,
+            (job_id, today, work_path, work_path + "/output"),
+        )
+    return db_path, job_id
+
+
+def _make_regen_command(job_id: str, managed_root: Path, work_path: Path) -> dict:
+    return {
+        "protocolVersion": 1,
+        "type": "start_job",
+        "jobId": job_id,
+        "timestamp": "2026-06-25T00:00:00.000Z",
+        "payload": {
+            "managedRoot": str(managed_root),
+            "workPath": str(work_path),
+            "regenerate": True,
+        },
+    }
+
+
+def _fake_run_success(args, **kwargs):
+    """ffmpeg 성공 + ffprobe 유효 응답 mock."""
+    if "ffmpeg" in str(args[0]):
+        out = Path(args[-1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"\x00" * 128)
+        return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+    info = {"streams": [{"codec_type": "video"}], "format": {"duration": "2.0"}}
+    return subprocess.CompletedProcess(args, 0, stdout=json.dumps(info).encode(), stderr=b"")
+
+
+class TestRegenerationFaultInjection:
+    """AC 3~6: 재생성 중 다양한 실패 지점에서 기존 완료 결과를 보호하는지 검증한다."""
+
+    def test_normal_start_on_completed_job_emits_job_failed(self, tmp_path):
+        """AC 6: 완료된 job에 일반 생성 요청은 즉시 job_failed를 방출한다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        _, job_id = _setup_db_completed(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_success):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        types = [e["type"] for e in emitted]
+        assert "job_accepted" in types
+        assert "job_failed" in types
+        assert "job_completed" not in types
+
+    def test_regeneration_success_replaces_artifact(self, tmp_path):
+        """AC 4: 재생성 성공 시 output 디렉터리에 새 artifact가 저장된다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        # 기존 완료 파일 생성
+        output_dir = work_path / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        existing_output = output_dir / "vertical-slice.mp4"
+        existing_output.write_bytes(b"OLD_CONTENT")
+
+        db_path, job_id = _setup_db_completed(managed_root)
+        command = _make_regen_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_success):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        types = [e["type"] for e in emitted]
+        assert "job_completed" in types
+        completed = next(e for e in emitted if e["type"] == "job_completed")
+        new_artifact = Path(completed["payload"]["artifactPath"])
+        assert new_artifact.exists()
+        # 기존 내용이 교체됐어야 함
+        assert new_artifact.read_bytes() != b"OLD_CONTENT"
+        # DB에서 job이 completed 상태인지 확인
+        with connect_database(db_path) as conn:
+            job = conn.execute("SELECT status, pending_artifact_path FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        assert job["status"] == "completed"
+        assert job["pending_artifact_path"] is None
+
+    def test_disk_failure_on_artifact_commit_emits_job_failed_preserves_db(self, tmp_path):
+        """AC 5: artifact commit 중 OSError 발생 시 job_failed 방출, DB job 상태 확인."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db_completed(managed_root)
+        command = _make_regen_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        original_replace = os.replace
+
+        def replace_raises(src, dst):
+            raise OSError("disk full")
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_success), \
+             mock.patch("gracetree_engine.jobs.orchestrator.os.replace", side_effect=replace_raises):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        types = [e["type"] for e in emitted]
+        assert "job_failed" in types
+        assert "job_completed" not in types
+        # DB에서 job 상태가 failed가 아닌 completed로 복원되어야 한다 (is_regeneration=True)
+        with connect_database(db_path) as conn:
+            job = conn.execute("SELECT status, pending_artifact_path FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        assert job["status"] == "completed"
+        assert job["pending_artifact_path"] is None
+
+    def test_regeneration_ffmpeg_failure_restores_completed_status(self, tmp_path):
+        """AC 5: 재생성 중 FFmpeg 실패 시 job status를 completed로 복원한다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db_completed(managed_root)
+        command = _make_regen_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        def ffmpeg_fails(args, **kwargs):
+            return subprocess.CompletedProcess(args, 1, stdout=b"", stderr=b"error")
+
+        with mock.patch("subprocess.run", side_effect=ffmpeg_fails):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        types = [e["type"] for e in emitted]
+        assert "job_failed" in types
+        assert "job_completed" not in types
+        with connect_database(db_path) as conn:
+            job = conn.execute("SELECT status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        assert job["status"] == "completed"

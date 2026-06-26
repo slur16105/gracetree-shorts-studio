@@ -85,7 +85,7 @@ export interface DesktopApi {
   listCompletedJobs(managedRoot: string): Promise<CompletedJobSummary[]>;
   openResultFolder(jobId: string): Promise<void>;
   openLogFolder(jobId: string, attemptId: string): Promise<void>;
-  startJob(jobId: string, managedRoot: string, workPath: string): Promise<void>;
+  startJob(jobId: string, managedRoot: string, workPath: string, regenerate?: boolean): Promise<void>;
   cancelJob(jobId: string, attemptId: string): Promise<void>;
   onJobEvent(listener: (event: EngineEvent) => void): () => void;
 }

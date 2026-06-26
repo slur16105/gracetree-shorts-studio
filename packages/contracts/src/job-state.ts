@@ -50,7 +50,7 @@ export function applyJobEvent(
 
   switch (event.type) {
     case "job_accepted": {
-      if (state.status !== "idle") return state;
+      if (state.status !== "idle" && state.status !== "completed") return state;
       return {
         status: "running",
         jobId: event.jobId,

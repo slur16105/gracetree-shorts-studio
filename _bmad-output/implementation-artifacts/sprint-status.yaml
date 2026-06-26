@@ -75,8 +75,8 @@ development_status:
 
   epic-3: in-progress
   3-1-실행-중-작업의-안전한-취소: review
-  3-2-생성-실패-진단과-복구-안내: review
-  3-3-완료-날짜-보호와-원자적-재생성: ready-for-dev
+  3-2-생성-실패-진단과-복구-안내: done
+  3-3-완료-날짜-보호와-원자적-재생성: review
   epic-3-retrospective: optional
 
   epic-4: in-progress

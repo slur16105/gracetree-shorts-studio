@@ -10,14 +10,15 @@ export class JobService {
     webContents: WebContents,
     jobId: string,
     managedRoot: string,
-    workPath: string
+    workPath: string,
+    regenerate = false
   ): Promise<void> {
     const command: StartJobCommand = {
       protocolVersion: 1,
       type: 'start_job',
       jobId,
       timestamp: new Date().toISOString(),
-      payload: { managedRoot, workPath }
+      payload: regenerate ? { managedRoot, workPath, regenerate: true } : { managedRoot, workPath }
     }
     return this.engineProcess.streamGeneration(command, (event) => {
       if (!webContents.isDestroyed()) {
