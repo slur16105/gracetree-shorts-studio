@@ -9,14 +9,13 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-# Release channel: 'external' requires signing credentials in secrets.
-# Builds without signing credentials are tagged 'development' and blocked from external release.
-env:
-  RELEASE_CHANNEL: ${{ secrets.CSC_LINK != '' && 'external' || 'development' }}
-
 jobs:
   build-windows:
     runs-on: windows-latest
+    outputs:
+      # Expose installer path and release channel to downstream jobs
+      installer: ${{ steps.locate.outputs.installer }}
+      channel: ${{ steps.channel.outputs.value }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,12 +44,26 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Determine release channel
+        id: channel
+        shell: pwsh
+        run: |
+          # Secrets are only readable in step-level env blocks, not workflow-level env.
+          # We determine the channel here once and expose it as a step output.
+          if ("$env:CSC_LINK" -ne '') {
+            "value=external" | Out-File -Append $env:GITHUB_OUTPUT
+          } else {
+            "value=development" | Out-File -Append $env:GITHUB_OUTPUT
+          }
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+
       - name: Stage FFmpeg for Windows
         shell: pwsh
         run: |
           $dest = "resources\ffmpeg\win32"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          # Install ffmpeg via winget/scoop then copy binaries into resources
+          # Install ffmpeg via scoop then copy binaries into resources
           # so electron-builder can include them in extraResources.
           scoop install ffmpeg --global
           Copy-Item "$env:SCOOP\shims\ffmpeg.exe"  "$dest\ffmpeg.exe"
@@ -68,23 +81,29 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
 
-      - name: Verify installer (size + extension)
+      - name: Locate installer
+        id: locate
         shell: pwsh
         run: |
-          $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
-          node scripts/verify-package.mjs --installer "$($installer.FullName)" --platform win32
+          $f = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
+          "installer=$($f.FullName)" | Out-File -Append $env:GITHUB_OUTPUT
+
+      - name: Verify installer (size + extension)
+        shell: pwsh
+        run: node scripts/verify-package.mjs --installer "${{ steps.locate.outputs.installer }}" --platform win32
 
       - name: Signing gate
         shell: pwsh
         run: |
-          $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
-          node scripts/verify-signing.mjs --installer "$($installer.FullName)" --channel "$env:RELEASE_CHANNEL" --platform win32
+          node scripts/verify-signing.mjs `
+            --installer "${{ steps.locate.outputs.installer }}" `
+            --channel "${{ steps.channel.outputs.value }}" `
+            --platform win32
 
-      - name: Offline smoke test (no system Python/FFmpeg)
+      - name: Offline smoke test
         shell: pwsh
         run: |
-          $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
-          .\tests\smoke\windows\install.ps1 -InstallerPath "$($installer.FullName)"
+          .\tests\smoke\windows\install.ps1 -InstallerPath "${{ steps.locate.outputs.installer }}"
           # -SkipPathCheck: CI runner has Python from actions/setup-python; engine still uses bundled binary
           # -SkipNetworkCheck: CI network cannot be blocked at the runner level
           .\tests\smoke\windows\offline-smoke.ps1 -SkipNetworkCheck -SkipPathCheck
@@ -98,6 +117,9 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    outputs:
+      installer: ${{ steps.locate.outputs.installer }}
+      channel: ${{ steps.channel.outputs.value }}
     steps:
       - uses: actions/checkout@v4
 
@@ -125,6 +147,17 @@ jobs:
 
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Determine release channel
+        id: channel
+        run: |
+          if [[ -n "$CSC_LINK_MAC" ]]; then
+            echo "value=external" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=development" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          CSC_LINK_MAC: ${{ secrets.CSC_LINK_MAC }}
 
       - name: Stage FFmpeg for macOS
         run: |
@@ -149,20 +182,25 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK_MAC != '' && 'true' || 'false' }}
 
-      - name: Verify installer (size + extension)
+      - name: Locate installer
+        id: locate
         run: |
           installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
-          node scripts/verify-package.mjs --installer "$installer" --platform darwin
+          echo "installer=$installer" >> "$GITHUB_OUTPUT"
+
+      - name: Verify installer (size + extension)
+        run: node scripts/verify-package.mjs --installer "${{ steps.locate.outputs.installer }}" --platform darwin
 
       - name: Signing gate
         run: |
-          installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
-          node scripts/verify-signing.mjs --installer "$installer" --channel "$RELEASE_CHANNEL" --platform darwin
+          node scripts/verify-signing.mjs \
+            --installer "${{ steps.locate.outputs.installer }}" \
+            --channel "${{ steps.channel.outputs.value }}" \
+            --platform darwin
 
-      - name: Offline smoke test (no system Python/FFmpeg)
+      - name: Offline smoke test
         run: |
-          installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
-          ./tests/smoke/macos/install.sh "$installer"
+          ./tests/smoke/macos/install.sh "${{ steps.locate.outputs.installer }}"
           # --skip-path-check: CI runner has Python from actions/setup-python; engine still uses bundled binary
           # --skip-network-check: CI network cannot be blocked at the runner level
           ./tests/smoke/macos/offline-smoke.sh --skip-network-check --skip-path-check
@@ -193,8 +231,8 @@ jobs:
           # External releases only — development channel builds stay as draft artifacts only.
           # The release body clearly marks unsigned/development builds to prevent misuse.
           body: |
-            **Release channel:** ${{ env.RELEASE_CHANNEL }}
-            ${{ env.RELEASE_CHANNEL == 'development' && '> ⚠️ This is a **development** build. It is unsigned and NOT intended for external distribution.' || '> ✅ This build has been signed and notarized for external distribution.' }}
+            **Release channel:** ${{ needs.build-windows.outputs.channel }}
+            ${{ needs.build-windows.outputs.channel == 'development' && '> ⚠️ This is a **development** build. It is unsigned and NOT intended for external distribution.' || '> ✅ This build has been signed and notarized for external distribution.' }}
 
             ---
           files: |
@@ -202,5 +240,5 @@ jobs:
             dist/artifacts/macos-arm64-installer/*.dmg
           generate_release_notes: true
           fail_on_unmatched_files: true
-          # Block publishing development builds as non-draft releases.
-          prerelease: ${{ env.RELEASE_CHANNEL == 'development' }}
+          # development builds remain as pre-release drafts
+          prerelease: ${{ needs.build-windows.outputs.channel == 'development' }}
