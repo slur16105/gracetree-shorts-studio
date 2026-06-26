@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-06-19T15:55:33+09:00
-last_updated: 2026-06-26T00:00:00+09:00
+last_updated: 2026-06-26T09:00:00+09:00
 project: gracetree-shorts-studio
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   2-2-스크립트-구조화와-타이밍-계약: done
   2-3-로컬-음성-정렬과-타이밍-생성: review
   2-4-음성-모델-성능-기준-확정: review
-  2-5-스타일-ass-자막-생성: ready-for-dev
+  2-5-스타일-ass-자막-생성: review
   2-6-배경-영상-구성: ready-for-dev
   2-7-오디오와-썸네일-합성: ready-for-dev
   2-8-ffmpeg-파이프라인-통합-검증: ready-for-dev

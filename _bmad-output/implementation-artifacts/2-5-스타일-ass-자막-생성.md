@@ -1,6 +1,10 @@
+---
+baseline_commit: 4aff6d7
+---
+
 # Story 2.5: 스타일 ASS 자막 생성
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -15,11 +19,11 @@ so that 기존 영상 양식에 맞는 읽기 좋은 자막을 얻을 수 있다
 
 ## Tasks / Subtasks
 
-- [ ] timing DTO를 ASS event와 style로 변환하는 순수 generator를 구현한다. (AC: 1)
-- [ ] 1080×1920 좌표계, 상단/중앙 safe area, 폰트·outline·shadow·fade 설정을 typed config로 둔다. (AC: 1, 2)
-- [ ] ASS 특수문자·개행을 escape하고 UTF-8 출력을 보장한다. (AC: 1, 2)
-- [ ] 폰트 파일의 한글 glyph 가용성과 event bounds를 렌더 전 검증한다. (AC: 2)
-- [ ] golden ASS, 아멘 duration/fade, glyph·safe-area 실패 테스트를 추가한다. (AC: 1, 2)
+- [x] timing DTO를 ASS event와 style로 변환하는 순수 generator를 구현한다. (AC: 1)
+- [x] 1080×1920 좌표계, 상단/중앙 safe area, 폰트·outline·shadow·fade 설정을 typed config로 둔다. (AC: 1, 2)
+- [x] ASS 특수문자·개행을 escape하고 UTF-8 출력을 보장한다. (AC: 1, 2)
+- [x] 폰트 파일의 한글 glyph 가용성과 event bounds를 렌더 전 검증한다. (AC: 2)
+- [x] golden ASS, 아멘 duration/fade, glyph·safe-area 실패 테스트를 추가한다. (AC: 1, 2)
 
 ## Dev Notes
 
@@ -51,5 +55,9 @@ GPT-5 Codex
 
 ### File List
 
+- `engine/gracetree_engine/subtitles/__init__.py`
+- `engine/gracetree_engine/subtitles/config.py`
+- `engine/gracetree_engine/subtitles/generator.py`
+- `engine/tests/test_subtitle_generator.py`
 - `_bmad-output/implementation-artifacts/2-5-스타일-ass-자막-생성.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
