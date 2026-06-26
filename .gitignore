@@ -25,6 +25,13 @@ build/
 .next/
 .nuxt/
 coverage/
+*.tsbuildinfo
+
+# Claude Code agent worktrees
+.claude/worktrees/
+
+# Packaging binaries (fetched/copied per-platform at build time, not source)
+resources/ffmpeg/
 
 # Python
 __pycache__/
