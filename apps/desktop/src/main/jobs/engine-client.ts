@@ -31,8 +31,9 @@ export class EngineClient {
     private readonly projectRoot: string,
     private readonly approvedManagedRoot: string,
     private readonly spawnConfig: EngineSpawnConfig = {
-      command: process.env['PYTHON'] ?? 'python3',
+      command: process.env['PYTHON'] ?? (process.platform === 'win32' ? 'python' : 'python3'),
       args: ['-m', 'gracetree_engine'],
+      isDev: true,
     }
   ) {}
 
@@ -95,9 +96,9 @@ export class EngineClient {
       GRACETREE_MANAGED_ROOT: this.approvedManagedRoot,
     }
     // In dev mode (python -m gracetree_engine), provide the source tree on PYTHONPATH.
-    // In packaged mode (PyInstaller bundle), PYTHONPATH is irrelevant and must not be set
-    // to a source path that may not exist on the end user's machine.
-    if (args.length > 0 && args[0] === '-m') {
+    // In packaged mode (PyInstaller bundle), PYTHONPATH must not be set to a source path
+    // that does not exist on the end user's machine.
+    if (this.spawnConfig.isDev) {
       env['PYTHONPATH'] = `${this.projectRoot}/engine`
     }
     const child = spawn(command, args, {

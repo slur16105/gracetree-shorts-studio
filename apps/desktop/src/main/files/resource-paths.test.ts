@@ -10,17 +10,19 @@ const MAC_RESOURCES = '/Applications/GraceTree Shorts Studio.app/Contents/Resour
 
 describe('resolveEngineCommand — packaged mode', () => {
   it('returns bundled exe on Windows', () => {
-    const { command, args } = resolveEngineCommand(WIN_RESOURCES, false, 'win32')
+    const { command, args, isDev } = resolveEngineCommand(WIN_RESOURCES, false, 'win32')
     expect(command).toContain('gracetree-engine.exe')
     expect(command).toContain('engine')
     expect(args).toEqual([])
+    expect(isDev).toBe(false)
   })
 
   it('returns bundled binary on macOS (no .exe)', () => {
-    const { command, args } = resolveEngineCommand(MAC_RESOURCES, false, 'darwin')
+    const { command, args, isDev } = resolveEngineCommand(MAC_RESOURCES, false, 'darwin')
     expect(command).toContain('gracetree-engine')
     expect(command).not.toContain('.exe')
     expect(args).toEqual([])
+    expect(isDev).toBe(false)
   })
 
   it('command uses args array (spaces in path work correctly)', () => {
@@ -41,10 +43,11 @@ describe('resolveEngineCommand — packaged mode', () => {
 })
 
 describe('resolveEngineCommand — dev mode', () => {
-  it('uses python command with -m flag', () => {
-    const { args } = resolveEngineCommand('/project/resources', true, 'darwin')
+  it('uses python command with -m flag and isDev=true', () => {
+    const { args, isDev } = resolveEngineCommand('/project/resources', true, 'darwin')
     expect(args).toContain('-m')
     expect(args).toContain('gracetree_engine')
+    expect(isDev).toBe(true)
   })
 
   it('does not reference resources path in dev mode', () => {

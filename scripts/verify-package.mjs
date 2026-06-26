@@ -8,9 +8,7 @@
  * Checks performed (non-destructive, works on the artifact file only):
  *   1. Installer file exists and has non-zero size
  *   2. File extension matches the declared platform
- *   3. Engine bundle manifest checksum file is present inside the installer
- *      (extracted to a temp dir using platform tools — 7z on Windows, hdiutil/7z on macOS)
- *   4. Installer binary is not larger than MAX_INSTALLER_MB (hard cap)
+ *   3. Installer binary is not larger than MAX_INSTALLER_MB (hard cap)
  *
  * Exit codes:
  *   0 — all checks passed
@@ -40,8 +38,8 @@ async function main() {
   const platformIdx = args.indexOf('--platform')
   if (installerIdx === -1) usage()
 
-  const installerPath = resolve(args[installerIdx + 1] ?? '')
-  const platform = args[platformIdx + 1] ?? process.platform
+  const installerPath = resolve(installerIdx !== -1 ? (args[installerIdx + 1] ?? '') : '')
+  const platform = platformIdx !== -1 ? args[platformIdx + 1] : process.platform
 
   const failures = []
 

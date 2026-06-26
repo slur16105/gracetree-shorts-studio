@@ -15,6 +15,8 @@ import { join } from 'node:path'
 export interface EngineSpawnConfig {
   command: string
   args: string[]
+  /** true when running from source (python -m), false when using the PyInstaller bundle */
+  isDev: boolean
 }
 
 const EXE = (platform: string): string => (platform === 'win32' ? '.exe' : '')
@@ -33,12 +35,13 @@ export function resolveEngineCommand(
   if (isDev) {
     const python =
       process.env['PYTHON'] ?? (platform === 'win32' ? 'python' : 'python3')
-    return { command: python, args: ['-m', 'gracetree_engine'] }
+    return { command: python, args: ['-m', 'gracetree_engine'], isDev: true }
   }
   const exe = `gracetree-engine${EXE(platform)}`
   return {
     command: join(resourcesPath, 'engine', 'gracetree-engine', exe),
     args: [],
+    isDev: false,
   }
 }
 

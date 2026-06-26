@@ -9,7 +9,7 @@ directories:
 # Engine bundle (PyInstaller onedir) and FFmpeg are placed outside ASAR
 # so they remain as native executables the OS can spawn directly.
 extraResources:
-  - from: ../../engine/dist/gracetree-engine
+  - from: ../../dist/gracetree-engine
     to: engine/gracetree-engine
     filter:
       - '**/*'

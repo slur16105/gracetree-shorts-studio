@@ -22,13 +22,14 @@ import { resolve, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const ROOT = resolve(import.meta.dirname, '..')
-const ENGINE_DIST = join(ROOT, 'engine', 'dist', 'gracetree-engine')
+const ENGINE_DIST = join(ROOT, 'dist', 'gracetree-engine')
 const DESKTOP = join(ROOT, 'apps', 'desktop')
 
 function run(cmd, args, opts = {}) {
   const result = spawnSync(cmd, args, { stdio: 'inherit', cwd: ROOT, ...opts })
-  if (result.status !== 0) {
-    process.stderr.write(`\n[build-desktop] FAILED: ${cmd} ${args.join(' ')}\n`)
+  if (result.error || result.status !== 0) {
+    const detail = result.error ? `: ${result.error.message}` : ''
+    process.stderr.write(`\n[build-desktop] FAILED: ${cmd} ${args.join(' ')}${detail}\n`)
     process.exit(result.status ?? 1)
   }
 }
@@ -46,9 +47,11 @@ async function ensureEngineBundle() {
 
 function parsePlatformArgs() {
   const args = process.argv.slice(2)
-  const plat = args[args.indexOf('--platform') + 1] ?? process.platform
-  const arch = args[args.indexOf('--arch') + 1] ?? process.arch
-  return { platform: plat, arch }
+  const platIdx = args.indexOf('--platform')
+  const archIdx = args.indexOf('--arch')
+  const platform = platIdx !== -1 ? args[platIdx + 1] : process.platform
+  const arch = archIdx !== -1 ? args[archIdx + 1] : process.arch
+  return { platform, arch }
 }
 
 async function main() {

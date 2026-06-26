@@ -40,6 +40,17 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Stage FFmpeg for Windows
+        shell: pwsh
+        run: |
+          $dest = "resources\ffmpeg\win32"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          # Install ffmpeg via winget/scoop then copy binaries into resources
+          # so electron-builder can include them in extraResources.
+          scoop install ffmpeg --global
+          Copy-Item "$env:SCOOP\shims\ffmpeg.exe"  "$dest\ffmpeg.exe"
+          Copy-Item "$env:SCOOP\shims\ffprobe.exe" "$dest\ffprobe.exe"
+
       - name: Build Python engine bundle
         run: node scripts/build-engine.mjs --platform win32
 
@@ -90,6 +101,14 @@ jobs:
 
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Stage FFmpeg for macOS
+        run: |
+          brew install ffmpeg
+          dest="resources/ffmpeg/darwin"
+          mkdir -p "$dest"
+          cp "$(which ffmpeg)"  "$dest/ffmpeg"
+          cp "$(which ffprobe)" "$dest/ffprobe"
 
       - name: Build Python engine bundle
         run: node scripts/build-engine.mjs --platform darwin

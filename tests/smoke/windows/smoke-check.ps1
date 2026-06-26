@@ -53,19 +53,21 @@ Check "Engine executable exists" (Test-Path $engineExe) $engineExe
 Check "FFmpeg executable exists" (Test-Path $ffmpegExe) $ffmpegExe
 Check "FFprobe executable exists" (Test-Path $ffprobeExe) $ffprobeExe
 
-# 4. Engine health check
+# 4. Engine health check — write JSON payload to a temp file, redirect as stdin
 if (Test-Path $engineExe) {
   try {
-    $healthInput = '{"type":"check_health","jobId":"smoke-win-001","timestamp":"2026-06-26T00:00:00.000Z","payload":{}}'
+    $healthInput = '{"protocolVersion":1,"type":"check_health","jobId":"smoke-win-001","timestamp":"2026-06-26T00:00:00.000Z","payload":{}}'
+    $stdinFile  = "$env:TEMP\engine-in.txt"
+    $stdoutFile = "$env:TEMP\engine-out.txt"
+    $stderrFile = "$env:TEMP\engine-err.txt"
+    [System.IO.File]::WriteAllText($stdinFile, $healthInput + "`n")
     $proc = Start-Process -FilePath $engineExe -ArgumentList @() `
-      -RedirectStandardInput 'NUL' -RedirectStandardOutput "$env:TEMP\engine-out.txt" `
-      -RedirectStandardError "$env:TEMP\engine-err.txt" -NoNewWindow -PassThru
-    # Write health check to stdin via pipeline
-    $pipeIn = [System.IO.StreamWriter]::new($proc.StandardInput.BaseStream)
-    $pipeIn.WriteLine($healthInput)
-    $pipeIn.Close()
-    $proc.WaitForExit(10000)
-    $out = Get-Content "$env:TEMP\engine-out.txt" -Raw -ErrorAction SilentlyContinue
+      -RedirectStandardInput $stdinFile `
+      -RedirectStandardOutput $stdoutFile `
+      -RedirectStandardError  $stderrFile `
+      -NoNewWindow -PassThru
+    $null = $proc.WaitForExit(10000)
+    $out = Get-Content $stdoutFile -Raw -ErrorAction SilentlyContinue
     Check "Engine health check responds" ($out -match '"type"') "output: $out"
   } catch {
     Check "Engine health check responds" $false $_.Exception.Message
