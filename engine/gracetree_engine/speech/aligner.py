@@ -96,18 +96,20 @@ def _default_transcribe(voice_path: Path, config: SpeechConfig) -> list[Segment]
     """Run faster-whisper against a local model (no network allowed)."""
     from faster_whisper import WhisperModel  # type: ignore[import-untyped]
 
-    kwargs: dict[str, Any] = dict(
+    model_kwargs: dict[str, Any] = dict(
         device=config.device,
         compute_type=config.compute_type,
+        cpu_threads=config.cpu_threads,
+        num_workers=config.num_workers,
     )
     if config.model_dir is not None:
-        kwargs["download_root"] = config.model_dir
+        model_kwargs["download_root"] = config.model_dir
 
-    model = WhisperModel(config.model_size, **kwargs)
+    model = WhisperModel(config.model_size, **model_kwargs)
     raw_segments, _ = model.transcribe(
         str(voice_path),
         language=config.language,
-        beam_size=1,
+        beam_size=config.beam_size,
         vad_filter=False,
     )
     return [Segment(s.start, s.end, s.text) for s in raw_segments]

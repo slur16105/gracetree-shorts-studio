@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "description": "Story 2.4 한국어 음성 벤치마크 코퍼스 — 라이선스 안전한 기도문 대표 샘플",
+  "samples": [
+    {
+      "id": "ko-prayer-01",
+      "file": "korean-sample-16k.wav",
+      "reference_text": "주님 감사합니다 오늘도 지켜주세요",
+      "duration_seconds": 3.0,
+      "language": "ko",
+      "source": "synthetic-silence-placeholder",
+      "note": "실제 한국어 TTS/녹음 샘플로 교체 필요. 현재는 harness 로직 검증용 무음 WAV."
+    }
+  ]
+}
