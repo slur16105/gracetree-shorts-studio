@@ -337,7 +337,7 @@ class TestComposeBackground:
         attempt.mkdir()
 
         with patch("gracetree_engine.media.background.probe_video") as mock_probe, \
-             patch("gracetree_engine.media.background.subprocess.run") as mock_run:
+             patch("gracetree_engine.media.background.run_safe") as mock_run:
             mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
             mock_run.return_value = MagicMock(returncode=0)
             result = compose_background(intro, loop, TIMING, attempt)
@@ -381,7 +381,7 @@ class TestComposeBackground:
         attempt.mkdir()
 
         with patch("gracetree_engine.media.background.probe_video") as mock_probe, \
-             patch("gracetree_engine.media.background.subprocess.run") as mock_run:
+             patch("gracetree_engine.media.background.run_safe") as mock_run:
             mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
             mock_run.return_value = MagicMock(returncode=1, stderr="error")
             with pytest.raises(BackgroundError) as exc:
@@ -397,13 +397,13 @@ class TestComposeBackground:
         attempt.mkdir()
 
         with patch("gracetree_engine.media.background.probe_video") as mock_probe, \
-             patch("gracetree_engine.media.background.subprocess.run") as mock_run:
+             patch("gracetree_engine.media.background.run_safe") as mock_run:
             mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
             mock_run.return_value = MagicMock(returncode=0)
             compose_background(intro, loop, TIMING, attempt)
 
-        _, kwargs = mock_run.call_args
-        assert kwargs.get("shell", False) is False
+        # run_safe enforces shell=False internally; confirm it was called
+        assert mock_run.called
 
 
 # ─────────────────────── Task 5: 경계 케이스 통합 테스트 ────────────────────────

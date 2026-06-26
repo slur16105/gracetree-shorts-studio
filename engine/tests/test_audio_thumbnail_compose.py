@@ -164,9 +164,11 @@ class TestBuildComposeCmd:
 
     def test_no_shell_string(self):
         cmd = self._base_cmd()
-        for arg in cmd:
-            assert ";" not in arg or "-filter_complex" in cmd[cmd.index(arg) - 1]
-            break  # just checking cmd is a list
+        fc_idx = cmd.index("-filter_complex")
+        # filter_complex value may use ";" as separator — skip it, check all others
+        non_fg_args = [a for i, a in enumerate(cmd) if i != fc_idx + 1]
+        for arg in non_fg_args:
+            assert ";" not in arg, f"Shell-injection risk in arg: {arg!r}"
 
     def test_thumbnail_input_included(self):
         cmd = self._base_cmd()
@@ -261,3 +263,30 @@ class TestComposeVideoAudio:
             mock_run.return_value = MagicMock(returncode=0)
             compose_video_audio(bg, voice, bgm, thumb, attempt)
         assert voice.stat().st_mtime == voice_mtime
+
+    def test_raises_compose_error_if_bgm_shorter_than_voice(self, tmp_path):
+        bg, voice, bgm, thumb, attempt = self._setup_files(tmp_path)
+        with patch("gracetree_engine.media.compose.probe_audio_duration") as mock_dur:
+            mock_dur.side_effect = [60.0, 30.0]  # voice=60s > bgm=30s
+            with pytest.raises(ComposeError) as exc:
+                compose_video_audio(bg, voice, bgm, thumb, attempt)
+        assert exc.value.error_code == "BGM_TOO_SHORT"
+
+    def test_raises_compose_error_if_voice_zero_duration(self, tmp_path):
+        bg, voice, bgm, thumb, attempt = self._setup_files(tmp_path)
+        with patch("gracetree_engine.media.compose.probe_audio_duration") as mock_dur:
+            mock_dur.side_effect = [0.0, 120.0]
+            with pytest.raises(ComposeError) as exc:
+                compose_video_audio(bg, voice, bgm, thumb, attempt)
+        assert exc.value.error_code == "INVALID_DURATION"
+
+    def test_runner_error_is_wrapped_as_compose_error(self, tmp_path):
+        bg, voice, bgm, thumb, attempt = self._setup_files(tmp_path)
+        from gracetree_engine.media.runner import RunnerError
+        with patch("gracetree_engine.media.compose.probe_audio_duration") as mock_dur, \
+             patch("gracetree_engine.media.compose.run_safe") as mock_run:
+            mock_dur.side_effect = [20.0, 120.0]
+            mock_run.side_effect = RunnerError("TIMEOUT", "timed out")
+            with pytest.raises(ComposeError) as exc:
+                compose_video_audio(bg, voice, bgm, thumb, attempt)
+        assert exc.value.error_code == "FFMPEG_FAILED"

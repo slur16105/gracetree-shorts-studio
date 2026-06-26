@@ -11,7 +11,7 @@ from __future__ import annotations
 import subprocess
 
 ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ffmpeg", "ffprobe"})
-_STDERR_MAX_CHARS = 500
+STDERR_MAX_CHARS = 500
 
 
 class RunnerError(Exception):
@@ -35,12 +35,18 @@ def run_safe(
             f"실행 파일이 허용 목록에 없습니다: {executable!r}",
         )
     try:
-        return subprocess.run(
+        result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             shell=False,
             timeout=timeout,
         )
+        # Truncate stderr to limit sensitive path exposure in callers
+        if result.stderr and len(result.stderr) > STDERR_MAX_CHARS:
+            result.stderr = result.stderr[:STDERR_MAX_CHARS] + "…"
+        return result
     except subprocess.TimeoutExpired:
         raise RunnerError("TIMEOUT", f"FFmpeg 타임아웃 ({timeout}s 초과)")
+    except (FileNotFoundError, PermissionError, OSError) as exc:
+        raise RunnerError("EXECUTION_FAILED", f"실행 파일을 시작할 수 없습니다: {exc}") from exc

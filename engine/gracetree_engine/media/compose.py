@@ -37,11 +37,20 @@ def compose_video_audio(
     """
     try:
         voice_duration = probe_audio_duration(voice_path)
-        _bgm_duration = probe_audio_duration(bgm_path)
-    except (FileNotFoundError, RuntimeError) as exc:
+        bgm_duration = probe_audio_duration(bgm_path)
+    except Exception as exc:
         raise ComposeError("PROBE_FAILED", str(exc)) from exc
 
-    # Total output duration is driven by voice length
+    if voice_duration <= 0:
+        raise ComposeError("INVALID_DURATION", "음성 파일의 재생 시간이 유효하지 않습니다.")
+
+    if bgm_duration < voice_duration:
+        raise ComposeError(
+            "BGM_TOO_SHORT",
+            f"BGM 재생 시간({bgm_duration:.2f}s)이 음성({voice_duration:.2f}s)보다 짧습니다. "
+            "BGM이 부족하면 오디오 테일이 무음 처리됩니다.",
+        )
+
     total_duration = voice_duration
     output_path = attempt_dir / "final.mp4"
 

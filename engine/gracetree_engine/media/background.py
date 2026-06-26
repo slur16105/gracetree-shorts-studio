@@ -1,13 +1,13 @@
 """Story 2.6: Background video composition orchestrator."""
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .probe import ProbeError, VideoInfo, probe_video
 from .ffmpeg import build_background_cmd
+from .runner import RunnerError, run_safe
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,11 @@ def compose_background(
         config=config,
     )
 
-    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+    try:
+        result = run_safe(cmd)
+    except RunnerError as exc:
+        raise BackgroundError("FFMPEG_FAILED", str(exc)) from exc
+
     if result.returncode != 0:
         raise BackgroundError(
             "FFMPEG_FAILED",

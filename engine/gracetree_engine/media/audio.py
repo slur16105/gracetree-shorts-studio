@@ -7,16 +7,16 @@ Builds the final-composition FFmpeg command that:
 from __future__ import annotations
 
 import json
-import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 
+from .runner import ALLOWED_EXECUTABLES, RunnerError, run_safe
 
-def probe_audio_duration(path: Path) -> float:
-    """Return duration of an audio file in seconds using ffprobe.
+
+def probe_audio_duration(path: Path, timeout: int = 60) -> float:
+    """Return duration of an audio file in seconds using ffprobe (via run_safe).
 
     Raises FileNotFoundError if path does not exist.
-    Raises RuntimeError if ffprobe fails.
+    Raises RuntimeError if ffprobe fails or returns unparseable output.
     """
     if not path.exists():
         raise FileNotFoundError(f"오디오 파일을 찾을 수 없습니다: {path}")
@@ -29,18 +29,36 @@ def probe_audio_duration(path: Path) -> float:
         "-show_format",
         str(path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+    try:
+        result = run_safe(cmd, timeout=timeout)
+    except RunnerError as exc:
+        raise RuntimeError(str(exc)) from exc
+
     if result.returncode != 0:
         raise RuntimeError(f"ffprobe 실패: {result.stderr[:200]}")
 
     data = json.loads(result.stdout)
-    # Prefer stream duration; fall back to format duration
+
+    # Try stream duration first, then format duration
     for stream in data.get("streams", []):
         dur_str = stream.get("duration")
-        if dur_str:
-            return float(dur_str)
+        if dur_str and dur_str != "N/A":
+            try:
+                dur = float(dur_str)
+                if dur > 0:
+                    return dur
+            except (ValueError, TypeError):
+                pass
+
     dur_str = data.get("format", {}).get("duration", "0")
-    return float(dur_str)
+    try:
+        dur = float(dur_str) if dur_str and dur_str != "N/A" else 0.0
+    except (ValueError, TypeError):
+        dur = 0.0
+
+    if dur <= 0:
+        raise RuntimeError(f"유효한 재생 시간을 찾을 수 없습니다: {path}")
+    return dur
 
 
 def build_compose_cmd(
@@ -70,11 +88,13 @@ def build_compose_cmd(
     # Clamp fade so in+out don't overlap when total_duration < 2*fade
     max_fade = total_duration / 2.0
     actual_fade = min(fade, max_fade)
+    # Use consistent float format for both fade-in and fade-out
+    fade_str = f"{actual_fade:.3f}"
 
     # 1/30s = one frame at 30fps; thumbnail shown for the first frame
     frame_dur = 1.0 / 30.0
 
-    # BGM fade out start (in BGM stream time; assume BGM >= total_duration)
+    # BGM fade out start (in BGM stream time)
     fade_out_start = total_duration - actual_fade
 
     parts: list[str] = []
@@ -84,10 +104,10 @@ def build_compose_cmd(
         f"[0:v][3:v]overlay=x=0:y=0:enable='lte(t,{frame_dur:.6f})'[vout]"
     )
 
-    # BGM fade in + fade out
+    # BGM fade in + fade out (consistent precision)
     parts.append(
-        f"[2:a]afade=t=in:st=0:d={actual_fade},"
-        f"afade=t=out:st={fade_out_start:.1f}:d={actual_fade}[bgm_faded]"
+        f"[2:a]afade=t=in:st=0:d={fade_str},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={fade_str}[bgm_faded]"
     )
 
     # Mix voice + BGM; duration follows voice (first input)
