@@ -59,6 +59,9 @@ def probe_video(path: Path) -> VideoInfo:
 
     fps_str = vs.get("r_frame_rate", "30/1")
     num, _, den = fps_str.partition("/")
-    fps = float(num) / float(den) if den else float(num)
+    try:
+        fps = float(num) / float(den) if (den and float(den) != 0) else float(num)
+    except (ValueError, ZeroDivisionError):
+        fps = 0.0
 
     return VideoInfo(duration=duration, width=width, height=height, fps=fps)

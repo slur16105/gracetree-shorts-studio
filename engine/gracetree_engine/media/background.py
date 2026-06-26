@@ -29,8 +29,10 @@ def _extract_timing(timing: dict[str, Any]) -> tuple[float, float]:
     """Return (intro_target, prayer_end) from timing.json dict."""
     blocks = timing.get("subtitleBlocks", [])
     if not blocks:
-        voice_offset = float(timing.get("voiceOffset", 0.0))
-        return voice_offset, voice_offset
+        raise BackgroundError(
+            "MISSING_TIMING",
+            "subtitleBlocks가 비어 있거나 없습니다. 음성 정렬이 완료된 후 배경을 합성하세요.",
+        )
     start = blocks[0].get("startTime")
     end = blocks[-1].get("endTime")
     if start is None or end is None:
@@ -88,6 +90,12 @@ def compose_background(
         raise BackgroundError(
             "FFMPEG_FAILED",
             f"FFmpeg 실패: {result.stderr[:500]}",
+        )
+
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise BackgroundError(
+            "OUTPUT_MISSING",
+            "FFmpeg가 성공했지만 background.mp4가 생성되지 않았습니다.",
         )
 
     return output_path

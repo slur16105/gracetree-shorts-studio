@@ -214,7 +214,8 @@ class TestFFprobeVerification:
         mp4 = tmp_path / "bg.mp4"
         _make_mp4(mp4, duration=5.0, width=1080, height=1920)
         info = probe_file(mp4)
-        vs = next(s for s in info["streams"] if s["codec_type"] == "video")
+        vs = next((s for s in info["streams"] if s["codec_type"] == "video"), None)
+        assert vs is not None, "ffprobe가 비디오 스트림을 보고하지 않았습니다"
         verify_dimensions(vs["width"], vs["height"], 1080, 1920)
 
 

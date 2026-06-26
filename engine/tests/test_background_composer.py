@@ -336,14 +336,20 @@ class TestComposeBackground:
         attempt = tmp_path / "attempt"
         attempt.mkdir()
 
+        def _fake_run(cmd, **kwargs):
+            # Simulate ffmpeg writing the output file
+            out = attempt / "background.mp4"
+            out.write_bytes(b"fake-video")
+            return MagicMock(returncode=0)
+
         with patch("gracetree_engine.media.background.probe_video") as mock_probe, \
-             patch("gracetree_engine.media.background.run_safe") as mock_run:
+             patch("gracetree_engine.media.background.run_safe", side_effect=_fake_run):
             mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
-            mock_run.return_value = MagicMock(returncode=0)
             result = compose_background(intro, loop, TIMING, attempt)
 
         assert result.name == "background.mp4"
         assert result.parent == attempt
+        assert result.is_file()
 
     def test_raises_background_error_if_probe_fails(self, tmp_path):
         intro = tmp_path / "intro.mp4"
@@ -388,7 +394,7 @@ class TestComposeBackground:
                 compose_background(intro, loop, TIMING, attempt)
         assert exc.value.error_code == "FFMPEG_FAILED"
 
-    def test_ffmpeg_called_without_shell(self, tmp_path):
+    def test_raises_background_error_if_output_not_created(self, tmp_path):
         intro = tmp_path / "intro.mp4"
         intro.write_bytes(b"x")
         loop = tmp_path / "loop.mp4"
@@ -399,11 +405,33 @@ class TestComposeBackground:
         with patch("gracetree_engine.media.background.probe_video") as mock_probe, \
              patch("gracetree_engine.media.background.run_safe") as mock_run:
             mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
+            # ffmpeg returns 0 but writes no file
             mock_run.return_value = MagicMock(returncode=0)
+            with pytest.raises(BackgroundError) as exc:
+                compose_background(intro, loop, TIMING, attempt)
+        assert exc.value.error_code == "OUTPUT_MISSING"
+
+    def test_ffmpeg_called_without_shell(self, tmp_path):
+        intro = tmp_path / "intro.mp4"
+        intro.write_bytes(b"x")
+        loop = tmp_path / "loop.mp4"
+        loop.write_bytes(b"x")
+        attempt = tmp_path / "attempt"
+        attempt.mkdir()
+
+        called = []
+
+        def _fake_run(cmd, **kwargs):
+            called.append(cmd)
+            (attempt / "background.mp4").write_bytes(b"fake")
+            return MagicMock(returncode=0)
+
+        with patch("gracetree_engine.media.background.probe_video") as mock_probe, \
+             patch("gracetree_engine.media.background.run_safe", side_effect=_fake_run):
+            mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
             compose_background(intro, loop, TIMING, attempt)
 
-        # run_safe enforces shell=False internally; confirm it was called
-        assert mock_run.called
+        assert called, "run_safe was never called"
 
 
 # ─────────────────────── Task 5: 경계 케이스 통합 테스트 ────────────────────────
@@ -519,4 +547,19 @@ class TestLoopBoundaryIntegration:
             mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
             with pytest.raises(BackgroundError) as exc:
                 compose_background(intro, loop, bad_timing, attempt)
+        assert exc.value.error_code == "MISSING_TIMING"
+
+    def test_empty_subtitle_blocks_raises_missing_timing(self, tmp_path):
+        intro = tmp_path / "intro.mp4"
+        intro.write_bytes(b"x")
+        loop = tmp_path / "loop.mp4"
+        loop.write_bytes(b"x")
+        attempt = tmp_path / "attempt"
+        attempt.mkdir()
+
+        empty_blocks_timing = {"version": 1, "subtitleBlocks": [], "voiceOffset": 5.0}
+        with patch("gracetree_engine.media.background.probe_video") as mock_probe:
+            mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
+            with pytest.raises(BackgroundError) as exc:
+                compose_background(intro, loop, empty_blocks_timing, attempt)
         assert exc.value.error_code == "MISSING_TIMING"
