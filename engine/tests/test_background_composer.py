@@ -466,3 +466,57 @@ class TestLoopBoundaryIntegration:
         n = loop_count_needed(5.0, 20.0, 3.0, 0.5, 3.0)
         xfade_count = filter_graph.count("xfade")
         assert xfade_count == n
+
+    def test_xfade_offset_is_never_negative(self):
+        # intro_target=0.3 < crossfade=0.5 → offset would be negative without clamp
+        cmd = build_background_cmd(
+            intro_path=Path("intro.mp4"),
+            intro_info=VideoInfo(duration=15.0, width=1080, height=1920, fps=30.0),
+            loop_path=Path("loop.mp4"),
+            loop_info=VideoInfo(duration=10.0, width=1080, height=1920, fps=30.0),
+            output_path=Path("out.mp4"),
+            intro_target=0.3,
+            prayer_end=20.0,
+            config=BackgroundConfig(crossfade_seconds=0.5, tail_seconds=3.0),
+        )
+        fc_idx = cmd.index("-filter_complex")
+        filter_graph = cmd[fc_idx + 1]
+        # All offset= values must be non-negative
+        import re
+        offsets = [float(m) for m in re.findall(r"offset=([\d.]+)", filter_graph)]
+        assert all(o >= 0.0 for o in offsets), f"Negative offset found: {offsets}"
+
+    def test_setpts_not_zero_when_intro_target_equals_zero(self):
+        # When intro_target=0, setpts should fall back to ratio=1.0 (not 0.0)
+        cmd = build_background_cmd(
+            intro_path=Path("intro.mp4"),
+            intro_info=VideoInfo(duration=15.0, width=1080, height=1920, fps=30.0),
+            loop_path=Path("loop.mp4"),
+            loop_info=VideoInfo(duration=10.0, width=1080, height=1920, fps=30.0),
+            output_path=Path("out.mp4"),
+            intro_target=0.0,
+            prayer_end=20.0,
+            config=DEFAULT_BACKGROUND_CONFIG,
+        )
+        fc_idx = cmd.index("-filter_complex")
+        filter_graph = cmd[fc_idx + 1]
+        # setpts=PTS*0.000000 would collapse intro; 1.000000 is the safe fallback
+        assert "setpts=PTS*0.000000" not in filter_graph
+
+    def test_missing_timing_key_raises_background_error(self, tmp_path):
+        intro = tmp_path / "intro.mp4"
+        intro.write_bytes(b"x")
+        loop = tmp_path / "loop.mp4"
+        loop.write_bytes(b"x")
+        attempt = tmp_path / "attempt"
+        attempt.mkdir()
+
+        bad_timing = {
+            "version": 1,
+            "subtitleBlocks": [{"index": 0, "text": "아멘."}],  # missing startTime/endTime
+        }
+        with patch("gracetree_engine.media.background.probe_video") as mock_probe:
+            mock_probe.side_effect = [INTRO_INFO, LOOP_INFO]
+            with pytest.raises(BackgroundError) as exc:
+                compose_background(intro, loop, bad_timing, attempt)
+        assert exc.value.error_code == "MISSING_TIMING"

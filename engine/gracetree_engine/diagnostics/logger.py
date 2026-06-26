@@ -12,7 +12,8 @@ from typing import Generator
 
 # ─────────────────────── path redaction ────────────────────────
 
-_UNIX_PATH_RE = re.compile(r"/(?:[^\s,\"'\\]+/)+([^\s,\"'\\]+)")
+# Matches multi-segment Unix paths (/a/b/c) AND root-level paths (/file.ext)
+_UNIX_PATH_RE = re.compile(r"/(?:[^\s,\"'\\]+/)*([^\s,\"'\\]+)")
 _WIN_PATH_RE = re.compile(r"[A-Za-z]:\\(?:[^\s,\"'\\]+\\)+([^\s,\"'\\]+)")
 
 
@@ -50,22 +51,26 @@ class PipelineDiagnostics:
 
     @contextlib.contextmanager
     def stage(self, name: str, cmd: list[str] | None = None) -> Generator[None, None, None]:
-        """Context manager that records wall time for a named stage."""
+        """Context manager that records wall time for a named stage, even on exception."""
         t0 = time.perf_counter()
-        yield
-        wall_time = time.perf_counter() - t0
-        self.record_stage(name, wall_time, cmd)
+        try:
+            yield
+        finally:
+            wall_time = time.perf_counter() - t0
+            self.record_stage(name, wall_time, cmd)
 
     @property
     def total_wall_time(self) -> float:
         return sum(s.wall_time for s in self.stages)
 
     def write_log(self) -> Path:
-        """Write diagnostics JSON to attempt_dir/pipeline-diagnostics.json."""
+        """Write diagnostics JSON atomically to attempt_dir/pipeline-diagnostics.json."""
         out = self.attempt_dir / "pipeline-diagnostics.json"
+        tmp = self.attempt_dir / "pipeline-diagnostics.json.tmp"
         data = {
             "total_wall_time": self.total_wall_time,
             "stages": [asdict(s) for s in self.stages],
         }
-        out.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(out)
         return out

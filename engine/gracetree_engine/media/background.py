@@ -31,9 +31,14 @@ def _extract_timing(timing: dict[str, Any]) -> tuple[float, float]:
     if not blocks:
         voice_offset = float(timing.get("voiceOffset", 0.0))
         return voice_offset, voice_offset
-    intro_target = float(blocks[0]["startTime"])
-    prayer_end = float(blocks[-1]["endTime"])
-    return intro_target, prayer_end
+    start = blocks[0].get("startTime")
+    end = blocks[-1].get("endTime")
+    if start is None or end is None:
+        raise BackgroundError(
+            "MISSING_TIMING",
+            "subtitleBlocks 항목에 startTime 또는 endTime이 없습니다.",
+        )
+    return float(start), float(end)
 
 
 def compose_background(

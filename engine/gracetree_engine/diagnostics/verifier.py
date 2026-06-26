@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import Any
+
+from ..media.runner import RunnerError, run_safe
+from .logger import redact_paths
 
 
 class VerificationError(Exception):
@@ -14,16 +16,30 @@ class VerificationError(Exception):
 
 
 def probe_file(path: Path) -> dict[str, Any]:
-    """Run ffprobe on path and return parsed JSON. Raises RuntimeError on failure."""
+    """Run ffprobe on path and return parsed JSON.
+
+    Raises VerificationError(FILE_NOT_FOUND) if path is absent.
+    Raises VerificationError(PROBE_FAILED) if ffprobe fails.
+    """
+    if not path.exists():
+        raise VerificationError("FILE_NOT_FOUND", f"파일을 찾을 수 없습니다: {path.name}")
+
     cmd = [
         "ffprobe", "-v", "quiet",
         "-print_format", "json",
         "-show_streams", "-show_format",
         str(path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+    try:
+        result = run_safe(cmd)
+    except RunnerError as exc:
+        raise VerificationError("PROBE_FAILED", redact_paths(str(exc))) from exc
+
     if result.returncode != 0:
-        raise RuntimeError(f"ffprobe failed: {result.stderr[:200]}")
+        raise VerificationError(
+            "PROBE_FAILED",
+            f"ffprobe 실패: {redact_paths(result.stderr[:200])}",
+        )
     return json.loads(result.stdout)
 
 
@@ -68,18 +84,29 @@ def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float
     """Run ffmpeg blackdetect and return list of black intervals.
 
     Each interval: {"start": float, "end": float, "duration": float}
-    Requires ffmpeg to be installed. Returns [] if ffmpeg is unavailable.
+    Returns [] if ffmpeg is unavailable or the input has no black frames.
+    Raises VerificationError on non-zero ffmpeg exit.
     """
     cmd = [
         "ffmpeg", "-i", str(path),
         "-vf", f"blackdetect=d=0.1:pix_th={threshold}",
         "-an", "-f", "null", "-",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+    try:
+        result = run_safe(cmd)
+    except RunnerError:
+        return []
+
+    if result.returncode != 0:
+        raise VerificationError(
+            "BLACKDETECT_FAILED",
+            f"blackdetect 실패: {redact_paths(result.stderr[:200])}",
+        )
+
     intervals = []
     for line in result.stderr.splitlines():
         if "black_start" in line:
-            parts = {}
+            parts: dict[str, float] = {}
             for token in line.split():
                 if ":" in token:
                     k, _, v = token.partition(":")
@@ -89,38 +116,51 @@ def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float
                         pass
             if "black_start" in parts:
                 intervals.append({
-                    "start": parts.get("black_start", 0),
-                    "end": parts.get("black_end", 0),
-                    "duration": parts.get("black_duration", 0),
+                    "start": parts.get("black_start", 0.0),
+                    "end": parts.get("black_end", 0.0),
+                    "duration": parts.get("black_duration", 0.0),
                 })
     return intervals
 
 
 def run_freezedetect(path: Path, noise: float = -60.0, duration: float = 2.0) -> list[dict]:
-    """Run ffmpeg freezedetect and return list of frozen intervals."""
+    """Run ffmpeg freezedetect and return list of frozen intervals.
+
+    Each interval: {"start": float, "end": float}
+    Raises VerificationError on non-zero ffmpeg exit.
+    """
     cmd = [
         "ffmpeg", "-i", str(path),
         "-vf", f"freezedetect=noise={noise}dB:duration={duration}",
         "-an", "-f", "null", "-",
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+    try:
+        result = run_safe(cmd)
+    except RunnerError:
+        return []
+
+    if result.returncode != 0:
+        raise VerificationError(
+            "FREEZEDETECT_FAILED",
+            f"freezedetect 실패: {redact_paths(result.stderr[:200])}",
+        )
+
+    # ffmpeg emits tokens like "freeze_start: 1.23" (value is the NEXT whitespace-separated token)
     intervals = []
-    freeze_start = None
+    freeze_start: float | None = None
     for line in result.stderr.splitlines():
-        if "freeze_start" in line:
-            for token in line.split():
-                if "freeze_start:" in token:
-                    try:
-                        freeze_start = float(token.split(":")[1])
-                    except (IndexError, ValueError):
-                        pass
-        elif "freeze_end" in line and freeze_start is not None:
-            for token in line.split():
-                if "freeze_end:" in token:
-                    try:
-                        freeze_end = float(token.split(":")[1])
-                        intervals.append({"start": freeze_start, "end": freeze_end})
-                        freeze_start = None
-                    except (IndexError, ValueError):
-                        pass
+        tokens = line.split()
+        for i, token in enumerate(tokens):
+            if token == "freeze_start:" and i + 1 < len(tokens):
+                try:
+                    freeze_start = float(tokens[i + 1])
+                except ValueError:
+                    pass
+            elif token == "freeze_end:" and i + 1 < len(tokens) and freeze_start is not None:
+                try:
+                    freeze_end = float(tokens[i + 1])
+                    intervals.append({"start": freeze_start, "end": freeze_end})
+                    freeze_start = None
+                except ValueError:
+                    pass
     return intervals

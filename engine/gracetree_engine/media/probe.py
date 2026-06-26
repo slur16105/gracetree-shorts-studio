@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from typing import NamedTuple
+
+from .runner import RunnerError, run_safe
 
 
 class VideoInfo(NamedTuple):
@@ -33,15 +34,19 @@ def probe_video(path: Path) -> VideoInfo:
         "-show_format",
         str(path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, shell=False)
+    try:
+        result = run_safe(cmd)
+    except RunnerError as exc:
+        raise ProbeError("PROBE_FAILED", str(exc)) from exc
+
     if result.returncode != 0:
-        raise ProbeError("PROBE_FAILED", f"ffprobe 실패: {result.stderr}")
+        raise ProbeError("PROBE_FAILED", f"ffprobe 실패: {result.stderr[:200]}")
 
     data = json.loads(result.stdout)
     streams = data.get("streams", [])
     video_streams = [s for s in streams if s.get("codec_type") == "video"]
     if not video_streams:
-        raise ProbeError("NO_VIDEO_STREAM", f"비디오 스트림이 없습니다: {path}")
+        raise ProbeError("NO_VIDEO_STREAM", f"비디오 스트림이 없습니다: {path.name}")
 
     vs = video_streams[0]
     duration_str = vs.get("duration") or data.get("format", {}).get("duration", "0")

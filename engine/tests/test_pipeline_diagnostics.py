@@ -206,3 +206,56 @@ class TestFailureIsolation:
             generate_subtitles(bad_ast, bad_timing, attempt)
 
         assert not (attempt / "subtitles.ass").exists()
+
+
+# ─────────────────────── 리뷰 수정 검증 ────────────────────────
+
+class TestReviewFixes:
+    def test_stage_context_manager_records_on_exception(self, tmp_path):
+        """stage()가 예외 발생 시에도 스테이지를 기록해야 한다."""
+        diag = PipelineDiagnostics(attempt_dir=tmp_path)
+        with pytest.raises(ValueError):
+            with diag.stage("failing_stage"):
+                raise ValueError("boom")
+        assert len(diag.stages) == 1
+        assert diag.stages[0].name == "failing_stage"
+        assert diag.stages[0].wall_time >= 0.0
+
+    def test_write_log_is_atomic(self, tmp_path):
+        """write_log()은 .tmp를 거쳐 atomic replace한다 — 중간 파일이 남으면 안 된다."""
+        diag = PipelineDiagnostics(attempt_dir=tmp_path)
+        diag.record_stage("stage1", wall_time=0.1)
+        diag.write_log()
+        tmp_file = tmp_path / "pipeline-diagnostics.json.tmp"
+        assert not tmp_file.exists(), ".tmp 파일이 남아 있으면 안 됩니다"
+        assert (tmp_path / "pipeline-diagnostics.json").exists()
+
+    def test_redact_paths_handles_root_level_paths(self):
+        """루트 레벨 Unix 경로 /filename.ext도 redact 처리해야 한다."""
+        result = redact_paths("output /output.mp4 done")
+        assert "/output.mp4" not in result
+        assert "output.mp4" in result
+
+    def test_probe_file_raises_verification_error_for_missing_file(self):
+        """probe_file()은 파일 없을 때 VerificationError(FILE_NOT_FOUND)를 발생시켜야 한다."""
+        from gracetree_engine.diagnostics.verifier import VerificationError, probe_file
+        with pytest.raises(VerificationError) as exc:
+            probe_file(Path("/no/such/file.mp4"))
+        assert exc.value.error_code == "FILE_NOT_FOUND"
+
+    def test_freezedetect_tokenizer_parses_space_separated_value(self):
+        """run_freezedetect가 'freeze_start: 1.23' 형태(값이 다음 토큰)를 올바르게 파싱한다."""
+        from gracetree_engine.diagnostics.verifier import run_freezedetect
+        from unittest.mock import MagicMock, patch
+
+        fake_stderr = (
+            "frame=  10 fps=30 ...\n"
+            "[freezedetect @ 0x...] freeze_start: 2.000000\n"
+            "[freezedetect @ 0x...] freeze_end: 5.000000 freeze_duration: 3.000000\n"
+        )
+        mock_result = MagicMock(returncode=0, stdout="", stderr=fake_stderr)
+        with patch("subprocess.run", return_value=mock_result):
+            intervals = run_freezedetect(Path("/fake/video.mp4"))
+        assert len(intervals) == 1
+        assert intervals[0]["start"] == pytest.approx(2.0)
+        assert intervals[0]["end"] == pytest.approx(5.0)

@@ -9,9 +9,14 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Protocol
 
 from .probe import VideoInfo
-from ..subtitles.config import SubtitleConfig  # noqa: F401 — for future reference only
+
+
+class _BackgroundConfigProto(Protocol):
+    crossfade_seconds: float
+    tail_seconds: float
 
 
 def loop_count_needed(
@@ -44,7 +49,7 @@ def build_background_cmd(
     output_path: Path,
     intro_target: float,
     prayer_end: float,
-    config: object,  # BackgroundConfig — imported lazily to avoid circular
+    config: _BackgroundConfigProto,
 ) -> list[str]:
     """Build an FFmpeg command list for background video composition.
 
@@ -54,12 +59,17 @@ def build_background_cmd(
 
     Returns a list of strings safe to pass to subprocess.run without shell=True.
     """
-    crossfade: float = config.crossfade_seconds  # type: ignore[attr-defined]
-    tail: float = config.tail_seconds  # type: ignore[attr-defined]
+    crossfade: float = config.crossfade_seconds
+    tail: float = config.tail_seconds
 
     n_loops = loop_count_needed(intro_target, prayer_end, loop_info.duration, crossfade, tail)
     total_duration = prayer_end + tail
-    speed_ratio = intro_info.duration / intro_target if intro_target > 0 else 1.0
+
+    # PTS multiplier: scales presentation timestamps so intro fits intro_target
+    if intro_info.duration > 0 and intro_target > 0:
+        pts_ratio = intro_target / intro_info.duration
+    else:
+        pts_ratio = 1.0
 
     # Inputs: intro + N loop copies
     cmd: list[str] = ["ffmpeg", "-y"]
@@ -70,11 +80,11 @@ def build_background_cmd(
     # Build filter_complex
     parts: list[str] = []
 
-    # Speed-adjust intro
-    parts.append(f"[0:v]setpts=PTS*{intro_target / intro_info.duration:.6f}[iv]")
+    # Speed-adjust intro using guarded pts_ratio
+    parts.append(f"[0:v]setpts=PTS*{pts_ratio:.6f}[iv]")
 
     # Chain xfade: intro→l0, l0→l1, ...
-    # Offset at step k: intro_target + k*(D - c) - c
+    # Offset at step k: intro_target + k*(D - c) - c; clamped >= 0
     D = loop_info.duration
     c = crossfade
 
@@ -82,7 +92,7 @@ def build_background_cmd(
     for k in range(n_loops):
         input_label = f"{k + 1}:v"
         out_label = f"x{k}"
-        offset = intro_target + k * (D - c) - c
+        offset = max(0.0, intro_target + k * (D - c) - c)
         parts.append(
             f"[{prev_label}][{input_label}]"
             f"xfade=transition=fade:duration={c}:offset={offset:.3f}"
