@@ -53,7 +53,8 @@ export function applyJobEvent(
       if (
         state.status !== "idle" &&
         state.status !== "completed" &&
-        state.status !== "failed"
+        state.status !== "failed" &&
+        state.status !== "cancelled"
       ) return state;
       return {
         status: "running",
@@ -66,8 +67,9 @@ export function applyJobEvent(
     }
 
     case "stage_started": {
-      if (state.status !== "running") return state;
+      if (state.status !== "running" && state.status !== "cancelling") return state;
       if (state.attemptId !== event.payload.attemptId) return state;
+      if (state.status !== "running") return state;
       return {
         ...state,
         stageId: event.payload.stageId,
@@ -76,8 +78,9 @@ export function applyJobEvent(
     }
 
     case "progress": {
-      if (state.status !== "running") return state;
+      if (state.status !== "running" && state.status !== "cancelling") return state;
       if (state.attemptId !== event.payload.attemptId) return state;
+      if (state.status !== "running") return state;
       const incoming = event.payload.percent;
       if (incoming < state.percent) return state;
       if (incoming >= 100) return state;

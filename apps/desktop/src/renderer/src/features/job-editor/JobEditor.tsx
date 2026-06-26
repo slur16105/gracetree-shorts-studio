@@ -199,10 +199,11 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
     setJobCancelling()
     try {
       await window.desktopApi.cancelJob(job.id, attemptId)
-    } catch {
-      // IPC rejected immediately (engine not running) — revert so the user can retry.
-      // If IPC merely timed out (engine slow), job_cancelled will still arrive via
-      // the stream listener and transition the state machine normally.
+    } catch (err) {
+      // On timeout the cancel signal was delivered; job_cancelled arrives via the stream
+      // so we must NOT revert — reverting would cause a running→cancelled flicker.
+      // Only revert on genuine failure (engine crashed, IPC layer down, etc.).
+      if (err instanceof Error && err.message.includes('timed out')) return
       revertJobCancellingToRunning(prevRunState)
     }
   }, [job, attemptId, jobRunState])

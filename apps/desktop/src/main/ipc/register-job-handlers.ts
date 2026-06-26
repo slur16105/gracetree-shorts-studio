@@ -6,7 +6,7 @@ import type {
   JobDto,
   ListCompletedJobsCommand
 } from '@gracetree/contracts'
-import { isCompletedJobsListedEvent, isJobCancelledEvent, isJobLoadedEvent } from '@gracetree/contracts'
+import { isCompletedJobsListedEvent, isJobCancelledEvent, isJobCompletedEvent, isJobFailedEvent, isJobLoadedEvent } from '@gracetree/contracts'
 import {
   JOB_CANCEL_CHANNEL,
   JOB_GET_OR_CREATE_CHANNEL,
@@ -269,7 +269,12 @@ export function registerJobHandlers(
       payload: { attemptId }
     }
     const event = await requestEngine(command)
-    if (!isJobCancelledEvent(event) || event.jobId !== jobId) {
+    // Accept any terminal event: job_cancelled is normal, job_completed/job_failed means
+    // the job finished before the cancel signal reached a checkpoint (race condition).
+    const isTerminalForJob =
+      (isJobCancelledEvent(event) || isJobCompletedEvent(event) || isJobFailedEvent(event)) &&
+      event.jobId === jobId
+    if (!isTerminalForJob) {
       throw new Error('Python engine cancel response is invalid')
     }
   })

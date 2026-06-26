@@ -306,6 +306,7 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
     active_cancel_events: dict[str, threading.Event] = {}
 
     def _write_event(event: dict[str, Any]) -> None:
+        EVENT_VALIDATOR.validate(event)
         with lock:
             stdout.write(json.dumps(event, separators=(",", ":")) + "\n")
             stdout.flush()
@@ -342,12 +343,35 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 def _run_start_job(cmd=command, jid=job_id, ce=cancel_event) -> None:
                     try:
                         _handle_start_job_streaming(cmd, stdout, lock, ce)
-                    except Exception:
+                    except Exception as exc:
                         print(
-                            "UNHANDLED_ERROR: start_job thread failed unexpectedly",
+                            f"UNHANDLED_ERROR: start_job thread failed: {exc}",
                             file=stderr,
                             flush=True,
                         )
+                        # Emit job_failed so the stream listener resolves immediately
+                        # instead of waiting the full 10-minute timeout.
+                        try:
+                            import uuid as _uuid
+                            _now = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+                            _err_event = {
+                                "protocolVersion": 1,
+                                "type": "job_failed",
+                                "jobId": jid,
+                                "timestamp": _now,
+                                "payload": {
+                                    "attemptId": str(_uuid.uuid4()),
+                                    "errorCode": "PROCESS_FAILED",
+                                    "stageId": None,
+                                    "recoverable": False,
+                                    "details": str(exc),
+                                },
+                            }
+                            with lock:
+                                stdout.write(json.dumps(_err_event, separators=(",", ":")) + "\n")
+                                stdout.flush()
+                        except Exception:
+                            pass
                     finally:
                         with lock:
                             active_cancel_events.pop(jid, None)
@@ -361,9 +385,18 @@ def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
                 with lock:
                     cancel_event = active_cancel_events.get(job_id)
                 if cancel_event is not None:
-                    # Signal the generation thread; it will emit job_cancelled
                     cancel_event.set()
-                    continue
+                    # Immediately acknowledge so the IPC caller doesn't wait 30 s.
+                    # If the generation thread also emits job_cancelled the duplicate
+                    # is silently absorbed by engine-client.ts routing.
+                    now_ts = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+                    event = {
+                        "protocolVersion": 1,
+                        "type": "job_cancelled",
+                        "jobId": command["jobId"],
+                        "timestamp": now_ts,
+                        "payload": {"attemptId": command["payload"]["attemptId"]},
+                    }
                 else:
                     # Job already completed or never started — acknowledge directly
                     event = _job_cancelled(command)

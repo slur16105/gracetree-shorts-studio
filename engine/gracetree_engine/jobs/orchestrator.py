@@ -48,14 +48,14 @@ def _run_ffmpeg_cancellable(
     deadline = time.monotonic() + timeout
     try:
         while True:
-            if cancel_event.is_set():
-                proc.kill()
-                proc.wait()
-                raise JobCancelledError()
             if time.monotonic() >= deadline:
                 proc.kill()
                 proc.wait()
                 raise subprocess.TimeoutExpired(cmd=args, timeout=timeout)
+            if cancel_event.is_set():
+                proc.kill()
+                proc.wait()
+                raise JobCancelledError()
             try:
                 stdout, stderr = proc.communicate(timeout=0.1)
                 return subprocess.CompletedProcess(
