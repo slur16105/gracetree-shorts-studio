@@ -53,7 +53,7 @@ development_status:
   1-8-작업-흐름을-설명하는-사용-가이드: done
   epic-1-retrospective: optional
 
-  epic-2: in-progress
+  epic-2: done
   2-1-최소-생성-수직-슬라이스와-진행-상태: done
   2-2-스크립트-구조화와-타이밍-계약: done
   2-3-로컬-음성-정렬과-타이밍-생성: done
@@ -69,7 +69,7 @@ development_status:
   2-13-windows-설치-패키지: done
   2-14-macos-설치-패키지: done
   2-15-오프라인-설치-스모크-테스트: done
-  2-16-7일-반복-안정성-검증: in-progress
+  2-16-7일-반복-안정성-검증: done
   2-17-외부-배포-서명-게이트: done
   epic-2-retrospective: optional
 
