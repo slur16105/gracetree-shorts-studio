@@ -1,4 +1,5 @@
 import { Ajv2020, type ErrorObject } from "ajv/dist/2020.js";
+import type { ValidateFunction } from "ajv";
 import * as addFormatsModule from "ajv-formats";
 import type { FormatsPlugin } from "ajv-formats";
 
@@ -394,8 +395,34 @@ const addFormats = (addFormatsModule.default ??
   addFormatsModule) as unknown as FormatsPlugin;
 addFormats(ajv);
 
-const validateCommand = ajv.compile<EngineCommand>(commandSchema);
-const validateEvent = ajv.compile<EngineEvent>(eventSchema);
+// AJV compiles each schema into a validator with `new Function(...)`, which
+// requires the 'unsafe-eval' CSP source. The renderer runs under a strict
+// `script-src 'self'` policy (no unsafe-eval), so compiling at module-load
+// time would throw an EvalError the instant this module is imported and crash
+// the renderer to a blank screen. Defer compilation to first use: the renderer
+// never reaches these validators (it relies on the structural
+// `isGenerationEvent` guard below for already-validated events), while the
+// main process — which validates raw engine I/O — runs in Node, where eval is
+// allowed.
+function makeLazyValidator<T>(
+  compile: () => ValidateFunction<T>,
+): ValidateFunction<T> {
+  let compiled: ValidateFunction<T> | null = null;
+  const validate = ((data: unknown) => {
+    if (compiled === null) compiled = compile();
+    const ok = compiled(data);
+    validate.errors = compiled.errors;
+    return ok;
+  }) as ValidateFunction<T>;
+  return validate;
+}
+
+const validateCommand = makeLazyValidator<EngineCommand>(() =>
+  ajv.compile<EngineCommand>(commandSchema),
+);
+const validateEvent = makeLazyValidator<EngineEvent>(() =>
+  ajv.compile<EngineEvent>(eventSchema),
+);
 
 export function isCheckHealthCommand(
   value: unknown,
@@ -630,17 +657,29 @@ export function isJobCancelledEvent(value: unknown): value is JobCancelledEvent 
   return validateEvent(value) && value.type === "job_cancelled";
 }
 
+const GENERATION_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "job_accepted",
+  "stage_started",
+  "progress",
+  "artifact_created",
+  "job_completed",
+  "job_failed",
+  "job_cancelled",
+]);
+
+// Structural guard only — does NOT run AJV. This is the single protocol export
+// reached by the renderer (via job-state's reducer), and the renderer must not
+// invoke AJV under its strict CSP (see makeLazyValidator above). Events reaching
+// the renderer have already passed full AJV validation in the main process
+// (engine-client.ts), so a discriminator on `type` is sufficient and correct.
 export function isGenerationEvent(
   value: unknown,
 ): value is JobAcceptedEvent | StageStartedEvent | ProgressEvent | ArtifactCreatedEvent | JobCompletedEvent | JobFailedEvent | JobCancelledEvent {
-  if (!isEngineEvent(value)) return false;
   return (
-    value.type === "job_accepted" ||
-    value.type === "stage_started" ||
-    value.type === "progress" ||
-    value.type === "artifact_created" ||
-    value.type === "job_completed" ||
-    value.type === "job_failed" ||
-    value.type === "job_cancelled"
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    typeof (value as { type: unknown }).type === "string" &&
+    GENERATION_EVENT_TYPES.has((value as { type: string }).type)
   );
 }
