@@ -19,7 +19,7 @@ import {
 import { shell, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { resolve, sep } from 'node:path'
+import { dirname, resolve, sep } from 'node:path'
 
 import { createManagedJobPaths, isValidJobId, isValidPublishDate } from '../files/managed-paths'
 import type { JobService } from '../jobs/job-service'
@@ -195,15 +195,42 @@ export function registerJobHandlers(
 
   // job start-to-log-path cache for openLogFolder
   const jobWorkPaths = new Map<string, string>()
-  ipcMain.handle(JOBS_OPEN_LOG_CHANNEL, async (_event, jobId: unknown, _attemptId: unknown) => {
-    if (typeof jobId !== 'string') {
+  ipcMain.handle(JOBS_OPEN_LOG_CHANNEL, async (_event, jobId: unknown, attemptId: unknown) => {
+    if (typeof jobId !== 'string' || typeof attemptId !== 'string') {
       throw new Error('openLogFolder args invalid')
     }
+    let logDir: string | null = null
+
     const storedWorkPath = jobWorkPaths.get(jobId)
-    if (!storedWorkPath) {
+    if (storedWorkPath) {
+      logDir = resolve(storedWorkPath, 'logs')
+    } else {
+      // Fall back to DB when in-session cache is unavailable (e.g. after restart)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { DatabaseSync } = require('node:sqlite') as {
+          DatabaseSync: new (path: string) => {
+            prepare(sql: string): { get(...args: unknown[]): unknown }
+            close(): void
+          }
+        }
+        const dbPath = resolve(managedRoot, 'studio.db')
+        const db = new DatabaseSync(dbPath)
+        const row = db
+          .prepare('SELECT log_path FROM job_attempts WHERE id = ?')
+          .get(attemptId) as { log_path: string | null } | undefined
+        db.close()
+        if (row?.log_path) {
+          logDir = dirname(resolve(row.log_path))
+        }
+      } catch {
+        // node:sqlite unavailable or DB error — logDir stays null
+      }
+    }
+
+    if (!logDir) {
       throw new Error('Log folder not available for this job')
     }
-    const logDir = resolve(storedWorkPath, 'logs')
     const canonicalManaged = resolve(managedRoot)
     if (!logDir.startsWith(canonicalManaged + sep)) {
       throw new Error('Log folder is outside managed root')

@@ -26,7 +26,7 @@ function getStatusLabel(state: ReturnType<typeof useJobRunState>): string {
   }
   if (state.status === 'cancelling') return '취소 중...'
   if (state.status === 'completed') return '생성 완료'
-  if (state.status === 'failed') return `오류: ${errorMessage(state.errorCode)}`
+  if (state.status === 'failed') return `오류: ${errorMessage(state.errorCode)} [${state.errorCode}]`
   if (state.status === 'cancelled') return '취소됨'
   return '대기 중'
 }

@@ -35,7 +35,9 @@ export function FailedResultDialog({
   }, [])
 
   const handleOpenLog = (): void => {
-    window.desktopApi.openLogFolder(jobId, attemptId).catch(() => {})
+    window.desktopApi.openLogFolder(jobId, attemptId).catch((err: unknown) => {
+      console.error('로그 폴더를 열 수 없습니다:', err)
+    })
   }
 
   const handleOpenSettings = (): void => {
@@ -70,6 +72,7 @@ export function FailedResultDialog({
             <button
               className={styles.primaryButton}
               onClick={onClose}
+              ref={closeButtonRef}
               type="button"
             >
               입력 수정
@@ -78,6 +81,7 @@ export function FailedResultDialog({
             <button
               className={styles.secondaryButton}
               onClick={onClose}
+              ref={closeButtonRef}
               type="button"
             >
               닫기
@@ -93,7 +97,6 @@ export function FailedResultDialog({
           <button
             className={styles.secondaryButton}
             onClick={handleOpenLog}
-            ref={closeButtonRef}
             type="button"
           >
             로그 폴더 열기

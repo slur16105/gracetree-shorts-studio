@@ -904,7 +904,7 @@ class TestFailureDiagnostics:
 
     def test_prayer_boundary_ambiguous_is_recoverable_with_details(self, tmp_path):
         def _failing_align(voice_path, script_ast, attempt_dir, config):
-            raise AlignmentError("PRAYER_BOUNDARY_AMBIGUOUS", "후보가 0개입니다")
+            raise AlignmentError("PRAYER_BOUNDARY_AMBIGUOUS", "후보가 0개입니다", recoverable=True)
 
         managed_root = tmp_path / "managed"
         managed_root.mkdir()
@@ -957,3 +957,23 @@ class TestFailureDiagnostics:
         content = log_file.read_text(encoding="utf-8")
         assert "PRAYER_BOUNDARY_AMBIGUOUS" in content
         assert "speech_alignment" in content
+
+    def test_job_accepted_emitted_before_job_failed_on_create_attempt_error(self, tmp_path):
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        _setup_db(managed_root)
+        # Use a non-existent job_id so create_attempt raises ValueError
+        command = _make_command("nonexistent-job-id", managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        types = [e["type"] for e in emitted]
+        assert "job_accepted" in types, "job_accepted must always be emitted"
+        assert "job_failed" in types, "job_failed must be emitted on create_attempt error"
+        accepted_idx = types.index("job_accepted")
+        failed_idx = types.index("job_failed")
+        assert accepted_idx < failed_idx, "job_accepted must precede job_failed"

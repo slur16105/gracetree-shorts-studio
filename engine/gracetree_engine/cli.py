@@ -292,8 +292,8 @@ def _startup_reconciliation() -> None:
         from .jobs.attempt_repository import AttemptRepository
         apply_migrations(database_path)
         AttemptRepository(database_path).interrupt_running_attempts()
-    except Exception:
-        pass  # 정리 실패 시 무시: 다음 작업 실행에 영향을 주지 않는다
+    except Exception as exc:
+        print(f"STARTUP_RECONCILIATION_FAILED: {exc}", file=sys.stderr, flush=True)
 
 
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:

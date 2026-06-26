@@ -253,6 +253,8 @@ def start_job(
     snapshot = _take_job_snapshot(job_id, approved_root)
     repo = AttemptRepository(db_path)
 
+    emit(_make_event("job_accepted", job_id, {"attemptId": attempt_id}))
+
     try:
         repo.create_attempt(
             attempt_id=attempt_id,
@@ -260,7 +262,10 @@ def start_job(
             snapshot=snapshot,
         )
     except (ValueError, RuntimeError) as exc:
-        _write_attempt_log(work_path, attempt_id, job_id, None, "PROCESS_FAILED", str(exc))
+        try:
+            _write_attempt_log(work_path, attempt_id, job_id, None, "PROCESS_FAILED", str(exc))
+        except OSError:
+            pass
         emit(_make_event("job_failed", job_id, {
             "attemptId": attempt_id,
             "errorCode": "PROCESS_FAILED",
@@ -269,8 +274,6 @@ def start_job(
             "details": None,
         }))
         return
-
-    emit(_make_event("job_accepted", job_id, {"attemptId": attempt_id}))
 
     attempt_dir = work_path / "temp" / "attempts" / attempt_id
     attempt_dir.mkdir(parents=True, exist_ok=True)
@@ -317,12 +320,17 @@ def _run_start_job_stages(
         cause: str,
     ) -> None:
         """실패 공통 처리: 로그 기록 → DB 업데이트 → 이벤트 방출 → 임시 폴더 삭제."""
-        log_path = _write_attempt_log(work_path, attempt_id, job_id, stage_id, error_code, cause)
+        try:
+            log_path_str: str | None = str(
+                _write_attempt_log(work_path, attempt_id, job_id, stage_id, error_code, cause)
+            )
+        except OSError:
+            log_path_str = None
         repo.fail_attempt(
             attempt_id=attempt_id,
             error_code=error_code,
             error_stage_id=stage_id,
-            log_path=str(log_path),
+            log_path=log_path_str,
         )
         emit(_make_event("job_failed", job_id, {
             "attemptId": attempt_id,
@@ -361,7 +369,7 @@ def _run_start_job_stages(
                 config=DEFAULT_SPEECH_CONFIG,
             )
         except AlignmentError as exc:
-            recoverable = exc.error_code == "PRAYER_BOUNDARY_AMBIGUOUS"
+            recoverable = exc.recoverable
             if recoverable:
                 details = (
                     f"{exc} — "
@@ -372,7 +380,7 @@ def _run_start_job_stages(
             _fail(exc.error_code, "speech_alignment", recoverable, details, str(exc))
             return
         except Exception as exc:
-            _fail("PROCESS_FAILED", "speech_alignment", False, None, "음성 정렬 중 처리 오류가 발생했습니다.")
+            _fail("PROCESS_FAILED", "speech_alignment", False, None, str(exc))
             return
         _check_cancel(cancel_event)
         emit(_make_event("progress", job_id, {

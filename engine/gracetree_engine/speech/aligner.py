@@ -28,9 +28,10 @@ class Segment(NamedTuple):
 class AlignmentError(Exception):
     """Raised when prayer boundary is 0 or N (ambiguous)."""
 
-    def __init__(self, error_code: str, message: str) -> None:
+    def __init__(self, error_code: str, message: str, *, recoverable: bool = False) -> None:
         super().__init__(message)
         self.error_code = error_code
+        self.recoverable = recoverable
 
 
 # ─────────────────────── text matching ────────────────────────
@@ -210,6 +211,7 @@ def align_speech(
         raise AlignmentError(
             "PRAYER_BOUNDARY_AMBIGUOUS",
             "스크립트 AST에 자막 블록이 없습니다.",
+            recoverable=True,
         )
 
     candidates = find_prayer_boundary(segments, subtitle_blocks[0])
@@ -217,6 +219,7 @@ def align_speech(
         raise AlignmentError(
             "PRAYER_BOUNDARY_AMBIGUOUS",
             f"기도 시작 후보 수가 {len(candidates)}개입니다 (정확히 1개여야 합니다).",
+            recoverable=True,
         )
 
     boundary_idx = candidates[0]
