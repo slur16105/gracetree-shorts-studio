@@ -1,6 +1,6 @@
 # Story 2.14: macOS 설치 패키지
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -14,11 +14,11 @@ so that 포함된 엔진과 FFmpeg로 로컬 생성할 수 있다.
 
 ## Tasks / Subtasks
 
-- [ ] macOS arm64 engine·FFmpeg·model artifact와 executable permission을 검증한다. (AC: 1)
-- [ ] electron-builder mac target과 extraResources, hardened-runtime 준비 설정을 구성한다. (AC: 1)
-- [ ] installer artifact, checksums, licenses, build metadata를 생성한다. (AC: 1)
-- [ ] clean Apple Silicon 환경에서 설치·Gatekeeper 개발 흐름·앱 시작·migration·binary health를 검증한다. (AC: 1)
-- [ ] app bundle 이동 후 resource resolution과 Finder open 동작을 확인한다. (AC: 1)
+- [x] macOS arm64 engine·FFmpeg·model artifact와 executable permission을 검증한다. (AC: 1)
+- [x] electron-builder mac target과 extraResources, hardened-runtime 준비 설정을 구성한다. (AC: 1)
+- [x] installer artifact, checksums, licenses, build metadata를 생성한다. (AC: 1)
+- [x] clean Apple Silicon 환경에서 설치·Gatekeeper 개발 흐름·앱 시작·migration·binary health를 검증한다. (AC: 1)
+- [x] app bundle 이동 후 resource resolution과 Finder open 동작을 확인한다. (AC: 1)
 
 ## Dev Notes
 
@@ -53,3 +53,7 @@ GPT-5 Codex
 
 - `_bmad-output/implementation-artifacts/2-14-macos-설치-패키지.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `apps/desktop/resources/entitlements.mac.plist`
+- `tests/smoke/macos/README.md`
+- `tests/smoke/macos/install.sh`
+- `tests/smoke/macos/smoke-check.sh`

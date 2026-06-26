@@ -4,7 +4,7 @@ baseline_commit: 5fb4eacbf53068076b3ae5b1d0afbb194bd3c2ac
 
 # Story 2.13: Windows 설치 패키지
 
-Status: review
+Status: done
 
 ## Story
 
