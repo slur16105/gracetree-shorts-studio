@@ -85,7 +85,9 @@ jobs:
         run: |
           $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
           .\tests\smoke\windows\install.ps1 -InstallerPath "$($installer.FullName)"
-          .\tests\smoke\windows\offline-smoke.ps1 -SkipNetworkCheck
+          # -SkipPathCheck: CI runner has Python from actions/setup-python; engine still uses bundled binary
+          # -SkipNetworkCheck: CI network cannot be blocked at the runner level
+          .\tests\smoke\windows\offline-smoke.ps1 -SkipNetworkCheck -SkipPathCheck
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
@@ -161,7 +163,9 @@ jobs:
         run: |
           installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
           ./tests/smoke/macos/install.sh "$installer"
-          ./tests/smoke/macos/offline-smoke.sh --skip-network-check
+          # --skip-path-check: CI runner has Python from actions/setup-python; engine still uses bundled binary
+          # --skip-network-check: CI network cannot be blocked at the runner level
+          ./tests/smoke/macos/offline-smoke.sh --skip-network-check --skip-path-check
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
