@@ -9,6 +9,11 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# Release channel: 'external' requires signing credentials in secrets.
+# Builds without signing credentials are tagged 'development' and blocked from external release.
+env:
+  RELEASE_CHANNEL: ${{ secrets.CSC_LINK != '' && 'external' || 'development' }}
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -57,13 +62,23 @@ jobs:
       - name: Build desktop installer
         run: node scripts/build-desktop.mjs --platform win32 --arch x64
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Signing secrets — only set when publishing externally.
+          # CSC_LINK and CSC_KEY_PASSWORD must NOT be echoed or exposed in logs.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
 
-      - name: Verify installer
+      - name: Verify installer (size + extension)
         shell: pwsh
         run: |
           $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
           node scripts/verify-package.mjs --installer "$($installer.FullName)" --platform win32
+
+      - name: Signing gate
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
+          node scripts/verify-signing.mjs --installer "$($installer.FullName)" --channel "$env:RELEASE_CHANNEL" --platform win32
 
       - name: Offline smoke test (no system Python/FFmpeg)
         shell: pwsh
@@ -123,12 +138,24 @@ jobs:
       - name: Build desktop installer
         run: node scripts/build-desktop.mjs --platform darwin --arch arm64
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Signing secrets — only set when publishing externally.
+          # APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID must NOT appear in logs.
+          CSC_LINK: ${{ secrets.CSC_LINK_MAC }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD_MAC }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK_MAC != '' && 'true' || 'false' }}
 
-      - name: Verify installer
+      - name: Verify installer (size + extension)
         run: |
           installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
           node scripts/verify-package.mjs --installer "$installer" --platform darwin
+
+      - name: Signing gate
+        run: |
+          installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
+          node scripts/verify-signing.mjs --installer "$installer" --channel "$RELEASE_CHANNEL" --platform darwin
 
       - name: Offline smoke test (no system Python/FFmpeg)
         run: |
@@ -159,8 +186,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
+          # External releases only — development channel builds stay as draft artifacts only.
+          # The release body clearly marks unsigned/development builds to prevent misuse.
+          body: |
+            **Release channel:** ${{ env.RELEASE_CHANNEL }}
+            ${{ env.RELEASE_CHANNEL == 'development' && '> ⚠️ This is a **development** build. It is unsigned and NOT intended for external distribution.' || '> ✅ This build has been signed and notarized for external distribution.' }}
+
+            ---
           files: |
             dist/artifacts/windows-x64-installer/*.exe
             dist/artifacts/macos-arm64-installer/*.dmg
           generate_release_notes: true
           fail_on_unmatched_files: true
+          # Block publishing development builds as non-draft releases.
+          prerelease: ${{ env.RELEASE_CHANNEL == 'development' }}
