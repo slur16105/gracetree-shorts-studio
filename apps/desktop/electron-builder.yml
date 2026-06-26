@@ -1,0 +1,70 @@
+appId: com.gracetree.shorts-studio
+productName: GraceTree Shorts Studio
+copyright: Copyright © 2026 GraceTree
+
+directories:
+  buildResources: resources
+  output: dist/installer
+
+# Engine bundle (PyInstaller onedir) and FFmpeg are placed outside ASAR
+# so they remain as native executables the OS can spawn directly.
+extraResources:
+  - from: ../../engine/dist/gracetree-engine
+    to: engine/gracetree-engine
+    filter:
+      - '**/*'
+  - from: ../../resources/ffmpeg/${os}
+    to: ffmpeg
+    filter:
+      - 'ffmpeg${ext}'
+      - 'ffprobe${ext}'
+
+# Files that must stay unpacked for the engine subprocess to locate them.
+# (Currently none from ASAR — engine/ffmpeg live in extraResources.)
+asarUnpack: []
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: '${productName}-${version}-windows-x64-setup.${ext}'
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  perMachine: false
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  category: public.app-category.productivity
+  artifactName: '${productName}-${version}-macos-${arch}.${ext}'
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
+
+dmg:
+  title: '${productName} ${version}'
+  contents:
+    - x: 410
+      y: 150
+      type: link
+      path: /Applications
+    - x: 130
+      y: 150
+      type: file
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+
+publish: null

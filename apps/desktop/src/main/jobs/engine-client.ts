@@ -2,6 +2,7 @@ import type { EngineCommand, EngineEvent, StartJobCommand } from '@gracetree/con
 import { isEngineEvent } from '@gracetree/contracts'
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { createInterface, type Interface } from 'node:readline'
+import type { EngineSpawnConfig } from '../files/resource-paths'
 
 interface PendingRequest {
   resolve: (event: EngineEvent) => void
@@ -29,7 +30,10 @@ export class EngineClient {
   constructor(
     private readonly projectRoot: string,
     private readonly approvedManagedRoot: string,
-    private readonly pythonExecutable = process.env['PYTHON'] ?? 'python3'
+    private readonly spawnConfig: EngineSpawnConfig = {
+      command: process.env['PYTHON'] ?? 'python3',
+      args: ['-m', 'gracetree_engine'],
+    }
   ) {}
 
   async request(command: EngineCommand): Promise<EngineEvent> {
@@ -85,14 +89,20 @@ export class EngineClient {
 
   private ensureStarted(): void {
     if (this.child) return
-    const engineRoot = `${this.projectRoot}/engine`
-    const child = spawn(this.pythonExecutable, ['-m', 'gracetree_engine'], {
+    const { command, args } = this.spawnConfig
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      GRACETREE_MANAGED_ROOT: this.approvedManagedRoot,
+    }
+    // In dev mode (python -m gracetree_engine), provide the source tree on PYTHONPATH.
+    // In packaged mode (PyInstaller bundle), PYTHONPATH is irrelevant and must not be set
+    // to a source path that may not exist on the end user's machine.
+    if (args.length > 0 && args[0] === '-m') {
+      env['PYTHONPATH'] = `${this.projectRoot}/engine`
+    }
+    const child = spawn(command, args, {
       cwd: this.projectRoot,
-      env: {
-        ...process.env,
-        PYTHONPATH: engineRoot,
-        GRACETREE_MANAGED_ROOT: this.approvedManagedRoot
-      },
+      env,
       stdio: ['pipe', 'pipe', 'pipe']
     })
     this.child = child

@@ -8,6 +8,7 @@ import { registerJobHandlers } from './ipc/register-job-handlers'
 import { registerFileHandlers } from './ipc/register-file-handlers'
 import { registerResourceHandlers } from './ipc/register-resource-handlers'
 import { EngineClient } from './jobs/engine-client'
+import { resolveEngineCommand } from './files/resource-paths'
 import { EngineProcess } from './jobs/engine-process'
 import { JobService } from './jobs/job-service'
 import { createManagedJobPaths } from './files/managed-paths'
@@ -50,7 +51,11 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.gracetree.shorts-studio')
   const userDataPath = app.getPath('userData')
   const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
-  engineClient = new EngineClient(projectRoot, managedRoot)
+  engineClient = new EngineClient(
+    projectRoot,
+    managedRoot,
+    resolveEngineCommand(process.resourcesPath, is.dev)
+  )
   const engineProcess = new EngineProcess(engineClient)
   const jobService = new JobService(engineProcess)
   registerJobHandlers(

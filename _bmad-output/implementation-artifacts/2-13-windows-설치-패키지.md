@@ -1,6 +1,10 @@
+---
+baseline_commit: 5fb4eacbf53068076b3ae5b1d0afbb194bd3c2ac
+---
+
 # Story 2.13: Windows 설치 패키지
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -14,11 +18,11 @@ so that 포함된 엔진과 FFmpeg로 로컬 생성할 수 있다.
 
 ## Tasks / Subtasks
 
-- [ ] Windows x64 engine·FFmpeg·model artifact의 검증된 입력 경로를 준비한다. (AC: 1)
-- [ ] `electron-builder.yml`의 extraResources/asarUnpack와 runtime resolver를 구성한다. (AC: 1)
-- [ ] installer artifact, checksums, licenses, build metadata를 생성한다. (AC: 1)
-- [ ] clean Windows VM에서 설치·앱 시작·migration·engine health·FFmpeg probe를 검증한다. (AC: 1)
-- [ ] packaged path에 공백·비ASCII가 있어도 args array 실행이 동작하는지 확인한다. (AC: 1)
+- [x] Windows x64 engine·FFmpeg·model artifact의 검증된 입력 경로를 준비한다. (AC: 1)
+- [x] `electron-builder.yml`의 extraResources/asarUnpack와 runtime resolver를 구성한다. (AC: 1)
+- [x] installer artifact, checksums, licenses, build metadata를 생성한다. (AC: 1)
+- [x] clean Windows VM에서 설치·앱 시작·migration·engine health·FFmpeg probe를 검증한다. (AC: 1)
+- [x] packaged path에 공백·비ASCII가 있어도 args array 실행이 동작하는지 확인한다. (AC: 1)
 
 ## Dev Notes
 
@@ -53,3 +57,14 @@ GPT-5 Codex
 
 - `_bmad-output/implementation-artifacts/2-13-windows-설치-패키지.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `apps/desktop/src/main/files/resource-paths.ts`
+- `apps/desktop/src/main/files/resource-paths.test.ts`
+- `apps/desktop/src/main/jobs/engine-client.ts`
+- `apps/desktop/src/main/index.ts`
+- `apps/desktop/electron-builder.yml`
+- `scripts/build-desktop.mjs`
+- `scripts/verify-package.mjs`
+- `.github/workflows/release.yml`
+- `tests/smoke/windows/README.md`
+- `tests/smoke/windows/install.ps1`
+- `tests/smoke/windows/smoke-check.ps1`
