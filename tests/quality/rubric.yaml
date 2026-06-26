@@ -1,0 +1,130 @@
+# Quality Evaluation Rubric — Story 2.11
+# 각 항목은 auto(자동) 또는 manual(수동) 평가 유형을 가진다.
+# critical: true이면 해당 항목 실패 시 fixture 전체가 FAIL 처리된다.
+
+rubric:
+  # ── 자동 검사 항목 ─────────────────────────────────────────────
+  - id: "auto-dimensions"
+    type: auto
+    category: technical
+    description: "해상도 1080×1920 (9:16 세로) 여부"
+    critical: true
+    pass_condition: "width==1080 AND height==1920"
+    auto_check: "probe → streams[video].width/height"
+
+  - id: "auto-fps"
+    type: auto
+    category: technical
+    description: "프레임레이트 30fps (±0.5 허용)"
+    critical: true
+    pass_condition: "|fps - 30.0| <= 0.5"
+    auto_check: "probe → streams[video].r_frame_rate"
+
+  - id: "auto-streams"
+    type: auto
+    category: technical
+    description: "비디오 + 오디오 스트림 모두 존재"
+    critical: true
+    pass_condition: "video_stream != null AND audio_stream != null"
+    auto_check: "probe → streams[].codec_type"
+
+  - id: "auto-duration"
+    type: auto
+    category: technical
+    description: "영상 길이 최소 1초 이상"
+    critical: true
+    pass_condition: "duration >= 1.0"
+    auto_check: "probe → streams[video].duration OR format.duration"
+
+  - id: "auto-subtitles-exist"
+    type: auto
+    category: subtitle
+    description: "subtitles.ass 파일 존재 및 비어있지 않음"
+    critical: true
+    pass_condition: "subtitles.ass exists AND size > 0"
+    auto_check: "file existence + size check"
+
+  - id: "auto-timing-valid"
+    type: auto
+    category: subtitle
+    description: "timing.json 유효한 JSON 형식"
+    critical: true
+    pass_condition: "json.loads(timing.json) succeeds"
+    auto_check: "JSON parse check"
+
+  - id: "auto-black-frames"
+    type: auto
+    category: visual
+    description: "검은 프레임 연속 2초 이상 없음"
+    critical: false
+    pass_condition: "no black segment >= 2.0s"
+    auto_check: "ffmpeg blackdetect filter"
+
+  - id: "auto-audio-loudness"
+    type: auto
+    category: audio
+    description: "EBU R128 통합 라우드니스 -23 LUFS ±3 범위"
+    critical: false
+    pass_condition: "-26 <= I_LUFS <= -20"
+    auto_check: "ffmpeg loudnorm / ebur128 filter"
+
+  # ── 수동 평가 항목 ─────────────────────────────────────────────
+  - id: "manual-subtitle-position"
+    type: manual
+    category: subtitle
+    description: "자막이 화면 하단 1/4 이내에 위치하며 영상 내용과 겹치지 않음"
+    critical: false
+    pass_condition: "시청 확인: 자막 가독성 양호"
+    rubric_detail: |
+      PASS: 자막이 명확히 읽히고 배경과 충분한 대비
+      FAIL: 자막이 얼굴/자막 영역 밖으로 이탈하거나 배경에 묻힘
+
+  - id: "manual-korean-accuracy"
+    type: manual
+    category: subtitle
+    description: "한글 자막 표기 정확성 (오자·띄어쓰기·발음 불일치)"
+    critical: false
+    pass_condition: "오자 0건, 발음 불일치 1건 이하"
+    rubric_detail: |
+      PASS: 원고와 자막 일치, 발음 불일치 최대 1건
+      FAIL: 오자 1건 이상 또는 발음 불일치 2건 이상
+
+  - id: "manual-timing-sync"
+    type: manual
+    category: subtitle
+    description: "자막 타이밍 동기화 (음성 시작 대비 ±300ms 이내)"
+    critical: false
+    pass_condition: "모든 자막 블록 ±300ms 이내"
+    rubric_detail: |
+      PASS: 자막이 음성과 자연스럽게 동기화
+      FAIL: 명확한 시간차(500ms 이상) 감지 가능
+
+  - id: "manual-transition"
+    type: manual
+    category: visual
+    description: "전환 효과가 자연스럽고 끊김 없음"
+    critical: false
+    pass_condition: "전환 부자연스러움 0건"
+    rubric_detail: |
+      PASS: 모든 씬 전환이 부드럽고 갑작스러운 플래시 없음
+      FAIL: 1건 이상의 갑작스러운 전환 또는 화면 깜박임
+
+  - id: "manual-voice-clarity"
+    type: manual
+    category: audio
+    description: "음성 명료도 — 내용 이해에 지장 없는 수준"
+    critical: false
+    pass_condition: "음성 이해도 양호"
+    rubric_detail: |
+      PASS: 내용을 헤드폰 없이 청취해도 이해 가능
+      FAIL: 노이즈/왜곡으로 내용 파악 어려움
+
+  - id: "manual-bgm-balance"
+    type: manual
+    category: audio
+    description: "BGM이 음성을 방해하지 않음 (음성 대비 BGM -10dB 이하)"
+    critical: false
+    pass_condition: "BGM이 음성보다 확연히 작게 들림"
+    rubric_detail: |
+      PASS: BGM이 배경으로 자연스럽게 흐름
+      FAIL: BGM이 음성과 비슷하거나 더 크게 들림

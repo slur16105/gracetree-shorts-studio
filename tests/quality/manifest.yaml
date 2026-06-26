@@ -1,0 +1,86 @@
+# Quality Gate Fixture Manifest — Story 2.11
+# 평가자, 빌드 ID, 날짜, 플랫폼을 기록한다.
+#
+# 각 fixture는 실제 생성된 output/ 디렉토리를 가리킨다.
+# sha256 체크섬은 `sha256sum output/final.mp4` 로 기록한다.
+# privacy: 개인정보·라이선스 클리어런스 여부 (true/false/pending)
+
+meta:
+  version: "1.0"
+  evaluator: TBD
+  build_id: TBD
+  platform: macOS
+  evaluation_date: TBD
+  gate_threshold: 8           # 10개 중 8개 이상 pass → release gate 통과
+  required_sample_count: 10
+
+fixtures:
+  - id: "fixture-001"
+    publish_date: TBD
+    description: "대표 영상 #1 — 일반 설교 형식"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-002"
+    publish_date: TBD
+    description: "대표 영상 #2 — 짧은 성경 구절"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-003"
+    publish_date: TBD
+    description: "대표 영상 #3 — 기도 영상 포함"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-004"
+    publish_date: TBD
+    description: "대표 영상 #4 — 긴 자막 (40자 이상)"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-005"
+    publish_date: TBD
+    description: "대표 영상 #5 — 배경음악 강도 엣지 케이스"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-006"
+    publish_date: TBD
+    description: "대표 영상 #6 — 전환 구간 많음 (5회 이상)"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-007"
+    publish_date: TBD
+    description: "대표 영상 #7 — 목소리 낮은 주파수 구간"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-008"
+    publish_date: TBD
+    description: "대표 영상 #8 — 자막 한글 혼용 구간"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-009"
+    publish_date: TBD
+    description: "대표 영상 #9 — 짧은 오디오 (30초 미만)"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
+
+  - id: "fixture-010"
+    publish_date: TBD
+    description: "대표 영상 #10 — 표준 대표 케이스"
+    output_dir: TBD
+    sha256_final_mp4: TBD
+    privacy: pending
