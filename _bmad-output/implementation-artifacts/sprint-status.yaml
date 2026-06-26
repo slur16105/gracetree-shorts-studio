@@ -68,7 +68,7 @@ development_status:
   2-12-python-엔진-번들: done
   2-13-windows-설치-패키지: done
   2-14-macos-설치-패키지: done
-  2-15-오프라인-설치-스모크-테스트: review
+  2-15-오프라인-설치-스모크-테스트: done
   2-16-7일-반복-안정성-검증: in-progress
   2-17-외부-배포-서명-게이트: review
   epic-2-retrospective: optional
