@@ -2,17 +2,20 @@
 """Story 2.11: Automated quality checker for release gate fixtures.
 
 Runs probe/frame/subtitle/audio checks on each fixture listed in manifest.yaml
-and outputs per-task results to quality-results.json.
+and outputs per-fixture results to quality-results.json.
 
 Usage:
     python3 tests/quality/check_quality.py [--manifest tests/quality/manifest.yaml]
     python3 tests/quality/check_quality.py --fixture fixture-001 --output-dir /path/to/output
 
 Exit code:
-    0  All fixtures pass gate threshold (8/10 default)
-    1  Below gate threshold or critical auto-check failure
+    0  All fixtures pass gate threshold AND no critical auto-check failures
+    1  Below gate threshold OR any critical auto-check failure OR GATE-AUTO violation
     2  Manifest / configuration error
 """
+# NOTE: probe_file is intentionally reimplemented here (not imported from
+# engine/gracetree_engine/diagnostics/verifier.py) so this script runs as a
+# standalone tool without requiring the engine package to be installed.
 from __future__ import annotations
 
 import argparse
@@ -23,28 +26,23 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    try:
-        import tomli as tomllib  # type: ignore[no-redef]
-    except ImportError:
-        tomllib = None  # type: ignore[assignment]
-
-try:
     import yaml
     _YAML_AVAILABLE = True
 except ImportError:
     _YAML_AVAILABLE = False
 
+# Thresholds — manifest meta values override these defaults at runtime.
 REQUIRED_WIDTH = 1080
 REQUIRED_HEIGHT = 1920
 REQUIRED_FPS = 30.0
 FPS_TOLERANCE = 0.5
-MIN_DURATION = 1.0
+MIN_DURATION = 55.0   # YouTube Shorts 최소 길이 (story: 55-65s)
 LOUDNESS_MIN = -26.0
 LOUDNESS_MAX = -20.0
 BLACK_DETECT_DURATION = 2.0
 BLACK_DETECT_THRESHOLD = 0.98
+DEFAULT_GATE_THRESHOLD = 8
+DEFAULT_REQUIRED_SAMPLE_COUNT = 10
 
 
 @dataclass
@@ -72,6 +70,10 @@ class FixtureResult:
         auto_failures = [c for c in self.checks if not c.passed]
         self.publishable = len(auto_failures) == 0
         self.fail_categories = [c.check_id for c in auto_failures]
+
+    @property
+    def has_critical_failure(self) -> bool:
+        return any(not c.passed and c.critical for c in self.checks)
 
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
@@ -121,12 +123,14 @@ def check_fps(info: dict) -> CheckResult:
 
 
 def check_streams(info: dict) -> CheckResult:
+    """Require exactly 1 video stream and at least 1 audio stream."""
     streams = info.get("streams", [])
-    types = {s.get("codec_type") for s in streams}
-    has_video = "video" in types
-    has_audio = "audio" in types
-    passed = has_video and has_audio
-    detail = f"video={has_video}, audio={has_audio}"
+    video_streams = [s for s in streams if s.get("codec_type") == "video"]
+    audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
+    has_one_video = len(video_streams) == 1
+    has_audio = len(audio_streams) >= 1
+    passed = has_one_video and has_audio
+    detail = f"video={len(video_streams)} (expected 1), audio={len(audio_streams)}"
     return CheckResult("auto-streams", passed, detail, critical=True)
 
 
@@ -169,7 +173,12 @@ def check_black_frames(video_path: Path) -> CheckResult:
         "-vf", f"blackdetect=d={BLACK_DETECT_DURATION}:pix_th={BLACK_DETECT_THRESHOLD}",
         "-an", "-f", "null", "-",
     ])
-    # blackdetect reports to stderr
+    if result.returncode != 0:
+        return CheckResult(
+            "auto-black-frames", False,
+            f"ffmpeg 실패 (exit {result.returncode})",
+            critical=False,
+        )
     found = "black_start" in result.stderr
     detail = "검은 프레임 구간 발견" if found else "이상 없음"
     return CheckResult("auto-black-frames", not found, detail, critical=False)
@@ -182,7 +191,12 @@ def check_audio_loudness(video_path: Path) -> CheckResult:
         "-af", "ebur128=peak=true",
         "-f", "null", "-",
     ])
-    # parse "I:     -23.0 LUFS" from stderr
+    if result.returncode != 0:
+        return CheckResult(
+            "auto-audio-loudness", False,
+            f"ffmpeg 실패 (exit {result.returncode})",
+            critical=False,
+        )
     loudness = None
     for line in result.stderr.splitlines():
         if "I:" in line and "LUFS" in line:
@@ -207,7 +221,7 @@ def check_fixture(fixture_id: str, output_dir_str: str) -> FixtureResult:
 
     if not video.is_file():
         result.checks.append(
-            CheckResult("auto-dimensions", False, f"final.mp4 없음: {output_dir}", critical=True)
+            CheckResult("auto-file-missing", False, f"final.mp4 없음: {output_dir}", critical=True)
         )
         result.evaluate()
         return result
@@ -234,24 +248,28 @@ def check_fixture(fixture_id: str, output_dir_str: str) -> FixtureResult:
     return result
 
 
-def load_manifest(manifest_path: Path) -> list[dict]:
+def load_manifest(manifest_path: Path) -> tuple[list[dict], dict]:
+    """Returns (fixtures, meta) from manifest.yaml."""
     if not _YAML_AVAILABLE:
         print("PyYAML not installed. Run: pip install pyyaml", file=sys.stderr)
         sys.exit(2)
     data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    return data.get("fixtures", [])
+    return data.get("fixtures", []), data.get("meta", {})
 
 
 def run_all(manifest_path: Path, output_json: Path) -> int:
-    fixtures = load_manifest(manifest_path)
-    threshold = 8
+    fixtures, meta = load_manifest(manifest_path)
+    threshold = int(meta.get("gate_threshold", DEFAULT_GATE_THRESHOLD))
+    required_count = int(meta.get("required_sample_count", DEFAULT_REQUIRED_SAMPLE_COUNT))
 
     results: list[FixtureResult] = []
+    skipped = 0
     for f in fixtures:
         fid = f.get("id", "unknown")
         out_dir = f.get("output_dir", "")
         if out_dir == "TBD" or not out_dir:
             print(f"  [SKIP] {fid}: output_dir not configured")
+            skipped += 1
             continue
         print(f"  [CHECK] {fid} …", end=" ", flush=True)
         r = check_fixture(fid, out_dir)
@@ -260,19 +278,44 @@ def run_all(manifest_path: Path, output_json: Path) -> int:
         print(status)
 
     pass_count = sum(1 for r in results if r.publishable)
-    total = len(results)
-    gate_pass = pass_count >= threshold and total >= 10
+    evaluated = len(results)
+    total_in_manifest = evaluated + skipped
+
+    # GATE-AUTO: any critical failure blocks release regardless of pass_count
+    any_critical = any(r.has_critical_failure for r in results)
+
+    # GATE-QUALITY: need pass_count >= threshold out of required_count total
+    # Unevaluated (skipped) fixtures count as failures against the denominator.
+    gate_pass = (
+        not any_critical
+        and pass_count >= threshold
+        and total_in_manifest >= required_count
+    )
+
+    gate_auto_fail = any_critical
+    gate_quality_fail = not gate_pass and not gate_auto_fail
 
     summary = {
-        "total_evaluated": total,
+        "total_in_manifest": total_in_manifest,
+        "total_evaluated": evaluated,
+        "skipped": skipped,
         "pass_count": pass_count,
-        "fail_count": total - pass_count,
+        "fail_count": evaluated - pass_count,
         "gate_threshold": threshold,
+        "required_sample_count": required_count,
+        "gate_auto_fail": gate_auto_fail,
+        "gate_quality_fail": gate_quality_fail,
         "gate_result": "PASS" if gate_pass else "FAIL",
         "fixtures": [asdict(r) for r in results],
     }
     output_json.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"\n결과: {pass_count}/{total} 통과 — gate {'✅ PASS' if gate_pass else '❌ FAIL'}")
+
+    gate_label = "✅ PASS" if gate_pass else "❌ FAIL"
+    print(f"\n결과: {pass_count}/{total_in_manifest} 통과 ({skipped}개 미평가) — gate {gate_label}")
+    if gate_auto_fail:
+        print("⛔ GATE-AUTO: critical 자동 검사 실패 → 릴리스 전면 차단")
+    elif gate_quality_fail:
+        print(f"⛔ GATE-QUALITY: {pass_count}/{required_count} < {threshold} → 프로덕션 릴리스 차단")
     print(f"상세 결과: {output_json}")
     return 0 if gate_pass else 1
 
@@ -295,13 +338,23 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        help="output/ directory for single fixture run",
+        help="output/ directory for single fixture run (required with --fixture)",
     )
     args = parser.parse_args()
 
+    if args.fixture and not args.output_dir:
+        print("오류: --fixture 사용 시 --output-dir 도 지정해야 합니다.", file=sys.stderr)
+        sys.exit(2)
+
     if args.fixture and args.output_dir:
         r = check_fixture(args.fixture, args.output_dir)
-        print(json.dumps(asdict(r), indent=2, ensure_ascii=False))
+        result_data = asdict(r)
+        output_json = Path(args.output)
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(
+            json.dumps(result_data, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        print(json.dumps(result_data, indent=2, ensure_ascii=False))
         sys.exit(0 if r.publishable else 1)
 
     manifest_path = Path(args.manifest)
