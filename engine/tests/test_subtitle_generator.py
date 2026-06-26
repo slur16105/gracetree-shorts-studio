@@ -172,6 +172,18 @@ class TestASSEscape:
         assert len(encoded) > 0
         assert content == encoded.decode("utf-8")
 
+    def test_crlf_in_text_does_not_leave_carriage_return(self):
+        """CRLF 입력에서 \\r이 Dialogue 텍스트 필드에 남지 않아야 한다."""
+        ast = {**SCRIPT_AST, "subtitleBlocks": [
+            {"index": 0, "text": "주님 감사합니다.\r\n오늘도 지켜주세요.", "lines": ["주님 감사합니다.", "오늘도 지켜주세요."]}
+        ]}
+        timing = {**TIMING, "subtitleBlocks": [
+            {"index": 0, "text": "주님 감사합니다.\r\n오늘도 지켜주세요.",
+             "lines": ["주님 감사합니다.", "오늘도 지켜주세요."], "startTime": 2.0, "endTime": 5.0}
+        ]}
+        content = generate_ass(ast, timing, DEFAULT_SUBTITLE_CONFIG)
+        assert "\r" not in content
+
 
 # ─────────────────────── Task 4: glyph·safe area 검증 ────────────────────────
 
@@ -191,13 +203,39 @@ class TestValidation:
         content = generate_ass(SCRIPT_AST, TIMING, DEFAULT_SUBTITLE_CONFIG, font_path=None)
         assert isinstance(content, str)
 
-    def test_non_korean_glyph_in_text_raises_error(self):
-        """한국 폰트가 지원하지 않는 한자(CJK Unified Ideographs)가 포함된 경우 오류를 발생시킨다."""
+    def test_non_korean_glyph_in_prayer_text_raises_error(self):
+        """한국 폰트가 지원하지 않는 한자(CJK Unified Ideographs)가 기도 블록에 포함된 경우."""
         ast = {**SCRIPT_AST, "subtitleBlocks": [
             {"index": 0, "text": "你好 주님", "lines": ["你好 주님"]}  # Chinese
         ]}
         timing = {**TIMING, "subtitleBlocks": [
             {"index": 0, "text": "你好 주님", "lines": ["你好 주님"], "startTime": 2.0, "endTime": 5.0}
+        ]}
+        with pytest.raises(SubtitleError) as exc:
+            generate_ass(ast, timing, DEFAULT_SUBTITLE_CONFIG)
+        assert exc.value.error_code == "GLYPH_NOT_SUPPORTED"
+
+    def test_non_korean_glyph_in_title_raises_error(self):
+        """한자가 title에 포함된 경우도 glyph 검증이 잡아야 한다."""
+        ast = {**SCRIPT_AST, "title": "主의 기도"}  # 主 = CJK
+        with pytest.raises(SubtitleError) as exc:
+            generate_ass(ast, TIMING, DEFAULT_SUBTITLE_CONFIG)
+        assert exc.value.error_code == "GLYPH_NOT_SUPPORTED"
+
+    def test_non_korean_glyph_in_scripture_raises_error(self):
+        """한자가 scripture에 포함된 경우도 glyph 검증이 잡아야 한다."""
+        ast = {**SCRIPT_AST, "scripture": "主를 사랑하고"}  # 主 = CJK
+        with pytest.raises(SubtitleError) as exc:
+            generate_ass(ast, TIMING, DEFAULT_SUBTITLE_CONFIG)
+        assert exc.value.error_code == "GLYPH_NOT_SUPPORTED"
+
+    def test_ascii_control_char_in_text_raises_error(self):
+        """제어 문자(NULL 등)는 GLYPH_NOT_SUPPORTED를 발생시켜야 한다."""
+        ast = {**SCRIPT_AST, "subtitleBlocks": [
+            {"index": 0, "text": "주님\x00감사", "lines": ["주님\x00감사"]}
+        ]}
+        timing = {**TIMING, "subtitleBlocks": [
+            {"index": 0, "text": "주님\x00감사", "lines": ["주님\x00감사"], "startTime": 2.0, "endTime": 5.0}
         ]}
         with pytest.raises(SubtitleError) as exc:
             generate_ass(ast, timing, DEFAULT_SUBTITLE_CONFIG)
@@ -286,6 +324,11 @@ class TestGenerateSubtitles:
         assert isinstance(result, Path)
         assert result.is_file()
 
+    def test_raises_subtitle_error_if_attempt_dir_missing(self, tmp_path):
+        with pytest.raises(SubtitleError) as exc:
+            generate_subtitles(SCRIPT_AST, TIMING, tmp_path / "nonexistent", DEFAULT_SUBTITLE_CONFIG)
+        assert exc.value.error_code == "OUTPUT_DIR_MISSING"
+
 
 # ─────────────────────── Golden fixture ────────────────────────
 
@@ -329,3 +372,25 @@ class TestGoldenFixture:
         parts = prayer_lines[0].split(",")
         # startTime = 2.0 → 0:00:02.00
         assert parts[1].strip() == "0:00:02.00"
+
+    def test_negative_timestamp_clamped_to_zero(self):
+        """음수 startTime은 0으로 clamp되어 유효한 ASS 타임스탬프를 생성해야 한다."""
+        timing = {**TIMING, "subtitleBlocks": [
+            {"index": 0, "startTime": -0.5, "endTime": 5.0, "text": "주님", "lines": ["주님"]},
+        ]}
+        content = generate_ass(SCRIPT_AST, timing, DEFAULT_SUBTITLE_CONFIG)
+        # Negative timestamp should be clamped: 0:00:00.00
+        prayer_lines = [l for l in content.splitlines()
+                        if "Dialogue:" in l and "주님" in l and "Prayer" in l]
+        assert len(prayer_lines) >= 1
+        parts = prayer_lines[0].split(",")
+        assert parts[1].strip() == "0:00:00.00"
+
+    def test_missing_timing_key_raises_subtitle_error(self):
+        """timing block에 startTime/endTime이 없으면 KeyError 대신 SubtitleError를 발생시킨다."""
+        timing = {**TIMING, "subtitleBlocks": [
+            {"index": 0, "text": "주님"},  # startTime/endTime 없음
+        ]}
+        with pytest.raises(SubtitleError) as exc:
+            generate_ass(SCRIPT_AST, timing, DEFAULT_SUBTITLE_CONFIG)
+        assert exc.value.error_code == "MISSING_TIMING"

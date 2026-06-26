@@ -35,6 +35,9 @@ class SubtitleConfig:
     margin_h: int = 108       # 10% of 1080
     margin_v_top: int = 192   # 10% of 1920 top
 
+    # Vertical gap between title and scripture text
+    title_scripture_gap: int = 20
+
     # 아멘 hold and fade
     amen_hold_seconds: float = 2.0
     amen_fade_out_ms: int = 500

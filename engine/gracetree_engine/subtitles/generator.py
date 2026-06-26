@@ -11,7 +11,6 @@ No file I/O in the pure generator; `generate_subtitles` handles writing.
 from __future__ import annotations
 
 import re
-import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -30,14 +29,24 @@ class SubtitleError(Exception):
 # ─────────────────────── text utilities ────────────────────────
 
 def _escape_ass(text: str) -> str:
-    """Escape ASS special characters and convert newlines to \\N."""
+    """Escape ASS special characters and convert newlines to \\N.
+
+    Strips carriage returns before conversion so CRLF input does not leave
+    stray \\r characters in the output Dialogue text field.
+    """
+    text = text.replace("\r", "")
     text = text.replace("{", "\\{").replace("}", "\\}")
     text = text.replace("\n", "\\N")
     return text
 
 
 def _format_time(seconds: float) -> str:
-    """Convert seconds to ASS timestamp H:MM:SS.CC (centiseconds)."""
+    """Convert seconds to ASS timestamp H:MM:SS.CC (centiseconds).
+
+    Clamps negative input to 0 so upstream alignment errors do not produce
+    invalid (negative) ASS timestamps.
+    """
+    seconds = max(0.0, seconds)
     total_cs = round(seconds * 100)
     h = total_cs // 360000
     total_cs %= 360000
@@ -49,9 +58,17 @@ def _format_time(seconds: float) -> str:
 
 
 def _is_supported_char(ch: str) -> bool:
-    """Return True if the character is ASCII, Hangul, or common punctuation."""
+    """Return True if the character is printable ASCII, Hangul, or common punctuation.
+
+    Line separators (\n, \r) are formatting characters converted by _escape_ass,
+    not rendered glyphs, so they are always accepted.
+    """
     cp = ord(ch)
-    if cp <= 0x7E:  # ASCII
+    # Line separators: structural, not rendered as glyphs
+    if ch in "\r\n":
+        return True
+    # Printable ASCII only (0x20 space to 0x7E tilde); reject other control chars
+    if 0x20 <= cp <= 0x7E:
         return True
     # Hangul syllables
     if 0xAC00 <= cp <= 0xD7A3:
@@ -70,17 +87,20 @@ def _is_supported_char(ch: str) -> bool:
 
 def _validate_glyphs(text: str) -> list[str]:
     """Return list of unsupported characters found in text."""
-    unsupported = []
-    for ch in text:
-        if not _is_supported_char(ch):
-            unsupported.append(ch)
-    return unsupported
+    return [ch for ch in text if not _is_supported_char(ch)]
 
 
 def _is_amen_text(text: str) -> bool:
     """Return True if text ends with 아멘 (with optional trailing punctuation)."""
     stripped = re.sub(r"[\s\.,!?·…\n]+$", "", text)
     return stripped.endswith("아멘")
+
+
+def _block_lines(block: dict[str, Any]) -> list[str]:
+    """Return lines list from a block dict (uses 'lines' key, falls back to text split)."""
+    if "lines" in block:
+        return block["lines"]
+    return block.get("text", "").split("\n")
 
 
 # ─────────────────────── validation ────────────────────────
@@ -95,10 +115,13 @@ def _validate(
     if font_path is not None and not font_path.is_file():
         raise SubtitleError("FONT_NOT_FOUND", f"폰트 파일을 찾을 수 없습니다: {font_path}")
 
-    all_text = " ".join(
-        block.get("text", "")
-        for block in timing.get("subtitleBlocks", [])
-    )
+    # Validate glyphs in title, scripture, AND prayer blocks
+    texts_to_check = [
+        script_ast.get("title", ""),
+        script_ast.get("scripture", ""),
+        *[block.get("text", "") for block in timing.get("subtitleBlocks", [])],
+    ]
+    all_text = " ".join(texts_to_check)
     unsupported = _validate_glyphs(all_text)
     if unsupported:
         chars = ", ".join(repr(c) for c in sorted(set(unsupported)))
@@ -108,7 +131,7 @@ def _validate(
         )
 
     for block in timing.get("subtitleBlocks", []):
-        lines = block.get("lines", block.get("text", "").split("\n"))
+        lines = _block_lines(block)
         if len(lines) > config.max_prayer_lines:
             raise SubtitleError(
                 "SAFE_AREA_EXCEEDED",
@@ -145,11 +168,12 @@ def _styles(config: SubtitleConfig) -> str:
             f"{alignment},{mh},{mh},{margin_v},1"
         )
 
+    scripture_v = mv + config.font_size_title + config.title_scripture_gap
     return (
         "[V4+ Styles]\n"
         f"{fmt}\n"
         f"{_style('Title', config.font_size_title, config.color_title, 8, mv)}\n"
-        f"{_style('Scripture', config.font_size_scripture, config.color_scripture, 8, mv + config.font_size_title + 20)}\n"
+        f"{_style('Scripture', config.font_size_scripture, config.color_scripture, 8, scripture_v)}\n"
         f"{_style('Prayer', config.font_size_prayer, config.color_prayer, 5, 0)}\n"
     )
 
@@ -173,7 +197,16 @@ def _events(
     ]
 
     timing_blocks = timing.get("subtitleBlocks", [])
-    first_prayer_start = timing_blocks[0]["startTime"] if timing_blocks else timing.get("voiceOffset", 2.0)
+    if timing_blocks:
+        try:
+            first_prayer_start = timing_blocks[0]["startTime"]
+        except KeyError as exc:
+            raise SubtitleError(
+                "MISSING_TIMING",
+                f"첫 번째 블록에 startTime이 없습니다: {exc}",
+            ) from exc
+    else:
+        first_prayer_start = timing.get("voiceOffset", 2.0)
 
     # Title and scripture: from 0 to first prayer start
     fi, fo = config.fade_in_ms, config.fade_out_ms
@@ -184,8 +217,14 @@ def _events(
     for i, block in enumerate(timing_blocks):
         is_last = (i == len(timing_blocks) - 1)
         text = block.get("text", "")
-        start = block["startTime"]
-        end = block["endTime"]
+        try:
+            start = block["startTime"]
+            end = block["endTime"]
+        except KeyError as exc:
+            raise SubtitleError(
+                "MISSING_TIMING",
+                f"블록 {block.get('index', i)}에 타이밍 키가 없습니다: {exc}",
+            ) from exc
 
         if is_last and _is_amen_text(text):
             end += config.amen_hold_seconds
@@ -221,7 +260,7 @@ def generate_ass(
 
     Raises
     ------
-    SubtitleError: FONT_NOT_FOUND, GLYPH_NOT_SUPPORTED, SAFE_AREA_EXCEEDED
+    SubtitleError: FONT_NOT_FOUND, GLYPH_NOT_SUPPORTED, SAFE_AREA_EXCEEDED, MISSING_TIMING
     """
     _validate(script_ast, timing, config, font_path)
     parts = [
@@ -241,9 +280,13 @@ def generate_subtitles(
 ) -> Path:
     """Generate and write subtitles.ass to attempt_dir.
 
-    Returns path to the written file.
-    Raises SubtitleError on validation failure.
+    Raises SubtitleError if attempt_dir does not exist or on validation failure.
     """
+    if not attempt_dir.is_dir():
+        raise SubtitleError(
+            "OUTPUT_DIR_MISSING",
+            f"출력 디렉토리가 존재하지 않습니다: {attempt_dir}",
+        )
     content = generate_ass(script_ast, timing, config, font_path)
     out = attempt_dir / "subtitles.ass"
     out.write_text(content, encoding="utf-8")
