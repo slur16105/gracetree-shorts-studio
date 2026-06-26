@@ -316,6 +316,28 @@ describe('openResultFolder handler', () => {
     expect(shellOpenPath).not.toHaveBeenCalled()
   })
 
+  it('uses canonicalized path for existence check and shell.openPath', async () => {
+    const jobWithDotDot: CompletedJobDto = {
+      ...completedJob,
+      resultPath: '/Users/test/AppData/GraceTreeData/jobs/../jobs/2026-06-15/output'
+    }
+    const fsExistsSync = vi.fn(() => true)
+    const shellOpenPath = vi.fn(async () => '')
+    const handler = createOpenResultFolderHandler(
+      managedRoot,
+      makeRequestEngine([jobWithDotDot]),
+      () => '33333333-3333-4333-8333-333333333333',
+      fsExistsSync,
+      shellOpenPath
+    )
+
+    await handler(jobWithDotDot.id)
+
+    const canonicalPath = '/Users/test/AppData/GraceTreeData/jobs/2026-06-15/output'
+    expect(fsExistsSync).toHaveBeenCalledWith(canonicalPath)
+    expect(shellOpenPath).toHaveBeenCalledWith(canonicalPath)
+  })
+
   it('throws when shell.openPath reports an OS error', async () => {
     const fsExistsSync = vi.fn(() => true)
     const shellOpenPath = vi.fn(async () => 'No application is associated with the file')

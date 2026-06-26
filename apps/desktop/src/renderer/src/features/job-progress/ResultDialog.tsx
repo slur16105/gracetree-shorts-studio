@@ -1,5 +1,7 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import { useEffect, useRef } from 'react'
 
+import { useFocusTrap } from '../../hooks/useFocusTrap'
+import { formatDate } from '../../utils/format-date'
 import styles from '../../styles/App.module.css'
 
 interface ResultDialogProps {
@@ -8,12 +10,6 @@ interface ResultDialogProps {
   completedAt: string
   resultPath: string
   onClose: () => void
-}
-
-function formatDate(isoString: string): string {
-  const date = new Date(isoString)
-  if (isNaN(date.getTime())) return isoString
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
 export function ResultDialog({
@@ -25,46 +21,11 @@ export function ResultDialog({
 }: ResultDialogProps): React.JSX.Element {
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const handleKeyDown = useFocusTrap(dialogRef, onClose)
 
   useEffect(() => {
     confirmButtonRef.current?.focus()
   }, [])
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-
-    if (event.key === 'Tab') {
-      const focusableElements = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]):not([tabindex="-1"])'
-        ) ?? []
-      )
-      const first = focusableElements.at(0)
-      const last = focusableElements.at(-1)
-      if (!first || !last) {
-        event.preventDefault()
-        return
-      }
-      const activeElement = document.activeElement
-      if (
-        event.shiftKey &&
-        (activeElement === first || !dialogRef.current?.contains(activeElement))
-      ) {
-        event.preventDefault()
-        last.focus()
-      } else if (
-        !event.shiftKey &&
-        (activeElement === last || !dialogRef.current?.contains(activeElement))
-      ) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-  }
 
   return (
     <div className={styles.dialogBackdrop}>

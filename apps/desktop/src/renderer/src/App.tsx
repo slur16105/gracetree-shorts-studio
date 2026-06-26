@@ -38,7 +38,14 @@ function App(): React.JSX.Element {
   const settingsWasOpen = useRef(false)
   const resultDialogPrevFocusRef = useRef<Element | null>(null)
   const loadedForJobIdRef = useRef<string | null>(null)
+  // pendingResultJobIdRef: set when we need onJobsLoaded to find this job for the dialog
+  const pendingResultJobIdRef = useRef<string | null>(null)
+  // mirrors resultDialogJob state so the completion effect can read it without a stale closure
+  const resultDialogJobRef = useRef<CompletedJobSummary | null>(null)
   const jobState = useJobRunState() ?? INITIAL_JOB_RUN_STATE
+
+  // keep ref in sync with state on every render (before effects run)
+  resultDialogJobRef.current = resultDialogJob
 
   // live region: 1초 스로틀 — cleanup 없이 타이머가 자연히 실행되어야 한다
   const [liveAnnouncement, setLiveAnnouncement] = useState('')
@@ -72,23 +79,27 @@ function App(): React.JSX.Element {
     return window.desktopApi.onJobEvent(dispatchJobEvent)
   }, [])
 
-  // 작업 완료 시 완료 목록 갱신 및 결과 다이얼로그 표시
+  // 작업 완료 시 완료 목록 갱신 및 결과 다이얼로그 표시.
+  // 다이얼로그 데이터는 CompletionList의 onJobsLoaded 콜백으로만 설정한다
+  // (App 자체 listCompletedJobs 호출 제거 → IPC 중복 방지, 비동기 경쟁 조건 제거).
   useEffect(() => {
     if (jobState.status === 'completed') {
-      if (loadedForJobIdRef.current !== jobState.jobId) {
+      // managedRoot가 아직 확인되지 않았으면 loadedForJobIdRef를 잠그지 않는다:
+      // managedRoot가 확정되면 이 effect가 재실행된다.
+      if (loadedForJobIdRef.current !== jobState.jobId && managedRoot) {
         loadedForJobIdRef.current = jobState.jobId
+        pendingResultJobIdRef.current = jobState.jobId
         setCompletionRefreshKey((k) => k + 1)
-        resultDialogPrevFocusRef.current = document.activeElement
-        if (managedRoot) {
-          void window.desktopApi.listCompletedJobs(managedRoot).then((jobs) => {
-            const job = jobs.find((j) => j.id === jobState.jobId)
-            if (job) setResultDialogJob(job)
-          })
-        }
       }
     } else {
       loadedForJobIdRef.current = null
-      setResultDialogJob(null)
+      pendingResultJobIdRef.current = null
+      // 다이얼로그가 열려 있는 상태에서 job이 비완료 상태로 전환되면 포커스를 복원 후 닫는다
+      if (resultDialogJobRef.current !== null) {
+        const prev = resultDialogPrevFocusRef.current
+        if (prev instanceof HTMLElement) prev.focus()
+        setResultDialogJob(null)
+      }
     }
   }, [jobState, managedRoot])
 
@@ -101,6 +112,19 @@ function App(): React.JSX.Element {
 
   const handleManagedRootResolved = useCallback((resolved: string) => {
     setManagedRoot((current) => (current === resolved ? current : resolved))
+  }, [])
+
+  // CompletionList 로드 완료 콜백: pendingResultJobId에 해당하는 작업이 있으면 다이얼로그 표시
+  const handleJobsLoaded = useCallback((jobs: CompletedJobSummary[]) => {
+    const pendingId = pendingResultJobIdRef.current
+    if (!pendingId) return
+    const job = jobs.find((j) => j.id === pendingId)
+    if (job) {
+      pendingResultJobIdRef.current = null
+      // 다이얼로그가 실제로 마운트되는 시점에 포커스를 캡처한다 (비동기 응답 후)
+      resultDialogPrevFocusRef.current = document.activeElement
+      setResultDialogJob(job)
+    }
   }, [])
 
   const handleResultDialogClose = useCallback(() => {
@@ -169,6 +193,7 @@ function App(): React.JSX.Element {
                 {managedRoot ? (
                   <CompletionList
                     managedRoot={managedRoot}
+                    onJobsLoaded={handleJobsLoaded}
                     refreshKey={completionRefreshKey}
                   />
                 ) : (

@@ -204,6 +204,31 @@ describe('CompletionList', () => {
     })
   })
 
+  it('onJobsLoaded가 로드 완료 후 정렬된 목록과 함께 호출된다', async () => {
+    const job = makeJob()
+    listCompletedJobs.mockResolvedValue([job])
+    const onJobsLoaded = vi.fn()
+    render(<CompletionList managedRoot={MANAGED_ROOT} onJobsLoaded={onJobsLoaded} />)
+
+    await waitFor(() => expect(onJobsLoaded).toHaveBeenCalledOnce())
+    expect(onJobsLoaded).toHaveBeenCalledWith([job])
+  })
+
+  it('openResultFolder 실패 시 오류 메시지를 표시한다', async () => {
+    const user = userEvent.setup()
+    const job = makeJob()
+    listCompletedJobs.mockResolvedValue([job])
+    openResultFolder.mockRejectedValue(new Error('엔진 오류'))
+    render(<CompletionList managedRoot={MANAGED_ROOT} />)
+
+    const openButton = await screen.findByRole('button', { name: '열기' })
+    await user.click(openButton)
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('엔진 오류')
+    })
+  })
+
   it('refreshKey 변경 시 listCompletedJobs를 다시 호출한다', async () => {
     listCompletedJobs.mockResolvedValue([])
     const { rerender } = render(<CompletionList managedRoot={MANAGED_ROOT} refreshKey={0} />)

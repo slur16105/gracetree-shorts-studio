@@ -140,20 +140,22 @@ export function createOpenResultFolderHandler(
       throw new Error(`Job not found: ${jobId}`)
     }
 
-    // 2. Validate path is within managedRoot (prevents symlink or path escape)
+    // 2. Validate path is within managedRoot.
+    // resolve() normalises '..' segments but does NOT dereference symlinks.
+    // Symlink escape is a separate OS-level concern; this guard prevents path-traversal.
     const canonicalManaged = resolve(managedRoot)
     const canonicalResult = resolve(job.resultPath)
     if (!canonicalResult.startsWith(canonicalManaged + sep)) {
       throw new Error(`Result path is outside managed root: ${job.resultPath}`)
     }
 
-    // 3. Existence check
-    if (!fsExistsSync(job.resultPath)) {
+    // 3. Existence check (use resolved path so normalised '..' forms are handled consistently)
+    if (!fsExistsSync(canonicalResult)) {
       throw new Error(`Result folder does not exist: ${job.resultPath}`)
     }
 
-    // 4. Open in OS file explorer
-    const openError = await shellOpenPath(job.resultPath)
+    // 4. Open in OS file explorer (use resolved path for consistency with the security check)
+    const openError = await shellOpenPath(canonicalResult)
     if (openError) {
       throw new Error(`Failed to open result folder: ${openError}`)
     }

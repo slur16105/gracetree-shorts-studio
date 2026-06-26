@@ -1,6 +1,7 @@
 import type { ResourceDto, ResourceType } from '@gracetree/contracts'
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
+import { useFocusTrap } from '../hooks/useFocusTrap'
 import styles from '../styles/App.module.css'
 
 interface ResourceRowConfig {
@@ -44,6 +45,7 @@ export function SettingsDialog({ managedRoot, onClose }: SettingsDialogProps): R
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const firstSelectButtonRef = useRef<HTMLButtonElement>(null)
+  const handleKeyDown = useFocusTrap(dialogRef, onClose)
 
   // Load resources when dialog opens
   useEffect(() => {
@@ -60,43 +62,6 @@ export function SettingsDialog({ managedRoot, onClose }: SettingsDialogProps): R
   useEffect(() => {
     firstSelectButtonRef.current?.focus()
   }, [])
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-
-    if (event.key === 'Tab') {
-      const focusableElements = Array.from(
-        dialogRef.current?.querySelectorAll<HTMLElement>(
-          'button:not([disabled]):not([tabindex="-1"])',
-        ) ?? [],
-      )
-      const first = focusableElements.at(0)
-      const last = focusableElements.at(-1)
-      if (!first || !last) {
-        event.preventDefault()
-        return
-      }
-
-      const activeElement = document.activeElement
-      if (
-        event.shiftKey &&
-        (activeElement === first || !dialogRef.current?.contains(activeElement))
-      ) {
-        event.preventDefault()
-        last.focus()
-      } else if (
-        !event.shiftKey &&
-        (activeElement === last || !dialogRef.current?.contains(activeElement))
-      ) {
-        event.preventDefault()
-        first.focus()
-      }
-    }
-  }
 
   const handleSelectFile = async (type: ResourceType): Promise<void> => {
     try {

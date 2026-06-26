@@ -1,33 +1,33 @@
 import type { CompletedJobSummary } from '@gracetree/contracts/desktop-api'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { formatDate } from '../../utils/format-date'
 import styles from './CompletionList.module.css'
 
 interface CompletionListProps {
   managedRoot: string
   refreshKey?: number
   onJobSelected?: (jobId: string) => void
+  onJobsLoaded?: (jobs: CompletedJobSummary[]) => void
 }
 
 type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
-function formatDate(isoString: string): string {
-  const date = new Date(isoString)
-  if (isNaN(date.getTime())) return isoString
-  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-}
-
 export function CompletionList({
   managedRoot,
   refreshKey,
-  onJobSelected
+  onJobSelected,
+  onJobsLoaded
 }: CompletionListProps): React.JSX.Element {
   const [jobs, setJobs] = useState<CompletedJobSummary[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
 
   const managedRootRef = useRef(managedRoot)
   managedRootRef.current = managedRoot
+  const onJobsLoadedRef = useRef(onJobsLoaded)
+  onJobsLoadedRef.current = onJobsLoaded
 
   const load = useCallback(async () => {
     if (!managedRootRef.current) return
@@ -40,6 +40,7 @@ export function CompletionList({
       )
       setJobs(sorted)
       setLoadState('loaded')
+      onJobsLoadedRef.current?.(sorted)
     } catch {
       setLoadState('error')
     }
@@ -63,7 +64,11 @@ export function CompletionList({
 
   function handleOpenClick(event: React.MouseEvent, job: CompletedJobSummary): void {
     event.stopPropagation()
-    void window.desktopApi.openResultFolder(job.id)
+    setOpenError(null)
+    window.desktopApi.openResultFolder(job.id).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : '폴더를 열 수 없습니다.'
+      setOpenError(message)
+    })
   }
 
   const isLoading = loadState === 'loading'
@@ -80,6 +85,12 @@ export function CompletionList({
           {isLoading ? '로딩 중…' : '새로고침'}
         </button>
       </div>
+
+      {openError ? (
+        <div className={styles.errorState} role="alert">
+          <p>{openError}</p>
+        </div>
+      ) : null}
 
       {loadState === 'error' ? (
         <div className={styles.errorState}>
