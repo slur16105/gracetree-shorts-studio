@@ -4,7 +4,7 @@ baseline_commit: 4aff6d7
 
 # Story 2.5: 스타일 ASS 자막 생성
 
-Status: review
+Status: done
 
 ## Story
 
