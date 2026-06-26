@@ -96,7 +96,7 @@ if (Test-Path $engineExe) {
     -NoNewWindow -PassThru
   $null = $proc.WaitForExit(15000)
   $out = Get-Content $stdoutFile -Raw -ErrorAction SilentlyContinue
-  if ($out -match '"type"') {
+  if ($out -match '"type"\s*:\s*"health_checked"') {
     Pass "Engine health check (bundled binary, no system Python)" "jobId: offline-win-001"
   } else {
     Fail "Engine health check" "output: $out"

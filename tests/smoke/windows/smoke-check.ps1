@@ -68,7 +68,7 @@ if (Test-Path $engineExe) {
       -NoNewWindow -PassThru
     $null = $proc.WaitForExit(10000)
     $out = Get-Content $stdoutFile -Raw -ErrorAction SilentlyContinue
-    Check "Engine health check responds" ($out -match '"type"') "output: $out"
+    Check "Engine health check responds (health_checked event)" ($out -match '"type"\s*:\s*"health_checked"') "output: $out"
   } catch {
     Check "Engine health check responds" $false $_.Exception.Message
   }

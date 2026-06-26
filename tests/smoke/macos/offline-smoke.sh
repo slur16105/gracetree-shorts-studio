@@ -88,7 +88,7 @@ fi
 if [[ -x "$ENGINE_EXE" ]]; then
   HEALTH='{"protocolVersion":1,"type":"check_health","jobId":"offline-mac-001","timestamp":"2026-06-26T00:00:00.000Z","payload":{}}'
   ENGINE_OUT=$(echo "$HEALTH" | "$ENGINE_EXE" 2>/dev/null || true)
-  if echo "$ENGINE_OUT" | grep -q '"type"'; then
+  if echo "$ENGINE_OUT" | grep -q '"type":"health_checked"'; then
     pass "Engine health check (bundled binary, no system Python)" "jobId: offline-mac-001"
   else
     fail "Engine health check" "output: $ENGINE_OUT"

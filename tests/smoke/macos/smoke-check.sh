@@ -5,17 +5,17 @@
 #   1. App bundle exists in /Applications
 #   2. Engine bundle binary exists and has +x permission
 #   3. FFmpeg and FFprobe binaries exist and have +x permission
-#   4. Engine responds to health check (JSON stdin → JSON stdout)
+#   4. Engine responds to health_checked event (not just any JSON with "type")
 #   5. FFmpeg version is readable
 #   6. Resource paths survive app bundle relocation (app copied to a temp dir)
-#   7. No quarantine xattr that would prevent execution (dev workflow only)
+#   7. No quarantine xattr on app bundle (FAIL if quarantined, warn is not enough)
 #
 # Usage:
 #   ./smoke-check.sh [--app-path "/Applications/GraceTree Shorts Studio.app"]
 #
 # Exit code: 0 = all passed, 1 = one or more failed
 
-set -uo pipefail
+set -euo pipefail
 
 APP_PATH="/Applications/GraceTree Shorts Studio.app"
 if [[ "${1:-}" == "--app-path" && -n "${2:-}" ]]; then
@@ -29,7 +29,7 @@ check() {
   local result="$2"
   local detail="${3:-}"
   if [[ "$result" == "pass" ]]; then
-    echo "[PASS] $label"
+    echo "[PASS] $label${detail:+: $detail}"
   else
     echo "[FAIL] $label${detail:+: $detail}"
     FAILURES+=("$label")
@@ -60,14 +60,18 @@ echo ""
 [[ -f "$FFPROBE_EXE" ]] && check "FFprobe binary exists"  pass || check "FFprobe binary exists"  fail "$FFPROBE_EXE"
 [[ -x "$FFPROBE_EXE" ]] && check "FFprobe is executable"  pass || check "FFprobe is executable"  fail "$FFPROBE_EXE"
 
-# 4. Engine health check
+# 4. Engine health check — must receive a 'health_checked' type event, not just any JSON
 if [[ -x "$ENGINE_EXE" ]]; then
   HEALTH_PAYLOAD='{"protocolVersion":1,"type":"check_health","jobId":"smoke-mac-001","timestamp":"2026-06-26T00:00:00.000Z","payload":{}}'
-  ENGINE_OUT=$(echo "$HEALTH_PAYLOAD" | "$ENGINE_EXE" 2>/dev/null || true)
-  if echo "$ENGINE_OUT" | grep -q '"type"'; then
-    check "Engine health check responds" pass
+  ENGINE_STDERR=$(mktemp)
+  ENGINE_OUT=$(echo "$HEALTH_PAYLOAD" | "$ENGINE_EXE" 2>"$ENGINE_STDERR" || true)
+  ENGINE_ERR=$(cat "$ENGINE_STDERR"); rm -f "$ENGINE_STDERR"
+  if echo "$ENGINE_OUT" | grep -q '"type":"health_checked"'; then
+    check "Engine health check responds (health_checked event)" pass
   else
-    check "Engine health check responds" fail "output: $ENGINE_OUT"
+    DIAG="stdout=$(echo "$ENGINE_OUT" | head -1)"
+    [[ -n "$ENGINE_ERR" ]] && DIAG="$DIAG stderr=$(echo "$ENGINE_ERR" | head -1)"
+    check "Engine health check responds (health_checked event)" fail "$DIAG"
   fi
 else
   FAILURES+=("Engine health check (skipped — binary not executable)")
@@ -86,26 +90,45 @@ else
 fi
 
 # 6. Resource resolution after app relocation
-TEMP_APP="/private/tmp/gracetree-smoke-$(date +%s).app"
+# Use $$ (PID) for uniqueness — avoids second-granularity timestamp collision in parallel runs
+TEMP_APP="/private/tmp/gracetree-smoke-$$.app"
 if [[ -d "$APP_PATH" ]]; then
-  cp -R "$APP_PATH" "$TEMP_APP"
-  RELOCATED_ENGINE="$TEMP_APP/Contents/Resources/engine/gracetree-engine/gracetree-engine"
-  [[ -x "$RELOCATED_ENGINE" ]] && check "Engine accessible after app relocation" pass \
-                                || check "Engine accessible after app relocation" fail "$RELOCATED_ENGINE"
-  rm -rf "$TEMP_APP"
+  # Run cp without -e so cp failure doesn't abort before the fail() record
+  set +e
+  cp -R "$APP_PATH" "$TEMP_APP" 2>/tmp/gracetree-cp-err-$$.txt
+  CP_STATUS=$?
+  set -e
+  if [[ $CP_STATUS -ne 0 ]]; then
+    check "Engine accessible after app relocation" fail "cp -R failed: $(cat /tmp/gracetree-cp-err-$$.txt)"
+    rm -f "/tmp/gracetree-cp-err-$$.txt"
+  else
+    rm -f "/tmp/gracetree-cp-err-$$.txt"
+    RELOCATED_ENGINE="$TEMP_APP/Contents/Resources/engine/gracetree-engine/gracetree-engine"
+    RELOCATED_FFMPEG="$TEMP_APP/Contents/Resources/ffmpeg/ffmpeg"
+    RELOCATED_FFPROBE="$TEMP_APP/Contents/Resources/ffmpeg/ffprobe"
+    [[ -x "$RELOCATED_ENGINE"  ]] && check "Engine +x after app relocation" pass \
+                                  || check "Engine +x after app relocation" fail "$RELOCATED_ENGINE"
+    [[ -x "$RELOCATED_FFMPEG"  ]] && check "FFmpeg +x after app relocation"  pass \
+                                  || check "FFmpeg +x after app relocation"  fail "$RELOCATED_FFMPEG"
+    [[ -x "$RELOCATED_FFPROBE" ]] && check "FFprobe +x after app relocation" pass \
+                                  || check "FFprobe +x after app relocation" fail "$RELOCATED_FFPROBE"
+    rm -rf "$TEMP_APP"
+  fi
 else
   FAILURES+=("App relocation check (skipped — app bundle missing)")
 fi
 
-# 7. Quarantine xattr check (warn, not fail — acceptable in dev workflow without notarization)
+# 7. Quarantine xattr check — FAIL if quarantined (Gatekeeper would block execution)
 if command -v xattr &>/dev/null; then
   QUARANTINE=$(xattr -l "$APP_PATH" 2>/dev/null | grep "com.apple.quarantine" || true)
   if [[ -z "$QUARANTINE" ]]; then
     check "No quarantine attribute on app bundle" pass
   else
-    echo "[WARN] com.apple.quarantine is set — remove with: xattr -dr com.apple.quarantine \"$APP_PATH\""
-    check "No quarantine attribute on app bundle" pass  # warn only, don't fail
+    check "No quarantine attribute on app bundle" fail \
+      "quarantine is set — remove with: xattr -dr com.apple.quarantine \"$APP_PATH\""
   fi
+else
+  FAILURES+=("Quarantine check (skipped — xattr not available)")
 fi
 
 echo ""
