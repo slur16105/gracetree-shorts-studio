@@ -65,6 +65,13 @@ jobs:
           $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
           node scripts/verify-package.mjs --installer "$($installer.FullName)" --platform win32
 
+      - name: Offline smoke test (no system Python/FFmpeg)
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem apps/desktop/dist/installer/*.exe | Select-Object -First 1
+          .\tests\smoke\windows\install.ps1 -InstallerPath "$($installer.FullName)"
+          .\tests\smoke\windows\offline-smoke.ps1 -SkipNetworkCheck
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
@@ -122,6 +129,12 @@ jobs:
         run: |
           installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
           node scripts/verify-package.mjs --installer "$installer" --platform darwin
+
+      - name: Offline smoke test (no system Python/FFmpeg)
+        run: |
+          installer=$(ls apps/desktop/dist/installer/*.dmg | head -1)
+          ./tests/smoke/macos/install.sh "$installer"
+          ./tests/smoke/macos/offline-smoke.sh --skip-network-check
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
