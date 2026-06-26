@@ -59,7 +59,7 @@ development_status:
   2-3-로컬-음성-정렬과-타이밍-생성: review
   2-4-음성-모델-성능-기준-확정: done
   2-5-스타일-ass-자막-생성: review
-  2-6-배경-영상-구성: ready-for-dev
+  2-6-배경-영상-구성: review
   2-7-오디오와-썸네일-합성: ready-for-dev
   2-8-ffmpeg-파이프라인-통합-검증: ready-for-dev
   2-9-최종-산출물-검증과-원자적-커밋: ready-for-dev
