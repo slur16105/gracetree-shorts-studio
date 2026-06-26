@@ -280,7 +280,24 @@ def _handle_start_job_streaming(
     )
 
 
+def _startup_reconciliation() -> None:
+    """비정상 종료 후 running 상태 attempt를 interrupted로 전환한다."""
+    approved_root_value = os.environ.get("GRACETREE_MANAGED_ROOT")
+    if not approved_root_value:
+        return
+    database_path = Path(approved_root_value) / "studio.db"
+    if not database_path.is_file():
+        return
+    try:
+        from .jobs.attempt_repository import AttemptRepository
+        apply_migrations(database_path)
+        AttemptRepository(database_path).interrupt_running_attempts()
+    except Exception:
+        pass  # 정리 실패 시 무시: 다음 작업 실행에 영향을 주지 않는다
+
+
 def run(stdin: TextIO, stdout: TextIO, stderr: TextIO) -> int:
+    _startup_reconciliation()
     had_error = False
     lock = threading.Lock()
     # job_id -> cancel_event; populated while start_job thread is active

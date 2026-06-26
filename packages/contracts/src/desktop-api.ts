@@ -27,6 +27,7 @@ export const RESOURCE_UPDATE_CHANNEL = "resources:update" as const;
 export const RESOURCE_SELECT_FILE_CHANNEL = "resources:select-file" as const;
 export const JOBS_LIST_COMPLETED_CHANNEL = "jobs:list-completed" as const;
 export const JOBS_OPEN_RESULT_CHANNEL = "jobs:open-result" as const;
+export const JOBS_OPEN_LOG_CHANNEL = "jobs:open-log" as const;
 
 export interface SelectedInputFile {
   name: string;
@@ -41,6 +42,13 @@ export interface InputFileCandidate {
 export interface InputRegistrationBatch {
   results: InputRegistrationResult[];
   inputs: JobInputDto[] | null;
+}
+
+export interface AppError {
+  code: string;
+  message: string;
+  recoverable: boolean;
+  details: string | null;
 }
 
 export interface DesktopApi {
@@ -76,6 +84,7 @@ export interface DesktopApi {
   selectResourceFile(resourceType: ResourceType): Promise<SelectedInputFile | null>;
   listCompletedJobs(managedRoot: string): Promise<CompletedJobSummary[]>;
   openResultFolder(jobId: string): Promise<void>;
+  openLogFolder(jobId: string, attemptId: string): Promise<void>;
   startJob(jobId: string, managedRoot: string, workPath: string): Promise<void>;
   cancelJob(jobId: string, attemptId: string): Promise<void>;
   onJobEvent(listener: (event: EngineEvent) => void): () => void;

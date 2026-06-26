@@ -280,7 +280,7 @@ describe('EngineClient.streamJob', () => {
       `${JSON.stringify(generationEvent('job_accepted', JOB_UUID_FAIL))}\n`
     )
     child.stdout.write(
-      `${JSON.stringify(generationEvent('job_failed', JOB_UUID_FAIL, { errorCode: 'PROCESS_FAILED', stageId: 'vertical_slice' }))}\n`
+      `${JSON.stringify(generationEvent('job_failed', JOB_UUID_FAIL, { errorCode: 'PROCESS_FAILED', stageId: 'vertical_slice', recoverable: false, details: null }))}\n`
     )
     await expect(done).resolves.toBeUndefined()
     client.stop()

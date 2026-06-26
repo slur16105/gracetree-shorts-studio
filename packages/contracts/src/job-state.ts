@@ -29,6 +29,8 @@ export type JobRunState =
       attemptId: string;
       errorCode: string;
       stageId: string | null;
+      recoverable: boolean;
+      details: string | null;
     }
   | {
       status: "cancelled";
@@ -105,6 +107,8 @@ export function applyJobEvent(
         attemptId: event.payload.attemptId,
         errorCode: event.payload.errorCode,
         stageId: event.payload.stageId,
+        recoverable: event.payload.recoverable,
+        details: event.payload.details,
       };
     }
 

@@ -74,6 +74,30 @@ def _run_ffmpeg_cancellable(
         raise
 
 
+def _write_attempt_log(
+    work_path: Path,
+    attempt_id: str,
+    job_id: str,
+    stage_id: str | None,
+    error_code: str,
+    cause: str,
+) -> Path:
+    """logs/<attemptId>-render_log.txt에 진단 정보를 기록하고 경로를 반환한다."""
+    logs_dir = work_path / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    log_path = logs_dir / f"{attempt_id}-render_log.txt"
+    stage_label = stage_id if stage_id else "N/A"
+    log_path.write_text(
+        f"[{_utc_now()}] Attempt {attempt_id} FAILED\n"
+        f"Job: {job_id}\n"
+        f"Stage: {stage_label}\n"
+        f"Error: {error_code}\n"
+        f"Cause: {cause}\n",
+        encoding="utf-8",
+    )
+    return log_path
+
+
 def _make_event(type_: str, job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "protocolVersion": 1,
@@ -236,10 +260,13 @@ def start_job(
             snapshot=snapshot,
         )
     except (ValueError, RuntimeError) as exc:
+        _write_attempt_log(work_path, attempt_id, job_id, None, "PROCESS_FAILED", str(exc))
         emit(_make_event("job_failed", job_id, {
             "attemptId": attempt_id,
             "errorCode": "PROCESS_FAILED",
             "stageId": None,
+            "recoverable": False,
+            "details": None,
         }))
         return
 
@@ -253,6 +280,7 @@ def start_job(
             job_id=job_id,
             attempt_id=attempt_id,
             attempt_dir=attempt_dir,
+            work_path=work_path,
             approved_root=approved_root,
             snapshot=snapshot,
             repo=repo,
@@ -271,6 +299,7 @@ def _run_start_job_stages(
     job_id: str,
     attempt_id: str,
     attempt_dir: Path,
+    work_path: Path,
     approved_root: Path,
     snapshot: dict[str, Any],
     repo: AttemptRepository,
@@ -279,6 +308,31 @@ def _run_start_job_stages(
     _align: Callable | None,
 ) -> None:
     """각 단계를 순서대로 실행한다. 취소 시 JobCancelledError를 발생시킨다."""
+
+    def _fail(
+        error_code: str,
+        stage_id: str | None,
+        recoverable: bool,
+        details: str | None,
+        cause: str,
+    ) -> None:
+        """실패 공통 처리: 로그 기록 → DB 업데이트 → 이벤트 방출 → 임시 폴더 삭제."""
+        log_path = _write_attempt_log(work_path, attempt_id, job_id, stage_id, error_code, cause)
+        repo.fail_attempt(
+            attempt_id=attempt_id,
+            error_code=error_code,
+            error_stage_id=stage_id,
+            log_path=str(log_path),
+        )
+        emit(_make_event("job_failed", job_id, {
+            "attemptId": attempt_id,
+            "errorCode": error_code,
+            "stageId": stage_id,
+            "recoverable": recoverable,
+            "details": details,
+        }))
+        shutil.rmtree(attempt_dir, ignore_errors=True)
+
     voice_path_str = _find_voice_path(snapshot)
     script_ast = snapshot.get("scriptAst")
 
@@ -286,12 +340,7 @@ def _run_start_job_stages(
         _check_cancel(cancel_event)
         voice_path = Path(voice_path_str).resolve()
         if not voice_path.is_relative_to(approved_root.resolve()):
-            repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
-            emit(_make_event("job_failed", job_id, {
-                "attemptId": attempt_id,
-                "errorCode": "PROCESS_FAILED",
-                "stageId": "speech_alignment",
-            }))
+            _fail("PROCESS_FAILED", "speech_alignment", False, None, "음성 파일 경로가 허가된 범위 밖입니다.")
             return
         align_fn = _align if _align is not None else _align_speech
         emit(_make_event("stage_started", job_id, {
@@ -312,20 +361,18 @@ def _run_start_job_stages(
                 config=DEFAULT_SPEECH_CONFIG,
             )
         except AlignmentError as exc:
-            repo.fail_attempt(attempt_id=attempt_id, error_code=exc.error_code)
-            emit(_make_event("job_failed", job_id, {
-                "attemptId": attempt_id,
-                "errorCode": exc.error_code,
-                "stageId": "speech_alignment",
-            }))
+            recoverable = exc.error_code == "PRAYER_BOUNDARY_AMBIGUOUS"
+            if recoverable:
+                details = (
+                    f"{exc} — "
+                    "스크립트의 첫 번째 기도 문장과 음성 녹음의 첫 기도 문장이 일치하는지 확인하세요."
+                )
+            else:
+                details = None
+            _fail(exc.error_code, "speech_alignment", recoverable, details, str(exc))
             return
-        except Exception:
-            repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
-            emit(_make_event("job_failed", job_id, {
-                "attemptId": attempt_id,
-                "errorCode": "PROCESS_FAILED",
-                "stageId": "speech_alignment",
-            }))
+        except Exception as exc:
+            _fail("PROCESS_FAILED", "speech_alignment", False, None, "음성 정렬 중 처리 오류가 발생했습니다.")
             return
         _check_cancel(cancel_event)
         emit(_make_event("progress", job_id, {
@@ -370,12 +417,7 @@ def _run_start_job_stages(
     except JobCancelledError:
         raise
     except (FileNotFoundError, subprocess.TimeoutExpired):
-        repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
-        emit(_make_event("job_failed", job_id, {
-            "attemptId": attempt_id,
-            "errorCode": "PROCESS_FAILED",
-            "stageId": "vertical_slice",
-        }))
+        _fail("PROCESS_FAILED", "vertical_slice", False, None, "FFmpeg 실행 실패 또는 시간 초과.")
         return
 
     _check_cancel(cancel_event)
@@ -387,12 +429,7 @@ def _run_start_job_stages(
     }))
 
     if result.returncode != 0:
-        repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
-        emit(_make_event("job_failed", job_id, {
-            "attemptId": attempt_id,
-            "errorCode": "PROCESS_FAILED",
-            "stageId": "vertical_slice",
-        }))
+        _fail("PROCESS_FAILED", "vertical_slice", False, None, "FFmpeg 비정상 종료.")
         return
 
     emit(_make_event("progress", job_id, {
@@ -402,12 +439,7 @@ def _run_start_job_stages(
     }))
 
     if not _verify_mp4(artifact_path):
-        repo.fail_attempt(attempt_id=attempt_id, error_code="PROCESS_FAILED")
-        emit(_make_event("job_failed", job_id, {
-            "attemptId": attempt_id,
-            "errorCode": "PROCESS_FAILED",
-            "stageId": "vertical_slice",
-        }))
+        _fail("PROCESS_FAILED", "vertical_slice", False, None, "생성된 MP4 파일 검증 실패.")
         return
 
     artifact_name = artifact_path.name

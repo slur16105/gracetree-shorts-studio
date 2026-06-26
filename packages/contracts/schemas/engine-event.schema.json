@@ -504,11 +504,13 @@
         "payload": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["attemptId", "errorCode", "stageId"],
+          "required": ["attemptId", "errorCode", "stageId", "recoverable", "details"],
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
             "errorCode": { "type": "string", "minLength": 1 },
-            "stageId": { "oneOf": [{ "enum": ["speech_alignment", "vertical_slice"] }, { "type": "null" }] }
+            "stageId": { "oneOf": [{ "enum": ["speech_alignment", "vertical_slice"] }, { "type": "null" }] },
+            "recoverable": { "type": "boolean" },
+            "details": { "type": ["string", "null"] }
           }
         }
       }

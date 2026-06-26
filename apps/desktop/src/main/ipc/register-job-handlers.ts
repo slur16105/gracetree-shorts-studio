@@ -12,6 +12,7 @@ import {
   JOB_GET_OR_CREATE_CHANNEL,
   JOB_START_CHANNEL,
   JOBS_LIST_COMPLETED_CHANNEL,
+  JOBS_OPEN_LOG_CHANNEL,
   JOBS_OPEN_RESULT_CHANNEL,
   type CompletedJobSummary
 } from '@gracetree/contracts/desktop-api'
@@ -192,6 +193,27 @@ export function registerJobHandlers(
     return openResultFolder(jobId)
   })
 
+  // job start-to-log-path cache for openLogFolder
+  const jobWorkPaths = new Map<string, string>()
+  ipcMain.handle(JOBS_OPEN_LOG_CHANNEL, async (_event, jobId: unknown, _attemptId: unknown) => {
+    if (typeof jobId !== 'string') {
+      throw new Error('openLogFolder args invalid')
+    }
+    const storedWorkPath = jobWorkPaths.get(jobId)
+    if (!storedWorkPath) {
+      throw new Error('Log folder not available for this job')
+    }
+    const logDir = resolve(storedWorkPath, 'logs')
+    const canonicalManaged = resolve(managedRoot)
+    if (!logDir.startsWith(canonicalManaged + sep)) {
+      throw new Error('Log folder is outside managed root')
+    }
+    const openError = await shell.openPath(logDir)
+    if (openError) {
+      throw new Error(`Failed to open log folder: ${openError}`)
+    }
+  })
+
   ipcMain.handle(
     JOB_START_CHANNEL,
     (event, jobId: unknown, jobManagedRoot: unknown, workPath: unknown) => {
@@ -202,6 +224,7 @@ export function registerJobHandlers(
       ) {
         throw new Error('startJob args invalid')
       }
+      jobWorkPaths.set(jobId, workPath)
       return jobService.startJob(event.sender, jobId, jobManagedRoot, workPath)
     }
   )

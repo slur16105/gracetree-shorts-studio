@@ -55,13 +55,17 @@ function completed(): EngineEvent {
   };
 }
 
-function failed(errorCode = "PROCESS_FAILED"): EngineEvent {
+function failed(
+  errorCode = "PROCESS_FAILED",
+  recoverable = false,
+  details: string | null = null,
+): EngineEvent {
   return {
     protocolVersion: 1,
     type: "job_failed",
     jobId: JOB_ID,
     timestamp: TS,
-    payload: { attemptId: ATTEMPT_ID, errorCode, stageId: "vertical_slice" },
+    payload: { attemptId: ATTEMPT_ID, errorCode, stageId: "vertical_slice", recoverable, details },
   };
 }
 
@@ -164,10 +168,21 @@ describe("applyJobEvent — terminal events", () => {
     });
   });
 
-  it("job_failed transitions to failed with errorCode", () => {
+  it("job_failed transitions to failed with errorCode, recoverable, details", () => {
     let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID);
     s = applyJobEvent(s, failed(), JOB_ID);
-    expect(s).toMatchObject({ status: "failed", errorCode: "PROCESS_FAILED" });
+    expect(s).toMatchObject({ status: "failed", errorCode: "PROCESS_FAILED", recoverable: false, details: null });
+  });
+
+  it("job_failed with recoverable=true and details propagates to state", () => {
+    let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID);
+    s = applyJobEvent(s, failed("PRAYER_BOUNDARY_AMBIGUOUS", true, "기도 시작 문장을 확인해 주세요."), JOB_ID);
+    expect(s).toMatchObject({
+      status: "failed",
+      errorCode: "PRAYER_BOUNDARY_AMBIGUOUS",
+      recoverable: true,
+      details: "기도 시작 문장을 확인해 주세요.",
+    });
   });
 
   it("job_cancelled from running transitions to cancelled", () => {
@@ -195,7 +210,7 @@ describe("applyJobEvent — terminal events", () => {
     const running = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID) as Extract<JobRunState, { status: "running" }>;
     const cancelling: JobRunState = { status: "cancelling", jobId: running.jobId, attemptId: running.attemptId };
     const after = applyJobEvent(cancelling, failed(), JOB_ID);
-    expect(after).toMatchObject({ status: "failed", errorCode: "PROCESS_FAILED" });
+    expect(after).toMatchObject({ status: "failed", errorCode: "PROCESS_FAILED", recoverable: false, details: null });
   });
 
   it("job_cancelled is ignored when already completed (late cancel)", () => {

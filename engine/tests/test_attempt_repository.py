@@ -153,3 +153,74 @@ def test_get_snapshot_returns_none_for_unknown_attempt(tmp_path: Path) -> None:
     db = _setup_db(tmp_path)
     repo = AttemptRepository(db)
     assert repo.get_snapshot(attempt_id=ATTEMPT_ID) is None
+
+
+def test_fail_attempt_stores_error_stage_id_and_log_path(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    repo = AttemptRepository(db)
+    repo.create_attempt(attempt_id=ATTEMPT_ID, job_id=JOB_ID, snapshot={"inputs": []})
+
+    repo.fail_attempt(
+        attempt_id=ATTEMPT_ID,
+        error_code="PRAYER_BOUNDARY_AMBIGUOUS",
+        error_stage_id="speech_alignment",
+        log_path="/managed/logs/test-render_log.txt",
+    )
+
+    with connect_database(db) as conn:
+        attempt = conn.execute(
+            "SELECT status, error_code, error_stage_id, log_path FROM job_attempts WHERE id = ?",
+            (ATTEMPT_ID,),
+        ).fetchone()
+
+    assert attempt["status"] == "failed"
+    assert attempt["error_code"] == "PRAYER_BOUNDARY_AMBIGUOUS"
+    assert attempt["error_stage_id"] == "speech_alignment"
+    assert attempt["log_path"] == "/managed/logs/test-render_log.txt"
+
+
+def test_interrupt_running_attempts_sets_interrupted_status(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    repo = AttemptRepository(db)
+    repo.create_attempt(attempt_id=ATTEMPT_ID, job_id=JOB_ID, snapshot={"inputs": []})
+
+    count = repo.interrupt_running_attempts()
+
+    assert count == 1
+    with connect_database(db) as conn:
+        attempt = conn.execute(
+            "SELECT status FROM job_attempts WHERE id = ?", (ATTEMPT_ID,)
+        ).fetchone()
+        job = conn.execute(
+            "SELECT status, running_attempt_id FROM jobs WHERE id = ?", (JOB_ID,)
+        ).fetchone()
+
+    assert attempt["status"] == "interrupted"
+    assert job["status"] == "interrupted"
+    assert job["running_attempt_id"] is None
+
+
+def test_interrupt_running_attempts_is_idempotent(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    repo = AttemptRepository(db)
+    repo.create_attempt(attempt_id=ATTEMPT_ID, job_id=JOB_ID, snapshot={"inputs": []})
+    repo.interrupt_running_attempts()
+
+    count = repo.interrupt_running_attempts()
+    assert count == 0
+
+
+def test_interrupt_running_attempts_skips_completed(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    repo = AttemptRepository(db)
+    repo.create_attempt(attempt_id=ATTEMPT_ID, job_id=JOB_ID, snapshot={"inputs": []})
+    repo.complete_attempt(attempt_id=ATTEMPT_ID, artifact_path="/output/out.mp4")
+
+    count = repo.interrupt_running_attempts()
+    assert count == 0
+
+    with connect_database(db) as conn:
+        attempt = conn.execute(
+            "SELECT status FROM job_attempts WHERE id = ?", (ATTEMPT_ID,)
+        ).fetchone()
+    assert attempt["status"] == "completed"

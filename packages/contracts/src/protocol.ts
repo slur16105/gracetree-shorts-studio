@@ -335,6 +335,8 @@ export interface JobFailedEvent {
     attemptId: string;
     errorCode: string;
     stageId: GenerationStage | null;
+    recoverable: boolean;
+    details: string | null;
   };
 }
 

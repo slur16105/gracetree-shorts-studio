@@ -11,7 +11,7 @@ from gracetree_engine.storage.migrations import apply_migrations, connect_databa
 def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
     database_path = tmp_path / "studio.db"
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4, 5]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6]
     assert apply_migrations(database_path) == []
 
     with connect_database(database_path) as connection:
@@ -21,7 +21,7 @@ def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()
         columns = connection.execute("PRAGMA table_info(jobs)").fetchall()
 
-    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,)]
+    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,), (6,)]
     assert tuple(foreign_keys) == (1,)
     assert {column[1] for column in columns} >= {
         "id",
@@ -43,7 +43,7 @@ def test_upgrades_a_previous_schema_database(tmp_path: Path) -> None:
             "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
         )
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4, 5]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6]
 
 
 def test_applies_002_to_a_story_1_3_database(tmp_path: Path) -> None:
@@ -284,6 +284,61 @@ def test_applies_005_to_story_2_1_database_and_preserves_rows(
     assert job_row["running_attempt_id"] is None
     assert attempt_columns >= {"id", "job_id", "snapshot_json", "status", "started_at", "ended_at", "artifact_path", "error_code"}
     assert updated_job["running_attempt_id"] == "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+
+def test_applies_006_adds_interrupted_status_and_new_columns(
+    tmp_path: Path,
+) -> None:
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    source_dir = Path(__file__).resolve().parents[1] / "migrations"
+    for name in (
+        "001_create_jobs.sql",
+        "002_create_job_inputs.sql",
+        "003_classify_job_inputs.sql",
+        "004_create_resources.sql",
+        "005_create_job_attempts.sql",
+    ):
+        (migrations_dir / name).write_text(
+            (source_dir / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    database_path = tmp_path / "studio.db"
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [1, 2, 3, 4, 5]
+
+    job_id = "11111111-1111-4111-8111-111111111111"
+    attempt_id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    with connect_database(database_path) as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, publish_date, status, title, work_path, result_path, created_at, updated_at) VALUES (?, '2026-06-26', 'running', NULL, ?, ?, ?, ?)",
+            (job_id, str(tmp_path), str(tmp_path / "output"), "2026-06-26T00:00:00.000Z", "2026-06-26T00:00:00.000Z"),
+        )
+        connection.execute(
+            "INSERT INTO job_attempts (id, job_id, snapshot_json, status, started_at) VALUES (?, ?, ?, 'running', ?)",
+            (attempt_id, job_id, '{"inputs": []}', "2026-06-26T00:00:00.000Z"),
+        )
+        connection.execute("UPDATE jobs SET running_attempt_id = ? WHERE id = ?", (attempt_id, job_id))
+
+    (migrations_dir / "006_add_interrupted_status.sql").write_text(
+        (source_dir / "006_add_interrupted_status.sql").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [6]
+
+    with connect_database(database_path) as connection:
+        attempt_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(job_attempts)").fetchall()
+        }
+        # Verify 'interrupted' is now a valid status
+        connection.execute(
+            "UPDATE job_attempts SET status = 'interrupted' WHERE id = ?", (attempt_id,)
+        )
+        attempt = connection.execute("SELECT status, error_stage_id, log_path FROM job_attempts WHERE id = ?", (attempt_id,)).fetchone()
+
+    assert attempt_columns >= {"id", "job_id", "snapshot_json", "status", "started_at", "ended_at", "artifact_path", "error_code", "error_stage_id", "log_path"}
+    assert attempt["status"] == "interrupted"
+    assert attempt["error_stage_id"] is None
+    assert attempt["log_path"] is None
 
 
 def test_rejects_duplicate_migration_versions_before_opening_database(

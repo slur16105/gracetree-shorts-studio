@@ -840,3 +840,120 @@ class TestStartJobCancellation:
         types = [e["type"] for e in emitted]
         assert "job_cancelled" in types
         assert "job_completed" not in types
+
+
+# ──────────────────────────── failure diagnostics tests ─────────────────────
+
+class TestFailureDiagnostics:
+    """AC 1~5: 실패 시 log 기록, temp 정리, recoverable/details 필드, 단일 job_failed."""
+
+    def _run_failing_ffmpeg(self, tmp_path):
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", side_effect=FileNotFoundError("ffmpeg not found")):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        return emitted, work_path, db_path, managed_root, job_id
+
+    def test_job_failed_payload_has_recoverable_and_details_fields(self, tmp_path):
+        emitted, *_ = self._run_failing_ffmpeg(tmp_path)
+
+        failed_event = next(e for e in emitted if e["type"] == "job_failed")
+        payload = failed_event["payload"]
+        assert "recoverable" in payload
+        assert "details" in payload
+        assert payload["recoverable"] is False
+        assert payload["details"] is None
+
+    def test_only_one_job_failed_event_per_run(self, tmp_path):
+        emitted, *_ = self._run_failing_ffmpeg(tmp_path)
+
+        failed_events = [e for e in emitted if e["type"] == "job_failed"]
+        assert len(failed_events) == 1
+
+    def test_temp_dir_deleted_on_failure(self, tmp_path):
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        with mock.patch("subprocess.run", side_effect=FileNotFoundError("ffmpeg not found")):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        attempt_id = next(e for e in emitted if e["type"] == "job_accepted")["payload"]["attemptId"]
+        attempt_temp_dir = work_path / "temp" / "attempts" / attempt_id
+        assert not attempt_temp_dir.exists(), "attempt temp dir must be deleted on failure"
+
+    def test_log_file_preserved_on_failure(self, tmp_path):
+        emitted, work_path, *_ = self._run_failing_ffmpeg(tmp_path)
+
+        attempt_id = next(e for e in emitted if e["type"] == "job_accepted")["payload"]["attemptId"]
+        log_file = work_path / "logs" / f"{attempt_id}-render_log.txt"
+        assert log_file.is_file(), "log file must exist at logs/<attemptId>-render_log.txt"
+        content = log_file.read_text(encoding="utf-8")
+        assert "PROCESS_FAILED" in content
+
+    def test_prayer_boundary_ambiguous_is_recoverable_with_details(self, tmp_path):
+        def _failing_align(voice_path, script_ast, attempt_dir, config):
+            raise AlignmentError("PRAYER_BOUNDARY_AMBIGUOUS", "후보가 0개입니다")
+
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        job_id, voice_path = _setup_db_with_voice(tmp_path, managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        base_snapshot = {
+            "inputs": [{"id": "x", "role": "voice", "managedPath": str(voice_path), "status": "ready"}],
+            "resources": {},
+            "scriptAst": _AST_ONE_BLOCK,
+        }
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg), \
+             mock.patch("gracetree_engine.jobs.orchestrator._take_job_snapshot", return_value=base_snapshot):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append, _align=_failing_align)
+
+        failed = next(e for e in emitted if e["type"] == "job_failed")
+        assert failed["payload"]["recoverable"] is True
+        assert failed["payload"]["details"] is not None
+        assert "확인" in failed["payload"]["details"]
+
+    def test_log_file_contains_stage_and_error_code(self, tmp_path):
+        def _failing_align(voice_path, script_ast, attempt_dir, config):
+            raise AlignmentError("PRAYER_BOUNDARY_AMBIGUOUS", "후보 없음")
+
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        job_id, voice_path = _setup_db_with_voice(tmp_path, managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        base_snapshot = {
+            "inputs": [{"id": "x", "role": "voice", "managedPath": str(voice_path), "status": "ready"}],
+            "resources": {},
+            "scriptAst": _AST_ONE_BLOCK,
+        }
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg), \
+             mock.patch("gracetree_engine.jobs.orchestrator._take_job_snapshot", return_value=base_snapshot):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append, _align=_failing_align)
+
+        attempt_id = next(e for e in emitted if e["type"] == "job_accepted")["payload"]["attemptId"]
+        log_file = work_path / "logs" / f"{attempt_id}-render_log.txt"
+        assert log_file.is_file()
+        content = log_file.read_text(encoding="utf-8")
+        assert "PRAYER_BOUNDARY_AMBIGUOUS" in content
+        assert "speech_alignment" in content

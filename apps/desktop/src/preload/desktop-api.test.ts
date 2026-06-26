@@ -56,6 +56,7 @@ describe('desktopApi bridge surface', () => {
       'selectResourceFile',
       'listCompletedJobs',
       'openResultFolder',
+      'openLogFolder',
       'startJob',
       'cancelJob',
       'onJobEvent'
@@ -137,6 +138,7 @@ describe('desktopApi bridge surface', () => {
       'selectResourceFile',
       'listCompletedJobs',
       'openResultFolder',
+      'openLogFolder',
       'startJob',
       'cancelJob',
       'onJobEvent'

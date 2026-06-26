@@ -5,7 +5,9 @@ import { SidebarIcon } from './components/SidebarIcon'
 import { GuideView } from './features/guide/GuideView'
 import { CompletionList } from './features/job-history/CompletionList'
 import { JobEditor } from './features/job-editor/JobEditor'
+import { FailedResultDialog } from './features/job-progress/FailedResultDialog'
 import { ResultDialog } from './features/job-progress/ResultDialog'
+import { errorMessage } from './features/job-progress/error-labels'
 import { INITIAL_JOB_RUN_STATE } from '@gracetree/contracts/job-state'
 import type { CompletedJobSummary } from '@gracetree/contracts/desktop-api'
 import {
@@ -24,7 +26,7 @@ function getStatusLabel(state: ReturnType<typeof useJobRunState>): string {
   }
   if (state.status === 'cancelling') return '취소 중...'
   if (state.status === 'completed') return '생성 완료'
-  if (state.status === 'failed') return `오류: ${state.errorCode}`
+  if (state.status === 'failed') return `오류: ${errorMessage(state.errorCode)}`
   if (state.status === 'cancelled') return '취소됨'
   return '대기 중'
 }
@@ -32,6 +34,7 @@ function getStatusLabel(state: ReturnType<typeof useJobRunState>): string {
 function App(): React.JSX.Element {
   const [view, setView] = useState<View>('home')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [failedDialogOpen, setFailedDialogOpen] = useState(false)
   const [managedRoot, setManagedRoot] = useState('')
   const [completionRefreshKey, setCompletionRefreshKey] = useState(0)
   const [resultDialogJob, setResultDialogJob] = useState<CompletedJobSummary | null>(null)
@@ -92,7 +95,18 @@ function App(): React.JSX.Element {
         pendingResultJobIdRef.current = jobState.jobId
         setCompletionRefreshKey((k) => k + 1)
       }
+      setFailedDialogOpen(false)
+    } else if (jobState.status === 'failed') {
+      setFailedDialogOpen(true)
+      loadedForJobIdRef.current = null
+      pendingResultJobIdRef.current = null
+      if (resultDialogJobRef.current !== null) {
+        const prev = resultDialogPrevFocusRef.current
+        if (prev instanceof HTMLElement) prev.focus()
+        setResultDialogJob(null)
+      }
     } else {
+      setFailedDialogOpen(false)
       loadedForJobIdRef.current = null
       pendingResultJobIdRef.current = null
       // 다이얼로그가 열려 있는 상태에서 job이 비완료 상태로 전환되면 포커스를 복원 후 닫는다
@@ -244,6 +258,20 @@ function App(): React.JSX.Element {
           publishDate={resultDialogJob.publishDate}
           resultPath={resultDialogJob.resultPath}
           title={resultDialogJob.title}
+        />
+      ) : null}
+
+      {failedDialogOpen && jobState.status === 'failed' ? (
+        <FailedResultDialog
+          attemptId={jobState.attemptId}
+          details={jobState.details}
+          errorCode={jobState.errorCode}
+          jobId={jobState.jobId}
+          message={errorMessage(jobState.errorCode)}
+          onClose={() => setFailedDialogOpen(false)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          recoverable={jobState.recoverable}
+          stageId={jobState.stageId}
         />
       ) : null}
     </div>

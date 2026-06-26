@@ -88,6 +88,8 @@ class AttemptRepository:
         *,
         attempt_id: str,
         error_code: str,
+        error_stage_id: str | None = None,
+        log_path: str | None = None,
     ) -> None:
         """attempt를 failed로 전환하고 jobs.running_attempt_id를 지운다."""
         now = _utc_now()
@@ -96,10 +98,10 @@ class AttemptRepository:
             conn.execute(
                 """
                 UPDATE job_attempts
-                SET status = 'failed', ended_at = ?, error_code = ?
+                SET status = 'failed', ended_at = ?, error_code = ?, error_stage_id = ?, log_path = ?
                 WHERE id = ? AND status = 'running'
                 """,
-                (now, error_code, attempt_id),
+                (now, error_code, error_stage_id, log_path, attempt_id),
             )
             conn.execute(
                 """
@@ -131,6 +133,27 @@ class AttemptRepository:
                 """,
                 (now, attempt_id),
             )
+
+    def interrupt_running_attempts(self) -> int:
+        """startup reconciliation: running 상태 attempt를 interrupted로 전환한다.
+
+        앱이 비정상 종료된 경우 running으로 남은 attempt를 정리한다.
+        반환값: 전환된 attempt 수.
+        """
+        now = _utc_now()
+        with connect_database(self._database_path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            result = conn.execute(
+                "UPDATE job_attempts SET status = 'interrupted', ended_at = ? WHERE status = 'running'",
+                (now,),
+            )
+            count = result.rowcount
+            # jobs.running_attempt_id IS NOT NULL implies status='running' by design invariant
+            conn.execute(
+                "UPDATE jobs SET running_attempt_id = NULL, status = 'interrupted', updated_at = ? WHERE running_attempt_id IS NOT NULL",
+                (now,),
+            )
+        return count
 
     def get_snapshot(self, *, attempt_id: str) -> dict[str, Any] | None:
         with connect_database(self._database_path) as conn:

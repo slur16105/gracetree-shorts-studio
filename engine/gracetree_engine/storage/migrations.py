@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,13 @@ def connect_database(database_path: Path) -> sqlite3.Connection:
     connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     return connection
+
+
+def _split_sql(sql: str) -> list[str]:
+    """세미콜론으로 SQL을 개별 문장으로 분리한다. 단일행 주석은 제거한다."""
+    sql = re.sub(r"--[^\n]*", "", sql)
+    statements = [s.strip() for s in sql.split(";")]
+    return [s for s in statements if s]
 
 
 def apply_migrations(
@@ -54,13 +62,24 @@ def apply_migrations(
                 .isoformat(timespec="milliseconds")
                 .replace("+00:00", "Z")
             )
-            connection.executescript(
-                "BEGIN IMMEDIATE;\n"
-                f"{sql}\n"
-                "INSERT INTO schema_migrations(version, applied_at) "
-                f"VALUES ({version}, '{applied_at}');\n"
-                "COMMIT;"
-            )
+            # Python의 묵시적 트랜잭션 관리가 ALTER TABLE RENAME 등 DDL 시퀀스를 방해하지
+            # 않도록 autocommit 모드(isolation_level=None)에서 직접 BEGIN/COMMIT을 제어한다.
+            prev_isolation = connection.isolation_level
+            connection.isolation_level = None
+            try:
+                connection.execute("BEGIN IMMEDIATE")
+                for statement in _split_sql(sql):
+                    connection.execute(statement)
+                connection.execute(
+                    "INSERT INTO schema_migrations(version, applied_at) "
+                    f"VALUES ({version}, '{applied_at}')"
+                )
+                connection.execute("COMMIT")
+            except Exception:
+                connection.execute("ROLLBACK")
+                raise
+            finally:
+                connection.isolation_level = prev_isolation
             applied.append(version)
 
     return applied
