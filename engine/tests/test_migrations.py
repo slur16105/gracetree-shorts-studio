@@ -11,7 +11,7 @@ from gracetree_engine.storage.migrations import apply_migrations, connect_databa
 def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
     database_path = tmp_path / "studio.db"
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6, 7]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6, 7, 8]
     assert apply_migrations(database_path) == []
 
     with connect_database(database_path) as connection:
@@ -21,7 +21,7 @@ def test_applies_migrations_once_to_an_empty_database(tmp_path: Path) -> None:
         foreign_keys = connection.execute("PRAGMA foreign_keys").fetchone()
         columns = connection.execute("PRAGMA table_info(jobs)").fetchall()
 
-    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
+    assert [tuple(row) for row in versions] == [(1,), (2,), (3,), (4,), (5,), (6,), (7,), (8,)]
     assert tuple(foreign_keys) == (1,)
     assert {column[1] for column in columns} >= {
         "id",
@@ -43,7 +43,7 @@ def test_upgrades_a_previous_schema_database(tmp_path: Path) -> None:
             "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
         )
 
-    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6, 7]
+    assert apply_migrations(database_path) == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 def test_applies_002_to_a_story_1_3_database(tmp_path: Path) -> None:
@@ -379,6 +379,52 @@ def test_applies_007_adds_regeneration_support_columns(
 
     assert "is_regeneration" in attempt_columns
     assert "pending_artifact_path" in job_columns
+
+
+def test_applies_008_adds_completed_at_to_jobs(
+    tmp_path: Path,
+) -> None:
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    source_dir = Path(__file__).resolve().parents[1] / "migrations"
+    for name in (
+        "001_create_jobs.sql",
+        "002_create_job_inputs.sql",
+        "003_classify_job_inputs.sql",
+        "004_create_resources.sql",
+        "005_create_job_attempts.sql",
+        "006_add_interrupted_status.sql",
+        "007_add_regeneration_support.sql",
+    ):
+        (migrations_dir / name).write_text(
+            (source_dir / name).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    database_path = tmp_path / "studio.db"
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [1, 2, 3, 4, 5, 6, 7]
+
+    job_id = "11111111-1111-4111-8111-111111111111"
+    with connect_database(database_path) as connection:
+        connection.execute(
+            "INSERT INTO jobs (id, publish_date, status, title, work_path, result_path, created_at, updated_at) VALUES (?, '2026-06-20', 'completed', NULL, ?, ?, ?, ?)",
+            (job_id, str(tmp_path), str(tmp_path / "output"), "2026-06-20T00:00:00.000Z", "2026-06-25T00:00:00.000Z"),
+        )
+
+    (migrations_dir / "008_add_completed_at_to_jobs.sql").write_text(
+        (source_dir / "008_add_completed_at_to_jobs.sql").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    assert apply_migrations(database_path, migrations_dir=migrations_dir) == [8]
+
+    with connect_database(database_path) as connection:
+        job_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(jobs)").fetchall()
+        }
+        row = connection.execute("SELECT completed_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+
+    assert "completed_at" in job_columns
+    # 기존 completed 행에는 updated_at 값이 backfill되어야 함
+    assert row["completed_at"] == "2026-06-25T00:00:00.000Z"
 
 
 def test_rejects_duplicate_migration_versions_before_opening_database(

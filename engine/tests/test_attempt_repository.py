@@ -377,16 +377,18 @@ def test_interrupt_regen_attempt_restores_completed_status(tmp_path: Path) -> No
     assert job["pending_artifact_path"] is None
 
 
-def test_reconcile_pending_artifact_completes_when_file_missing(tmp_path: Path) -> None:
-    """AC 5: crash 후 파일이 이미 이동되었으면 DB만 업데이트한다."""
+def test_reconcile_pending_artifact_completes_when_file_already_moved(tmp_path: Path) -> None:
+    """AC 5: crash 후 파일이 이미 output으로 이동되었으면 DB만 업데이트한다."""
     db = _setup_db(tmp_path)
     repo = AttemptRepository(db)
     repo.create_attempt(attempt_id=ATTEMPT_ID, job_id=JOB_ID, snapshot={"inputs": []})
-    # Simulate crash between file-move and DB update: pending_artifact_path set but file gone
+    # staging path that no longer exists (file was already moved to output before crash)
     staging = str(tmp_path / "staging" / "out.mp4")
     repo.mark_artifact_commit_pending(job_id=JOB_ID, artifact_path=staging)
-    # staging file does NOT exist (simulate: already renamed to output before crash)
-    output_path = str(tmp_path / "jobs" / "2026-06-25" / "output" / "out.mp4")
+    # output file already exists (rename completed but DB update did not)
+    output_dir = tmp_path / "jobs" / "2026-06-25" / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "out.mp4").write_bytes(b"mp4data")
 
     repo.reconcile_pending_artifacts()
 

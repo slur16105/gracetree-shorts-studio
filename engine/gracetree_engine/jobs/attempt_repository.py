@@ -103,10 +103,10 @@ class AttemptRepository:
                 """
                 UPDATE jobs
                 SET running_attempt_id = NULL, status = 'completed',
-                    pending_artifact_path = NULL, updated_at = ?
+                    pending_artifact_path = NULL, completed_at = ?, updated_at = ?
                 WHERE running_attempt_id = ?
                 """,
-                (now, attempt_id),
+                (now, now, attempt_id),
             )
 
     def fail_attempt(
@@ -185,14 +185,15 @@ class AttemptRepository:
         반환값: 전환된 attempt 수.
         """
         now = _utc_now()
-        count = 0
+        # read without write lock first to avoid unnecessary BEGIN IMMEDIATE on no-op startup
         with connect_database(self._database_path) as conn:
-            conn.execute("BEGIN IMMEDIATE")
             running = conn.execute(
                 "SELECT id, job_id, is_regeneration FROM job_attempts WHERE status = 'running'"
             ).fetchall()
-            if not running:
-                return 0
+        if not running:
+            return 0
+        with connect_database(self._database_path) as conn:
+            conn.execute("BEGIN IMMEDIATE")
             for row in running:
                 conn.execute(
                     "UPDATE job_attempts SET status = 'interrupted', ended_at = ? WHERE id = ?",
@@ -208,8 +209,12 @@ class AttemptRepository:
                     """,
                     (new_job_status, now, row["job_id"]),
                 )
-                count += 1
-        return count
+            # 고아 job 안전망: job_attempts에 running 행이 없지만 jobs.running_attempt_id가 남은 경우
+            conn.execute(
+                "UPDATE jobs SET running_attempt_id = NULL, status = 'interrupted', updated_at = ? WHERE running_attempt_id IS NOT NULL",
+                (now,),
+            )
+        return len(running)
 
     def reconcile_pending_artifacts(self) -> None:
         """startup reconciliation: pending_artifact_path 마커가 있는 job의 artifact commit을 완료한다.
@@ -234,6 +239,20 @@ class AttemptRepository:
             if staging_path.exists():
                 output_dir.mkdir(parents=True, exist_ok=True)
                 os.replace(str(staging_path), str(output_path))
+            elif not output_path.exists():
+                # staging 파일도 output 파일도 없음 → commit 이전에 crash
+                # 기존 output을 복원할 수 없으므로 interrupted로 처리
+                with connect_database(self._database_path) as conn:
+                    conn.execute("BEGIN IMMEDIATE")
+                    conn.execute(
+                        "UPDATE job_attempts SET status = 'interrupted', ended_at = ? WHERE job_id = ? AND status = 'running'",
+                        (now, job_id),
+                    )
+                    conn.execute(
+                        "UPDATE jobs SET running_attempt_id = NULL, status = 'interrupted', pending_artifact_path = NULL, updated_at = ? WHERE id = ?",
+                        (now, job_id),
+                    )
+                continue
 
             with connect_database(self._database_path) as conn:
                 conn.execute("BEGIN IMMEDIATE")
@@ -251,10 +270,10 @@ class AttemptRepository:
                     """
                     UPDATE jobs
                     SET running_attempt_id = NULL, status = 'completed',
-                        pending_artifact_path = NULL, updated_at = ?
+                        pending_artifact_path = NULL, completed_at = ?, updated_at = ?
                     WHERE id = ?
                     """,
-                    (now, job_id),
+                    (now, now, job_id),
                 )
 
     def get_snapshot(self, *, attempt_id: str) -> dict[str, Any] | None:

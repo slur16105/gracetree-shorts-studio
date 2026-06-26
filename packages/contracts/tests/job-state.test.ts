@@ -112,6 +112,14 @@ describe("applyJobEvent — idle → running", () => {
       percent: 0,
     });
   });
+
+  it("job_accepted from failed transitions to running for retry after regen failure", () => {
+    let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID);
+    s = applyJobEvent(s, failed(), JOB_ID);
+    expect(s.status).toBe("failed");
+    const retry = applyJobEvent(s, accepted(), JOB_ID);
+    expect(retry).toMatchObject({ status: "running", attemptId: ATTEMPT_ID });
+  });
 });
 
 describe("applyJobEvent — stage_started", () => {

@@ -460,7 +460,7 @@ def _run_start_job_stages(
         repo.mark_artifact_commit_pending(job_id=job_id, artifact_path=str(artifact_path))
         os.replace(str(artifact_path), str(output_path))
         repo.complete_attempt(attempt_id=attempt_id, artifact_path=str(output_path))
-    except OSError as exc:
+    except Exception as exc:
         _fail("PROCESS_FAILED", "vertical_slice", False, None, f"산출물 저장 실패: {exc}")
         return
 

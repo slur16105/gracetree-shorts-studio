@@ -62,7 +62,9 @@ def get_completed_jobs(conn: sqlite3.Connection) -> list[dict]:
     """게시 날짜 내림차순으로 완료된 job 목록을 반환한다."""
     rows = conn.execute(
         """
-        SELECT id, publish_date, title, updated_at AS completed_at, result_path
+        SELECT id, publish_date, title,
+               COALESCE(completed_at, updated_at) AS completed_at,
+               result_path
         FROM jobs
         WHERE status = 'completed'
         ORDER BY publish_date DESC
