@@ -348,24 +348,12 @@ class TestStartJobIntegration:
 
 # ──────────────────────────── speech alignment integration ──────────────────
 
-import struct
-
 from gracetree_engine.speech.aligner import AlignmentError, Segment
 
-
-def _make_wav(path: Path) -> Path:
-    sample_rate, num_samples = 16000, 16000
-    data_size = num_samples * 2
-    with open(path, "wb") as f:
-        f.write(b"RIFF")
-        f.write(struct.pack("<I", 36 + data_size))
-        f.write(b"WAVE")
-        f.write(b"fmt ")
-        f.write(struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16))
-        f.write(b"data")
-        f.write(struct.pack("<I", data_size))
-        f.write(b"\x00" * data_size)
-    return path
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(__file__))
+from helpers import make_silent_wav as _make_wav
 
 
 def _setup_db_with_voice(tmp_path: Path, managed_root: Path) -> tuple[str, Path]:
@@ -588,6 +576,57 @@ class TestSpeechAlignmentIntegration:
 
         assert emitted[-1]["type"] == "job_failed"
         assert emitted[-1]["payload"]["stageId"] == "speech_alignment"
+
+    def test_emits_job_failed_when_voice_has_null_managed_path(self, tmp_path):
+        """voice 슬롯이 ready지만 managed_path가 NULL이면 job_failed를 방출해야 한다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        snapshot_null_path = {
+            "inputs": [{"id": "x", "role": "voice", "managedPath": None, "status": "ready"}],
+            "resources": {},
+            "scriptAst": _AST_ONE_BLOCK,
+        }
+
+        with mock.patch("subprocess.run", side_effect=_fake_run_ffmpeg), \
+             mock.patch(
+                 "gracetree_engine.jobs.orchestrator._take_job_snapshot",
+                 return_value=snapshot_null_path,
+             ):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        assert emitted[-1]["type"] == "job_failed"
+        assert emitted[-1]["payload"]["errorCode"] == "PROCESS_FAILED"
+        assert emitted[-1]["payload"]["stageId"] == "speech_alignment"
+
+    def test_emits_job_failed_when_attempt_dir_mkdir_fails(self, tmp_path):
+        """attempt_dir.mkdir()가 OSError를 발생시키면 job_failed를 방출해야 한다."""
+        managed_root = tmp_path / "managed"
+        managed_root.mkdir()
+        work_path = managed_root / "jobs" / "2026-06-25"
+        work_path.mkdir(parents=True)
+        db_path, job_id = _setup_db(managed_root)
+        command = _make_command(job_id, managed_root, work_path)
+        emitted: list[dict] = []
+
+        original_mkdir = Path.mkdir
+
+        def _raise_on_attempt(self, *args, **kwargs):
+            if "attempts" in str(self):
+                raise OSError("disk full")
+            original_mkdir(self, *args, **kwargs)
+
+        with mock.patch.object(Path, "mkdir", _raise_on_attempt):
+            start_job(command=command, approved_root=managed_root, emit=emitted.append)
+
+        assert any(e["type"] == "job_failed" for e in emitted)
+        failed = next(e for e in emitted if e["type"] == "job_failed")
+        assert failed["payload"]["errorCode"] == "PROCESS_FAILED"
 
 
 # ──────────────────────────── cancellation tests ─────────────────────────────

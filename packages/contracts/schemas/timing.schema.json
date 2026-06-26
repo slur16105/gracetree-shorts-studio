@@ -21,8 +21,8 @@
           "index": { "type": "integer", "minimum": 0 },
           "text": { "type": "string" },
           "lines": { "type": "array", "items": { "type": "string" } },
-          "startTime": { "type": "number" },
-          "endTime": { "type": "number" }
+          "startTime": { "type": "number", "minimum": 0 },
+          "endTime": { "type": "number", "minimum": 0 }
         }
       }
     }

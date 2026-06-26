@@ -163,10 +163,17 @@ def _verify_mp4(artifact_path: Path) -> bool:
     return has_video and duration > 0
 
 
+def _assert_within_root(path: Path, approved_root: Path) -> None:
+    if not path.is_relative_to(approved_root.resolve()):
+        raise ValueError(f"'{path}' is outside the approved managed root")
+
+
 def _read_script_ast(managed_path: str, approved_root: Path) -> dict[str, Any] | None:
     """스크립트 파일을 읽어 AST를 반환한다. 읽기 실패 시 None."""
     script_path = Path(managed_path).resolve()
-    if not script_path.is_relative_to(approved_root.resolve()):
+    try:
+        _assert_within_root(script_path, approved_root)
+    except ValueError:
         return None
     try:
         raw = script_path.read_bytes()
@@ -244,8 +251,7 @@ def start_job(
     work_path = Path(command["payload"]["workPath"]).resolve()
     is_regeneration: bool = bool(command["payload"].get("regenerate", False))
 
-    if not work_path.is_relative_to(approved_root.resolve()):
-        raise ValueError(f"workPath '{work_path}' is outside the approved managed root")
+    _assert_within_root(work_path, approved_root)
 
     db_path = approved_root / "studio.db"
     apply_migrations(db_path)
@@ -278,7 +284,21 @@ def start_job(
         return
 
     attempt_dir = work_path / "temp" / "attempts" / attempt_id
-    attempt_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        attempt_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        try:
+            _write_attempt_log(work_path, attempt_id, job_id, None, "PROCESS_FAILED", str(exc))
+        except OSError:
+            pass
+        emit(_make_event("job_failed", job_id, {
+            "attemptId": attempt_id,
+            "errorCode": "PROCESS_FAILED",
+            "stageId": None,
+            "recoverable": False,
+            "details": None,
+        }))
+        return
 
     try:
         _run_start_job_stages(
@@ -346,12 +366,27 @@ def _run_start_job_stages(
     voice_path_str = _find_voice_path(snapshot)
     script_ast = snapshot.get("scriptAst")
 
-    if voice_path_str and script_ast:
-        _check_cancel(cancel_event)
+    # Detect: voice slot is ready but managed_path is NULL (data corruption).
+    _has_ready_voice = any(
+        inp.get("role") == "voice" and inp.get("status") == "ready"
+        for inp in snapshot.get("inputs", [])
+    )
+    if _has_ready_voice and voice_path_str is None:
+        _fail("PROCESS_FAILED", "speech_alignment", False, None, "음성 슬롯이 준비됐지만 managed_path가 없습니다.")
+        return
+
+    # Validate voice path boundary regardless of script_ast presence.
+    voice_path: Path | None = None
+    if voice_path_str is not None:
         voice_path = Path(voice_path_str).resolve()
-        if not voice_path.is_relative_to(approved_root.resolve()):
+        try:
+            _assert_within_root(voice_path, approved_root)
+        except ValueError:
             _fail("PROCESS_FAILED", "speech_alignment", False, None, "음성 파일 경로가 허가된 범위 밖입니다.")
             return
+
+    if voice_path is not None and script_ast:
+        _check_cancel(cancel_event)
         align_fn = _align if _align is not None else _align_speech
         emit(_make_event("stage_started", job_id, {
             "attemptId": attempt_id,

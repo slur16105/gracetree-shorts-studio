@@ -77,17 +77,23 @@ def find_prayer_boundary(
     if not target:
         return []
 
-    candidates = []
+    candidates: list[int] = []
+    seen: set[int] = set()
     n = len(segments)
     for idx in range(n):
         seg_norm = _normalize(segments[idx].text)
         if _lcs_ratio(seg_norm, target) >= 0.7:
-            candidates.append(idx)
+            if idx not in seen:
+                candidates.append(idx)
+                seen.add(idx)
         elif idx + 1 < n and _lcs_ratio(seg_norm, target) >= 0.25:
             # Pair check: only when the first segment meaningfully starts the line.
             combined = _normalize(segments[idx].text + segments[idx + 1].text)
             if _lcs_ratio(combined, target) >= 0.7:
-                candidates.append(idx)
+                # Boundary is at idx+1 (end of pair); deduplicate with seen.
+                if idx + 1 not in seen:
+                    candidates.append(idx + 1)
+                    seen.add(idx + 1)
     return candidates
 
 
@@ -186,26 +192,7 @@ def align_speech(
     AlignmentError(PRAYER_BOUNDARY_AMBIGUOUS)
         When 0 or ≥2 prayer boundary candidates are found.
     """
-    # Copy voice to attempt dir; original is never touched.
-    voice_copy = attempt_dir / f"voice_copy{voice_path.suffix}"
-    shutil.copy2(str(voice_path), str(voice_copy))
-
-    # Transcribe (real or injected mock).
-    transcribe = _transcribe if _transcribe is not None else _default_transcribe
-    segments = transcribe(voice_copy, config)
-
-    # Leading silence: injected (tests) or first segment start time.
-    # Use the raw value (which may be negative for unusual Whisper output) to
-    # compute voice_offset correctly, then clamp only for JSON storage.
-    if _leading_silence is not None:
-        raw_leading_silence = _leading_silence
-    else:
-        raw_leading_silence = segments[0].start if segments else 0.0
-    leading_silence = max(0.0, raw_leading_silence)
-
-    voice_offset = max(0.0, TARGET_VOICE_START_SECONDS - raw_leading_silence)
-
-    # Locate prayer start.
+    # Validate before expensive copy/transcribe operations.
     subtitle_blocks = script_ast.get("subtitleBlocks", [])
     if not subtitle_blocks:
         raise AlignmentError(
@@ -214,6 +201,33 @@ def align_speech(
             recoverable=True,
         )
 
+    # Copy voice to attempt dir; original is never touched.
+    voice_copy = attempt_dir / f"voice_copy{voice_path.suffix}"
+    shutil.copy2(str(voice_path), str(voice_copy))
+
+    # Transcribe (real or injected mock).
+    transcribe = _transcribe if _transcribe is not None else _default_transcribe
+    segments = transcribe(voice_copy, config)
+
+    if not segments:
+        raise AlignmentError(
+            "NO_SPEECH_DETECTED",
+            "음성 파일에서 발화가 감지되지 않았습니다.",
+            recoverable=True,
+        )
+
+    # Leading silence: injected (tests) or first segment start time.
+    # Use the raw value (which may be negative for unusual Whisper output) to
+    # compute voice_offset correctly, then clamp only for JSON storage.
+    if _leading_silence is not None:
+        raw_leading_silence = _leading_silence
+    else:
+        raw_leading_silence = segments[0].start
+    leading_silence = max(0.0, raw_leading_silence)
+
+    voice_offset = max(0.0, TARGET_VOICE_START_SECONDS - raw_leading_silence)
+
+    # Locate prayer start.
     candidates = find_prayer_boundary(segments, subtitle_blocks[0])
     if len(candidates) != 1:
         raise AlignmentError(

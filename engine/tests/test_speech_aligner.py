@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import struct
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -18,24 +17,10 @@ from gracetree_engine.speech.aligner import (
 )
 from gracetree_engine.speech.config import DEFAULT_SPEECH_CONFIG, SpeechConfig
 
-
-# ─────────────────────── helpers ────────────────────────
-
-def _make_silent_wav(path: Path, duration: float = 1.0) -> Path:
-    """Minimal 16kHz mono 16-bit PCM WAV (silence)."""
-    sample_rate = 16000
-    num_samples = int(sample_rate * duration)
-    data_size = num_samples * 2
-    with open(path, "wb") as f:
-        f.write(b"RIFF")
-        f.write(struct.pack("<I", 36 + data_size))
-        f.write(b"WAVE")
-        f.write(b"fmt ")
-        f.write(struct.pack("<IHHIIHH", 16, 1, 1, sample_rate, sample_rate * 2, 2, 16))
-        f.write(b"data")
-        f.write(struct.pack("<I", data_size))
-        f.write(b"\x00" * data_size)
-    return path
+import sys as _sys
+import os as _os
+_sys.path.insert(0, _os.path.dirname(__file__))
+from helpers import make_silent_wav as _make_silent_wav
 
 
 def _mock_transcribe(segments: list[Segment]):
@@ -109,6 +94,33 @@ class TestFindPrayerBoundary:
         segments = [
             Segment(start=0.0, end=2.0, text="오늘의 기도"),
             Segment(start=2.0, end=5.0, text="주님 감사합니다 오늘도 지켜주세요"),
+        ]
+        candidates = find_prayer_boundary(segments, AST_ONE_BLOCK["subtitleBlocks"][0])
+        assert len(candidates) == 1
+        assert candidates[0] == 1
+
+    def test_pair_window_boundary_is_at_second_segment(self):
+        """pair-window로 매치될 때 경계 인덱스는 쌍의 두 번째 세그먼트여야 한다."""
+        # "주님" alone: partial match (< 0.7 but >= 0.25 of "주님감사합니다")
+        # "주님" + "감사합니다" combined: "주님감사합니다" >= 0.7
+        segments = [
+            Segment(start=0.0, end=1.0, text="오늘의 기도"),
+            Segment(start=1.0, end=2.0, text="주님"),
+            Segment(start=2.0, end=4.0, text="감사합니다"),
+        ]
+        # target = "주님감사합니다" (first_block lines[0] = "주님 감사합니다.")
+        candidates = find_prayer_boundary(segments, AST_ONE_BLOCK["subtitleBlocks"][0])
+        assert len(candidates) == 1
+        assert candidates[0] == 2  # idx+1, not idx
+
+    def test_pair_window_deduplicates_when_second_segment_also_solo_matches(self):
+        """pair-window와 solo match가 같은 인덱스를 생성할 때 중복을 제거해야 한다."""
+        # segments[0] pair-matches via segments[0]+segments[1]
+        # segments[1] also solo-matches
+        # Result: [1] not [1, 1]
+        segments = [
+            Segment(start=0.0, end=1.0, text="주님"),       # partial (≥0.25, <0.7)
+            Segment(start=1.0, end=3.0, text="감사합니다"),  # solo & pair end
         ]
         candidates = find_prayer_boundary(segments, AST_ONE_BLOCK["subtitleBlocks"][0])
         assert len(candidates) == 1
@@ -301,6 +313,23 @@ class TestAlignSpeech:
             _leading_silence=0.0,
         )
         assert calls == []
+
+    def test_empty_segments_raises_no_speech_detected(self, tmp_path):
+        """발화가 감지되지 않으면 NO_SPEECH_DETECTED를 방출해야 한다."""
+        voice = _make_silent_wav(tmp_path / "voice.wav")
+        attempt_dir = tmp_path / "attempt"
+        attempt_dir.mkdir()
+        with pytest.raises(AlignmentError) as exc:
+            align_speech(
+                voice_path=voice,
+                script_ast=AST_ONE_BLOCK,
+                attempt_dir=attempt_dir,
+                config=DEFAULT_SPEECH_CONFIG,
+                _transcribe=_mock_transcribe([]),
+                _leading_silence=0.0,
+            )
+        assert exc.value.error_code == "NO_SPEECH_DETECTED"
+        assert exc.value.recoverable is True
 
 
 # ─────────────────────── Task 5: timing.json 스키마 검증 ────────────────────────
