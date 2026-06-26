@@ -1,6 +1,6 @@
 # Story 2.14: macOS 설치 패키지
 
-Status: review
+Status: done
 
 ## Story
 
