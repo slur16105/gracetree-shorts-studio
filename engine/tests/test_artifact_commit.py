@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -52,6 +51,16 @@ def _make_valid_attempt_dir(tmp_path: Path) -> Path:
     return attempt
 
 
+def _make_commit_dirs(tmp_path: Path):
+    """commit_artifacts 테스트용 디렉터리를 만든다."""
+    attempt = _make_valid_attempt_dir(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    log_dir = tmp_path / "logs"
+    log_dir.mkdir()
+    return attempt, output, log_dir
+
+
 def _ffprobe_result(stdout: str, returncode: int = 0) -> MagicMock:
     r = MagicMock()
     r.returncode = returncode
@@ -85,6 +94,14 @@ class TestValidateFinalArtifacts:
     def test_raises_if_subtitles_missing(self, tmp_path):
         attempt = _make_valid_attempt_dir(tmp_path)
         (attempt / "subtitles.ass").unlink()
+        with patch("subprocess.run", return_value=_ffprobe_result(_FFPROBE_VALID_OUTPUT)):
+            with pytest.raises(ValidationError) as exc:
+                validate_final_artifacts(attempt)
+        assert exc.value.error_code == "MISSING_ARTIFACT"
+
+    def test_raises_if_subtitles_empty(self, tmp_path):
+        attempt = _make_valid_attempt_dir(tmp_path)
+        (attempt / "subtitles.ass").write_bytes(b"")
         with patch("subprocess.run", return_value=_ffprobe_result(_FFPROBE_VALID_OUTPUT)):
             with pytest.raises(ValidationError) as exc:
                 validate_final_artifacts(attempt)
@@ -183,25 +200,31 @@ class TestValidateFinalArtifacts:
             validate_final_artifacts(attempt)
         assert (attempt / "final.mp4").stat().st_mtime == mtime_before
 
+    def test_duration_uses_stream_duration_when_format_missing(self, tmp_path):
+        """format.duration 없이 stream duration만 있어도 통과해야 한다 (fragmented MP4)."""
+        attempt = _make_valid_attempt_dir(tmp_path)
+        no_format_dur = json.dumps({
+            "streams": [
+                {"codec_type": "video", "width": 1080, "height": 1920,
+                 "r_frame_rate": "30/1", "duration": "10.0"},
+                {"codec_type": "audio", "duration": "10.0"},
+            ],
+            "format": {},  # duration 필드 없음
+        })
+        with patch("subprocess.run", return_value=_ffprobe_result(no_format_dur)):
+            validate_final_artifacts(attempt)  # should not raise
+
 
 # ─────────────────────── Task 2: staging + atomic rename ────────────────────────
 
 class TestCommitArtifacts:
-    def _make_dirs(self, tmp_path: Path):
-        attempt = _make_valid_attempt_dir(tmp_path)
-        output = tmp_path / "output"
-        output.mkdir()
-        log_dir = tmp_path / "logs"
-        log_dir.mkdir()
-        return attempt, output, log_dir
-
     def _mock_repo(self):
         repo = MagicMock()
         repo.complete_attempt = MagicMock()
         return repo
 
     def test_artifacts_appear_in_output_dir(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         commit_artifacts(
             attempt_dir=attempt,
             output_dir=output,
@@ -213,7 +236,7 @@ class TestCommitArtifacts:
             assert (output / name).is_file(), f"{name} missing in output"
 
     def test_complete_attempt_called(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         repo = self._mock_repo()
         commit_artifacts(
             attempt_dir=attempt,
@@ -228,7 +251,7 @@ class TestCommitArtifacts:
         assert "final.mp4" in call_kwargs["artifact_path"]
 
     def test_log_copied_to_logs_dir(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         commit_artifacts(
             attempt_dir=attempt,
             output_dir=output,
@@ -239,7 +262,7 @@ class TestCommitArtifacts:
         assert (log_dir / "test-001-render_log.txt").is_file()
 
     def test_attempt_dir_cleaned_up(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         commit_artifacts(
             attempt_dir=attempt,
             output_dir=output,
@@ -250,7 +273,7 @@ class TestCommitArtifacts:
         assert not attempt.exists()
 
     def test_no_staging_dir_left_after_success(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         commit_artifacts(
             attempt_dir=attempt,
             output_dir=output,
@@ -258,13 +281,10 @@ class TestCommitArtifacts:
             attempt_id="test-001",
             attempt_repo=self._mock_repo(),
         )
-        # No pending/staging dirs should remain
-        staging_dirs = list(tmp_path.glob("output.pending.*"))
-        assert not staging_dirs, f"Staging dir not cleaned up: {staging_dirs}"
+        assert not list(tmp_path.glob("output.pending.*"))
 
     def test_source_files_not_modified(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
-        # Confirm originals are removed (moved), not in place
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         commit_artifacts(
             attempt_dir=attempt,
             output_dir=output,
@@ -272,23 +292,14 @@ class TestCommitArtifacts:
             attempt_id="test-001",
             attempt_repo=self._mock_repo(),
         )
-        # Output should have the files (moved from staging)
         assert (output / "final.mp4").read_bytes() == b"x" * 100
 
 
 # ─────────────────────── Task 3: 실패 보상 순서 ────────────────────────
 
 class TestFailureCompensation:
-    def _make_dirs(self, tmp_path: Path):
-        attempt = _make_valid_attempt_dir(tmp_path)
-        output = tmp_path / "output"
-        output.mkdir()
-        log_dir = tmp_path / "logs"
-        log_dir.mkdir()
-        return attempt, output, log_dir
-
     def test_staging_failure_leaves_output_unchanged(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         (output / "existing.mp4").write_bytes(b"existing")
 
         with patch("shutil.copy2", side_effect=OSError("disk full")):
@@ -301,14 +312,12 @@ class TestFailureCompensation:
                     attempt_repo=MagicMock(),
                 )
         assert exc.value.error_code == "STAGING_FAILED"
-        # Output untouched
         assert (output / "existing.mp4").read_bytes() == b"existing"
         assert not (output / "final.mp4").exists()
-        # No orphan staging dirs
         assert not list(tmp_path.glob("output.pending.*"))
 
     def test_db_not_called_if_staging_fails(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         repo = MagicMock()
         with patch("shutil.copy2", side_effect=OSError("disk full")):
             with pytest.raises(CommitError):
@@ -321,8 +330,23 @@ class TestFailureCompensation:
                 )
         repo.complete_attempt.assert_not_called()
 
+    def test_db_not_called_if_rename_fails(self, tmp_path):
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
+        repo = MagicMock()
+        with patch("os.replace", side_effect=OSError("rename failed")):
+            with pytest.raises(CommitError) as exc:
+                commit_artifacts(
+                    attempt_dir=attempt,
+                    output_dir=output,
+                    log_dir=log_dir,
+                    attempt_id="fail-002",
+                    attempt_repo=repo,
+                )
+        assert exc.value.error_code == "RENAME_FAILED"
+        repo.complete_attempt.assert_not_called()
+
     def test_db_called_once_on_success(self, tmp_path):
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         repo = MagicMock()
         commit_artifacts(
             attempt_dir=attempt,
@@ -333,21 +357,28 @@ class TestFailureCompensation:
         )
         assert repo.complete_attempt.call_count == 1
 
+    def test_attempt_dir_cleaned_up_even_if_db_fails(self, tmp_path):
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
+        repo = MagicMock()
+        repo.complete_attempt.side_effect = RuntimeError("DB down")
+
+        with pytest.raises(RuntimeError):
+            commit_artifacts(
+                attempt_dir=attempt,
+                output_dir=output,
+                log_dir=log_dir,
+                attempt_id="db-fail-001",
+                attempt_repo=repo,
+            )
+        assert not attempt.exists()
+
 
 # ─────────────────────── Task 5: 크래시/실패 주입 ────────────────────────
 
 class TestCrashInjection:
-    def _make_dirs(self, tmp_path: Path):
-        attempt = _make_valid_attempt_dir(tmp_path)
-        output = tmp_path / "output"
-        output.mkdir()
-        log_dir = tmp_path / "logs"
-        log_dir.mkdir()
-        return attempt, output, log_dir
-
     def test_existing_output_preserved_if_staging_fails(self, tmp_path):
         """기존 output 파일은 staging 실패 시 보존된다."""
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
         (output / "final.mp4").write_bytes(b"old-video")
 
         with patch("shutil.copy2", side_effect=OSError("no space")):
@@ -360,7 +391,6 @@ class TestCrashInjection:
         """validate 실패 시 output 디렉터리가 변경되면 안 된다."""
         attempt = tmp_path / "attempt"
         attempt.mkdir()
-        # final.mp4 누락 → validate_final_artifacts 실패
         (attempt / "subtitles.ass").write_text("x")
         (attempt / "timing.json").write_text("{}")
         output = tmp_path / "output"
@@ -375,7 +405,7 @@ class TestCrashInjection:
 
     def test_orphan_staging_dir_not_left_after_rename_failure(self, tmp_path):
         """rename 실패 시 staging 디렉터리가 정리된다."""
-        attempt, output, log_dir = self._make_dirs(tmp_path)
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
 
         with patch("os.replace", side_effect=OSError("rename failed")):
             with pytest.raises(CommitError) as exc:
@@ -383,3 +413,25 @@ class TestCrashInjection:
 
         assert exc.value.error_code == "RENAME_FAILED"
         assert not list(tmp_path.glob("output.pending.*"))
+
+    def test_partial_rename_rolls_back_placed_files(self, tmp_path):
+        """첫 번째 파일만 rename 성공 후 두 번째에서 실패하면 output_dir이 원상태여야 한다."""
+        attempt, output, log_dir = _make_commit_dirs(tmp_path)
+        original_content = b"original-final"
+        (output / "final.mp4").write_bytes(original_content)
+
+        call_count = {"n": 0}
+
+        def _fail_on_second(*args, **kwargs):
+            call_count["n"] += 1
+            if call_count["n"] >= 2:
+                raise OSError("disk full on second rename")
+            return os.replace(*args, **kwargs)
+
+        with patch("os.replace", side_effect=_fail_on_second):
+            with pytest.raises(CommitError) as exc:
+                commit_artifacts(attempt, output, log_dir, "crash-3", MagicMock())
+
+        assert exc.value.error_code == "RENAME_FAILED"
+        # 첫 번째로 교체된 final.mp4는 롤백되어 원본이 복원되어야 한다
+        assert (output / "final.mp4").read_bytes() == original_content

@@ -8,7 +8,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ..diagnostics.verifier import VerificationError, probe_file, verify_streams
+from ..diagnostics.verifier import (
+    VerificationError,
+    probe_file,
+    verify_dimensions,
+    verify_streams,
+)
 
 
 REQUIRED_WIDTH = 1080
@@ -26,7 +31,7 @@ class ValidationError(Exception):
 def _parse_fps(fps_str: str) -> float:
     num, _, den = fps_str.partition("/")
     try:
-        return float(num) / float(den) if den else float(num)
+        return float(num) / float(den) if (den and float(den) != 0) else float(num)
     except (ValueError, ZeroDivisionError):
         return 0.0
 
@@ -62,17 +67,18 @@ def validate_final_artifacts(attempt_dir: Path) -> None:
     except VerificationError as exc:
         raise ValidationError(exc.error_code, str(exc)) from exc
 
-    # dimensions
+    # dimensions, fps, duration — video_stream is always non-None here
+    # because verify_streams(require_video=True) already raised if absent
     streams = info.get("streams", [])
     video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
     if video_stream is not None:
         width = int(video_stream.get("width", 0))
         height = int(video_stream.get("height", 0))
-        if width != REQUIRED_WIDTH or height != REQUIRED_HEIGHT:
-            raise ValidationError(
-                "WRONG_DIMENSIONS",
-                f"해상도 불일치: {width}×{height} (기대값: {REQUIRED_WIDTH}×{REQUIRED_HEIGHT})",
-            )
+        try:
+            verify_dimensions(width, height, REQUIRED_WIDTH, REQUIRED_HEIGHT)
+        except VerificationError as exc:
+            raise ValidationError(exc.error_code, str(exc)) from exc
+
         fps_str = video_stream.get("r_frame_rate", "0/1")
         fps = _parse_fps(fps_str)
         if abs(fps - REQUIRED_FPS) > 0.5:
@@ -81,16 +87,18 @@ def validate_final_artifacts(attempt_dir: Path) -> None:
                 f"프레임레이트 불일치: {fps:.2f}fps (기대값: {REQUIRED_FPS}fps)",
             )
 
-    # duration
-    try:
-        duration = float(info.get("format", {}).get("duration", 0))
-    except (ValueError, TypeError):
-        duration = 0.0
-    if duration < MIN_DURATION_SECONDS:
-        raise ValidationError(
-            "DURATION_TOO_SHORT",
-            f"재생 시간이 너무 짧습니다: {duration:.2f}s (최소: {MIN_DURATION_SECONDS:.2f}s)",
-        )
+        # Prefer per-stream duration; fall back to container level.
+        # format.duration may be absent for fragmented MP4s.
+        dur_str = video_stream.get("duration") or info.get("format", {}).get("duration", "0")
+        try:
+            duration = float(dur_str)
+        except (ValueError, TypeError):
+            duration = 0.0
+        if duration < MIN_DURATION_SECONDS:
+            raise ValidationError(
+                "DURATION_TOO_SHORT",
+                f"재생 시간이 너무 짧습니다: {duration:.2f}s (최소: {MIN_DURATION_SECONDS:.2f}s)",
+            )
 
     # ── subtitles.ass ──────────────────────────────────────────
     subtitles = attempt_dir / "subtitles.ass"
