@@ -126,6 +126,26 @@ class TestFindPrayerBoundary:
         assert len(candidates) == 1
         assert candidates[0] == 1
 
+    def test_short_first_line_uses_full_block_to_avoid_spurious_match(self):
+        """첫 줄이 한 단어("하나님")로 매우 짧으면, 멀리 떨어진 세그먼트에서
+        '하나(됨)…주(님)'처럼 부분수열로 우연히 매칭되어 후보가 2개가 되는
+        문제가 있다. 블록 전체 텍스트를 기준으로 삼아 유일하게 매칭해야 한다."""
+        block = {
+            "index": 0,
+            "text": "하나님,\n우리는\n타인의 슬픔에",
+            "lines": ["하나님,", "우리는", "타인의 슬픔에"],
+        }
+        segments = [
+            Segment(0.0, 11.0, "타인의 슬픔을 바라볼 때 드리는 기도 로마서 말씀"),
+            # 진짜 기도 시작: 블록 전체("하나님 우리는 타인의 슬픔에")를 포함
+            Segment(11.0, 23.0, "우는 자들과 함께 올라 하나님 우리는 타인의 슬픔에 얼마나 무감각"),
+            # 가짜: '하나'(됨) + '주님'으로 "하나님"이 부분수열로 매칭되지만 블록 전체는 아님
+            Segment(37.0, 46.0, "공동체의 하나의 마음을 허락하여 주옵소서 말씀하신 주님"),
+        ]
+        candidates = find_prayer_boundary(segments, block)
+        assert len(candidates) == 1
+        assert candidates[0] == 1
+
 
 # ─────────────────────── Task 1–3: align_speech ────────────────────────
 

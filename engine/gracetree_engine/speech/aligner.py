@@ -71,9 +71,25 @@ def find_prayer_boundary(
     happens to cover the target as a subsequence.
 
     Returns a list: len 0 → not found, len 1 → unique, len N → ambiguous.
+
+    Matching is two-pass: the full block text is tried first because it is the
+    most distinctive anchor. A very short first line (e.g. a single word like
+    "하나님") is a weak anchor — its few characters can appear as an incidental
+    subsequence elsewhere in the audio (e.g. "하나(됨)…주(님)"), yielding spurious
+    candidates. Only when the full block matches nothing (e.g. Whisper produced a
+    segment covering just the first line) do we relax to the first line alone.
     """
+    full_target = normalize(first_block.get("text", ""))
+    candidates = _match_target(segments, full_target)
+    if candidates:
+        return candidates
+
     first_line = first_block["lines"][0] if first_block.get("lines") else first_block.get("text", "")
-    target = normalize(first_line)
+    return _match_target(segments, normalize(first_line))
+
+
+def _match_target(segments: list[Segment], target: str) -> list[int]:
+    """Return indices of segments matching `target` (see find_prayer_boundary)."""
     if not target:
         return []
 
