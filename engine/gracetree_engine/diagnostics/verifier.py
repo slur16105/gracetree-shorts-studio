@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from ..media.runner import RunnerError, run_safe
+from ..media.runner import STDERR_MAX_CHARS, RunnerError, run_safe
 from .logger import redact_paths
 
 
@@ -38,12 +39,15 @@ def probe_file(path: Path) -> dict[str, Any]:
     if result.returncode != 0:
         raise VerificationError(
             "PROBE_FAILED",
-            f"ffprobe 실패: {redact_paths(result.stderr[:200])}",
+            f"ffprobe 실패: {redact_paths(result.stderr[:STDERR_MAX_CHARS])}",
         )
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise VerificationError("PROBE_FAILED", f"ffprobe JSON 파싱 실패: {exc}") from exc
+        raise VerificationError(
+            "PROBE_FAILED",
+            f"ffprobe JSON 파싱 실패: {redact_paths(str(exc))}",
+        ) from exc
 
 
 def verify_streams(
@@ -92,7 +96,7 @@ def _run_ffmpeg_detection(cmd: list[str], error_code: str):
     if result.returncode != 0:
         raise VerificationError(
             error_code,
-            f"ffmpeg 실패: {redact_paths(result.stderr[:200])}",
+            f"ffmpeg 실패: {redact_paths(result.stderr[:STDERR_MAX_CHARS])}",
         )
     return result
 
@@ -102,7 +106,7 @@ def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float
 
     Each interval: {"start": float, "end": float, "duration": float}
     Raises VerificationError on RunnerError or non-zero ffmpeg exit.
-    Intervals with missing black_end or black_duration are silently skipped.
+    Intervals with missing black_end or black_duration emit a warning and are skipped.
     """
     cmd = [
         "ffmpeg", "-i", str(path),
@@ -124,6 +128,10 @@ def run_blackdetect(path: Path, threshold: float = 0.98) -> list[dict[str, float
                         pass
             if "black_start" in parts:
                 if "black_end" not in parts or "black_duration" not in parts:
+                    print(
+                        f"[blackdetect] WARNING: 불완전한 인터벌 무시: {redact_paths(line)!r}",
+                        file=sys.stderr,
+                    )
                     continue
                 intervals.append({
                     "start": parts["black_start"],
@@ -157,7 +165,7 @@ def run_freezedetect(path: Path, noise: float = -60.0, duration: float = 2.0) ->
                 try:
                     freeze_start = float(tokens[i + 1])
                 except ValueError:
-                    pass
+                    freeze_start = None  # Reset stale value on parse failure
             elif token == "freeze_end:" and i + 1 < len(tokens) and freeze_start is not None:
                 try:
                     freeze_end = float(tokens[i + 1])

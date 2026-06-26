@@ -47,6 +47,11 @@ class TestRedactPaths:
         result = redact_paths("N/A kbits/s ratio=1/25")
         assert result == "N/A kbits/s ratio=1/25"
 
+    def test_redact_paths_handles_quoted_paths(self):
+        result = redact_paths("open '/home/user/video.mp4': No such file")
+        assert "/home/user" not in result
+        assert "video.mp4" in result
+
 
 class TestPipelineDiagnostics:
     def test_record_stage_captures_wall_time(self, tmp_path):
@@ -78,6 +83,7 @@ class TestPipelineDiagnostics:
         data = json.loads(log_file.read_text())
         assert "stages" in data
         assert data["stages"][0]["name"] == "parse_script"
+        assert data["stages"][0]["status"] == "ok"
 
     def test_total_wall_time_is_sum_of_stages(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
@@ -90,6 +96,7 @@ class TestPipelineDiagnostics:
         with diag.stage("parse_script"):
             time.sleep(0.01)
         assert diag.stages[0].wall_time >= 0.01
+        assert diag.stages[0].status == "ok"
 
     def test_multiple_stages_recorded(self, tmp_path):
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
@@ -215,7 +222,7 @@ class TestFailureIsolation:
 
 class TestReviewFixes:
     def test_stage_context_manager_records_on_exception(self, tmp_path):
-        """stage()가 예외 발생 시에도 스테이지를 기록해야 한다."""
+        """stage()가 예외 발생 시에도 스테이지를 기록하고 status='error'를 표시해야 한다."""
         diag = PipelineDiagnostics(attempt_dir=tmp_path)
         with pytest.raises(ValueError):
             with diag.stage("failing_stage"):
@@ -223,6 +230,7 @@ class TestReviewFixes:
         assert len(diag.stages) == 1
         assert diag.stages[0].name == "failing_stage"
         assert diag.stages[0].wall_time >= 0.0
+        assert diag.stages[0].status == "error"
 
     def test_write_log_is_atomic(self, tmp_path):
         """write_log()은 .tmp를 거쳐 atomic replace한다 — 중간 파일이 남으면 안 된다."""
@@ -287,6 +295,18 @@ class TestReviewFixes:
         assert len(intervals) == 1
         assert intervals[0]["start"] == pytest.approx(3.0)
         assert intervals[0]["end"] is None
+
+    def test_freezedetect_resets_stale_freeze_start_on_parse_error(self):
+        """freeze_start 파싱 ValueError 시 잔류 값을 초기화해 spurious EOF 인터벌을 방지해야 한다."""
+        from gracetree_engine.diagnostics.verifier import run_freezedetect
+        from unittest.mock import MagicMock, patch
+        fake_stderr = (
+            "[freezedetect @ 0x...] freeze_start: INVALID\n"
+        )
+        mock_result = MagicMock(returncode=0, stdout="", stderr=fake_stderr)
+        with patch("gracetree_engine.diagnostics.verifier.run_safe", return_value=mock_result):
+            intervals = run_freezedetect(Path("/fake/video.mp4"))
+        assert intervals == []
 
     def test_blackdetect_skips_incomplete_interval(self):
         """black_end 또는 black_duration이 없는 인터벌은 조용히 무시해야 한다."""
