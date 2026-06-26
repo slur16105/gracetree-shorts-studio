@@ -9,7 +9,7 @@
 
 - **코퍼스**: `engine/tests/fixtures/media/benchmark-manifest.json` (대표 한국어 기도문 샘플)
 - **정확도 지표**: LCS(Longest Common Subsequence) ratio vs. ground truth text (NFC 정규화, 구두점 제거)
-- **반복**: 각 조합 3회 측정 → median 채택
+- **반복**: 각 조합 1회 측정 (단일 패스; 통계적 안정성보다 빠른 설정 비교가 목적)
 - **환경**: 네트워크 차단 상태로 로컬 캐시 모델만 사용
 - **하드웨어**: CPU only (device=cpu), faster-whisper 1.2.1
 
@@ -21,10 +21,12 @@
 
 | model_size | compute_type | cpu_threads | LCS ratio (median) | wall time p50 (s) | peak mem (MB) |
 |------------|-------------|-------------|-------------------|-------------------|---------------|
-| base       | int8        | 4           | 0.913             | 2.3               | ~210          |
-| base       | float32     | 4           | 0.921             | 4.8               | ~430          |
-| base       | int8        | 2           | 0.912             | 3.1               | ~210          |
-| small      | int8        | 4           | 0.951             | 5.6               | ~340          |
+| base       | int8        | 4           | 0.913             | 2.3               | ~210†         |
+| base       | float32     | 4           | 0.921             | 4.8               | ~430†         |
+| base       | int8        | 2           | 0.912             | 3.1               | ~210†         |
+| small      | int8        | 4           | 0.951             | 5.6               | ~340†         |
+
+> †peak_memory_mb는 프로세스 수명 기준 최대 RSS(`ru_maxrss`)이며, 실행 순서에 따라 이전 실행의 피크를 상속합니다. 첫 번째 조합이 가장 정확하며 이후 값은 참고용입니다.
 
 > **Windows x64** (참고값 — Intel Core i7, 16GB RAM): base/int8/4threads 약 4.2s, LCS ≈ 0.905
 

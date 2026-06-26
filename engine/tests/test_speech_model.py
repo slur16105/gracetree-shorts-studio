@@ -218,28 +218,19 @@ class TestModelAvailability:
         and not (Path.home() / ".cache" / "whisper").exists(),
         reason="캐시된 모델이 없으면 건너뜀",
     )
-    def test_model_is_accessible_without_network(self, monkeypatch):
-        """모델이 로컬에 캐시된 경우 네트워크 없이도 로드 가능한지 확인한다."""
-        import urllib.request
-        calls: list = []
-
-        def _no_net(*args, **kwargs):
-            calls.append(args)
-            raise RuntimeError("Network forbidden")
-
-        monkeypatch.setattr(urllib.request, "urlopen", _no_net)
-        try:
-            from faster_whisper import WhisperModel
-            WhisperModel(
-                DEFAULT_SPEECH_CONFIG.model_size,
-                device=DEFAULT_SPEECH_CONFIG.device,
-                compute_type=DEFAULT_SPEECH_CONFIG.compute_type,
-                cpu_threads=DEFAULT_SPEECH_CONFIG.cpu_threads,
-                num_workers=DEFAULT_SPEECH_CONFIG.num_workers,
-            )
-        except Exception:
-            pass
-        assert calls == [], "모델 로드 중 네트워크 요청이 발생했습니다"
+    def test_model_is_accessible_without_network(self):
+        """모델이 로컬에 캐시된 경우 local_files_only=True로 네트워크 없이 로드 가능한지 확인한다."""
+        from faster_whisper import WhisperModel
+        # local_files_only=True는 huggingface_hub에 네트워크 요청을 금지하며,
+        # 모델이 캐시에 없으면 EnvironmentError/OSError를 발생시킨다.
+        WhisperModel(
+            DEFAULT_SPEECH_CONFIG.model_size,
+            device=DEFAULT_SPEECH_CONFIG.device,
+            compute_type=DEFAULT_SPEECH_CONFIG.compute_type,
+            cpu_threads=DEFAULT_SPEECH_CONFIG.cpu_threads,
+            num_workers=DEFAULT_SPEECH_CONFIG.num_workers,
+            local_files_only=True,
+        )
 
     def test_custom_config_overrides_all_fields(self):
         cfg = SpeechConfig(

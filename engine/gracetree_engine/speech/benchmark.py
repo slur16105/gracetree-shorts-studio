@@ -11,17 +11,16 @@ Usage (dev-only script — not run in CI):
 """
 from __future__ import annotations
 
+import dataclasses
 import json
 import platform
-import re
 import time
-import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable
 
 from .config import SpeechConfig
-from .aligner import Segment
+from .aligner import Segment, _normalize, _lcs_ratio
 
 
 # ─────────────────────── corpus ────────────────────────
@@ -36,29 +35,15 @@ class BenchmarkSample:
     language: str
 
 
-# ─────────────────────── text matching (mirrors aligner) ────────────────────────
-
-
-def _normalize(text: str) -> str:
-    text = unicodedata.normalize("NFC", text)
-    return re.sub(r"[\s\.,!?;:·…—\-『』「」《》\n]", "", text)
-
-
-def _lcs_ratio(source: str, target: str) -> float:
-    if not target:
-        return 1.0
-    i = 0
-    for ch in source:
-        if i < len(target) and ch == target[i]:
-            i += 1
-    return i / len(target)
-
-
 # ─────────────────────── memory measurement ────────────────────────
 
 
 def _peak_memory_mb() -> float:
-    """Return peak RSS memory in MB. Returns 0 when resource module is unavailable."""
+    """Return peak RSS memory in MB (process-lifetime high-water mark on macOS/Linux).
+
+    Note: ru_maxrss cannot be reset between runs; values for later runs in a
+    multi-config session are >= the previous peak, not per-run figures.
+    """
     try:
         import resource
         usage = resource.getrusage(resource.RUSAGE_SELF)
@@ -95,7 +80,11 @@ def run_benchmark(
     """
     manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
     media_dir = manifest_path.parent
-    samples = [BenchmarkSample(**{k: v for k, v in s.items() if k in BenchmarkSample.__dataclass_fields__}) for s in manifest_data["samples"]]
+    valid_fields = {f.name for f in dataclasses.fields(BenchmarkSample)}
+    samples = [
+        BenchmarkSample(**{k: v for k, v in s.items() if k in valid_fields})
+        for s in manifest_data["samples"]
+    ]
 
     if transcribe_fn is None:
         from .aligner import _default_transcribe
@@ -106,17 +95,27 @@ def run_benchmark(
         for sample in samples:
             audio_path = media_dir / sample.file
             if not audio_path.exists():
+                print(f"[benchmark] WARNING: audio file not found, skipping: {audio_path}")
+                continue
+
+            ref_normalized = _normalize(sample.reference_text)
+            if not ref_normalized:
+                print(f"[benchmark] WARNING: empty reference_text after normalization, skipping: {sample.id}")
                 continue
 
             t0 = time.perf_counter()
-            segments = transcribe_fn(audio_path, config)
+            try:
+                segments = transcribe_fn(audio_path, config)
+            except Exception as exc:
+                print(f"[benchmark] ERROR: transcription failed for {sample.id} / {config.model_size}/{config.compute_type}: {exc}")
+                continue
             wall_time = round(time.perf_counter() - t0, 3)
             peak_mem = _peak_memory_mb()
 
             combined = " ".join(s.text for s in segments)
             lcs = round(_lcs_ratio(
                 _normalize(combined),
-                _normalize(sample.reference_text),
+                ref_normalized,
             ), 4)
 
             runs.append({

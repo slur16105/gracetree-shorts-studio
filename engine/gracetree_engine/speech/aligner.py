@@ -105,7 +105,7 @@ def _default_transcribe(voice_path: Path, config: SpeechConfig) -> list[Segment]
     if config.model_dir is not None:
         model_kwargs["download_root"] = config.model_dir
 
-    model = WhisperModel(config.model_size, **model_kwargs)
+    model = WhisperModel(config.model_size, local_files_only=True, **model_kwargs)
     raw_segments, _ = model.transcribe(
         str(voice_path),
         language=config.language,
