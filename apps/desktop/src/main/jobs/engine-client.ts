@@ -35,7 +35,9 @@ export class EngineClient {
       command: process.env['PYTHON'] ?? (process.platform === 'win32' ? 'python' : 'python3'),
       args: ['-m', 'gracetree_engine'],
       isDev: true,
-    }
+    },
+    private readonly ffmpegPath?: string,
+    private readonly ffprobePath?: string
   ) {}
 
   async request(command: EngineCommand): Promise<EngineEvent> {
@@ -108,6 +110,10 @@ export class EngineClient {
       ...process.env,
       GRACETREE_MANAGED_ROOT: this.approvedManagedRoot,
     }
+    // Point the engine's safe runner at the bundled ffmpeg/ffprobe (libass build).
+    // The allowlist is still enforced on the logical name inside run_safe.
+    if (this.ffmpegPath) env['GRACETREE_FFMPEG'] = this.ffmpegPath
+    if (this.ffprobePath) env['GRACETREE_FFPROBE'] = this.ffprobePath
     // In dev mode (python -m gracetree_engine), provide the source tree on PYTHONPATH.
     // In packaged mode (PyInstaller bundle), PYTHONPATH must not be set to a source path
     // that does not exist on the end user's machine.

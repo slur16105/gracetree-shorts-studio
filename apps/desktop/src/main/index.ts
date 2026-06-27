@@ -7,8 +7,9 @@ import { createWindowOptions, enforceMinimumContentSize } from './window-options
 import { registerJobHandlers } from './ipc/register-job-handlers'
 import { registerFileHandlers } from './ipc/register-file-handlers'
 import { registerResourceHandlers } from './ipc/register-resource-handlers'
+import { existsSync } from 'node:fs'
 import { EngineClient } from './jobs/engine-client'
-import { resolveEngineCommand } from './files/resource-paths'
+import { resolveEngineCommand, resolveFfmpegPath, resolveFfprobePath } from './files/resource-paths'
 import { EngineProcess } from './jobs/engine-process'
 import { JobService } from './jobs/job-service'
 import { createManagedJobPaths } from './files/managed-paths'
@@ -51,10 +52,26 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.gracetree.shorts-studio')
   const userDataPath = app.getPath('userData')
   const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
+  // Resolve the bundled ffmpeg/ffprobe (libass build). In dev, prefer the
+  // checked-out static binary under resources/ffmpeg/<platform>/; otherwise fall
+  // back to FFMPEG_PATH/PATH. In a packaged app, use the extraResources copy.
+  const resolveMedia = (
+    name: 'ffmpeg' | 'ffprobe',
+    packaged: (rp: string, dev: boolean) => string
+  ): string => {
+    if (is.dev) {
+      const exe = process.platform === 'win32' ? '.exe' : ''
+      const devPath = join(projectRoot, 'resources', 'ffmpeg', process.platform, `${name}${exe}`)
+      return existsSync(devPath) ? devPath : packaged('/any', true)
+    }
+    return packaged(process.resourcesPath, false)
+  }
   engineClient = new EngineClient(
     projectRoot,
     managedRoot,
-    resolveEngineCommand(process.resourcesPath, is.dev)
+    resolveEngineCommand(process.resourcesPath, is.dev),
+    resolveMedia('ffmpeg', resolveFfmpegPath),
+    resolveMedia('ffprobe', resolveFfprobePath)
   )
   const engineProcess = new EngineProcess(engineClient)
   const jobService = new JobService(engineProcess)

@@ -1,4 +1,3 @@
-import { INITIAL_JOB_RUN_STATE } from '@gracetree/contracts/job-state'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Reset the module state between tests by re-importing
@@ -49,7 +48,6 @@ describe('job-progress-store', () => {
 
   it('dispatchJobEvent applies job_accepted and moves state to running', () => {
     store.setCurrentJobId(JOB_ID)
-    const notifications: number[] = []
 
     // Subscribe manually by exposing internal subscribe (via dynamic import)
     // Since we can't easily call useSyncExternalStore outside React, test via side-effects

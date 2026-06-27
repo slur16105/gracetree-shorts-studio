@@ -74,8 +74,14 @@ export const desktopApi = Object.freeze({
     ipcRenderer.invoke(jobsOpenResultChannel, jobId),
   openLogFolder: (jobId, attemptId) =>
     ipcRenderer.invoke(jobsOpenLogChannel, jobId, attemptId),
-  startJob: (jobId, managedRoot, workPath, regenerate) =>
-    ipcRenderer.invoke(jobStartChannel, jobId, managedRoot, workPath, regenerate),
+  startJob: (jobId, managedRoot, workPath, regenerate?: boolean) =>
+    ipcRenderer.invoke(
+      jobStartChannel,
+      jobId,
+      managedRoot,
+      workPath,
+      ...(regenerate === undefined ? [] : [regenerate])
+    ),
   cancelJob: (jobId, attemptId) => ipcRenderer.invoke(jobCancelChannel, jobId, attemptId),
   onJobEvent: (listener) => {
     const wrapper = (_: IpcRendererEvent, event: EngineEvent) => listener(event)

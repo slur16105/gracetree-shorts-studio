@@ -104,6 +104,26 @@ describe('EngineClient', () => {
     client.stop()
   })
 
+  it('passes the bundled ffmpeg/ffprobe paths to the engine via env', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient(
+      '/project',
+      '/managed/GraceTreeData',
+      undefined,
+      '/bundle/ffmpeg',
+      '/bundle/ffprobe'
+    )
+    const pending = client.request(command('job-1'))
+    const spawnEnv = spawnMock.mock.calls[0][2].env
+    expect(spawnEnv.GRACETREE_FFMPEG).toBe('/bundle/ffmpeg')
+    expect(spawnEnv.GRACETREE_FFPROBE).toBe('/bundle/ffprobe')
+
+    child.stdout.write(`${JSON.stringify(event('job-1'))}\n`)
+    await expect(pending).resolves.toEqual(event('job-1'))
+    client.stop()
+  })
+
   it('terminates a timed-out engine and starts a fresh process for the next request', async () => {
     vi.useFakeTimers()
     const firstChild = createFakeChild()
