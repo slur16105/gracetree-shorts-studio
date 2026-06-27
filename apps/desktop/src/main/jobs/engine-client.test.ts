@@ -91,16 +91,29 @@ describe('EngineClient', () => {
     vi.useRealTimers()
   })
 
-  it('rejects a duplicate pending job ID without replacing the first resolver', async () => {
+  it('queues a duplicate pending job ID and dispatches it after the first settles', async () => {
     const child = createFakeChild()
     spawnMock.mockReturnValue(child)
+    const writes: string[] = []
+    child.stdin.on('data', (chunk) => writes.push(chunk.toString()))
     const client = new EngineClient('/project', '/managed/GraceTreeData')
-    const first = client.request(command('job-1'))
 
-    await expect(client.request(command('job-1'))).rejects.toThrow('already pending')
+    const first = client.request(command('job-1'))
+    const second = client.request(command('job-1'))
+    await new Promise((resolve) => setImmediate(resolve))
+
+    // The duplicate is queued, not rejected — only the first command is on the wire.
+    expect(writes).toHaveLength(1)
 
     child.stdout.write(`${JSON.stringify(event('job-1'))}\n`)
     await expect(first).resolves.toEqual(event('job-1'))
+    await new Promise((resolve) => setImmediate(resolve))
+
+    // First settled → the queued request is now dispatched in submission order.
+    expect(writes).toHaveLength(2)
+
+    child.stdout.write(`${JSON.stringify(event('job-1'))}\n`)
+    await expect(second).resolves.toEqual(event('job-1'))
     client.stop()
   })
 

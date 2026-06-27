@@ -17,6 +17,12 @@ interface StreamListener {
   timeout: NodeJS.Timeout
 }
 
+interface QueuedRequest {
+  command: EngineCommand
+  resolve: (event: EngineEvent) => void
+  reject: (error: Error) => void
+}
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000
 const INPUT_REGISTRATION_TIMEOUT_MS = 30 * 60 * 1_000
 const GENERATION_TIMEOUT_MS = 10 * 60 * 1_000
@@ -26,6 +32,7 @@ export class EngineClient {
   private child: ChildProcessWithoutNullStreams | null = null
   private lines: Interface | null = null
   private readonly pending = new Map<string, PendingRequest>()
+  private readonly queued = new Map<string, QueuedRequest[]>()
   private readonly streamListeners = new Map<string, StreamListener>()
 
   constructor(
@@ -41,9 +48,22 @@ export class EngineClient {
   ) {}
 
   async request(command: EngineCommand): Promise<EngineEvent> {
+    // The engine routes responses by jobId, so at most one request per jobId may
+    // be outstanding at a time. Rather than rejecting a concurrent request for the
+    // same job (which silently dropped legitimate work — e.g. registering a file
+    // while that job's script auto-validation was still in flight), queue it FIFO
+    // and dispatch it as soon as the in-flight request for that job settles.
     if (this.pending.has(command.jobId)) {
-      throw new Error(`Python engine request for job ${command.jobId} is already pending`)
+      return new Promise<EngineEvent>((resolve, reject) => {
+        const queue = this.queued.get(command.jobId) ?? []
+        queue.push({ command, resolve, reject })
+        this.queued.set(command.jobId, queue)
+      })
     }
+    return this.dispatch(command)
+  }
+
+  private dispatch(command: EngineCommand): Promise<EngineEvent> {
     this.ensureStarted()
     const child = this.child
     if (!child) throw new Error('Python engine did not start')
@@ -66,6 +86,7 @@ export class EngineClient {
           const pendingEntry = this.pending.get(command.jobId)!
           this.pending.delete(command.jobId)
           pendingEntry.reject(new Error('cancel_job acknowledgment timed out'))
+          this.drainQueue(command.jobId)
         } else {
           this.terminateChild(child, new Error('Python engine request timed out'))
         }
@@ -73,6 +94,25 @@ export class EngineClient {
       this.pending.set(command.jobId, { resolve, reject, timeout })
       child.stdin.write(`${JSON.stringify(command)}\n`)
     })
+  }
+
+  // A pending request for this jobId just settled; send the next queued one (if
+  // any) so same-job commands run serially in submission order.
+  private drainQueue(jobId: string): void {
+    if (this.pending.has(jobId)) return
+    const queue = this.queued.get(jobId)
+    if (!queue || queue.length === 0) {
+      this.queued.delete(jobId)
+      return
+    }
+    const next = queue.shift()!
+    if (queue.length === 0) this.queued.delete(jobId)
+    try {
+      this.dispatch(next.command).then(next.resolve, next.reject)
+    } catch (error) {
+      next.reject(error as Error)
+      this.drainQueue(jobId)
+    }
   }
 
   streamJob(command: StartJobCommand, onEvent: (event: EngineEvent) => void): Promise<void> {
@@ -168,6 +208,7 @@ export class EngineClient {
           clearTimeout(cancelPending.timeout)
           this.pending.delete(value.jobId)
           cancelPending.resolve(value)
+          this.drainQueue(value.jobId)
         }
       }
       return
@@ -177,6 +218,7 @@ export class EngineClient {
     clearTimeout(pending.timeout)
     this.pending.delete(value.jobId)
     pending.resolve(value)
+    this.drainQueue(value.jobId)
   }
 
   private terminateCurrentChild(error: Error): void {
@@ -212,6 +254,10 @@ export class EngineClient {
       pending.reject(error)
     }
     this.pending.clear()
+    for (const queue of this.queued.values()) {
+      for (const entry of queue) entry.reject(error)
+    }
+    this.queued.clear()
     for (const listener of this.streamListeners.values()) {
       clearTimeout(listener.timeout)
       listener.reject(error)
