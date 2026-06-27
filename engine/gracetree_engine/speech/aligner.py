@@ -193,14 +193,20 @@ def _assign_blocks_by_words(
     subtitle_blocks: list[dict[str, Any]],
     start_word_idx: int,
 ) -> list[dict[str, Any]] | None:
-    """Distribute blocks across the prayer's word span, proportional to text length.
+    """Assign each block a contiguous run of spoken words and time it from them.
 
     The prayer is spoken contiguously from start_word_idx to the last word.
     Whisper's transcription rarely matches the script word-for-word (e.g. 아픈
-    vs 아픔), so fragile per-word text matching mis-aligns. Instead we map each
-    block onto the real spoken time span [first word start, last word end] in
-    proportion to its character length. This keeps timing monotonic, pause-aware
-    at the span level, and free of overflow pile-ups.
+    vs 아픔), so fragile per-word *text* matching mis-aligns. Instead we decide
+    how many words each block consumes from its character-length share, but take
+    each block's startTime/endTime from the REAL word timestamps of the words it
+    consumes. A block therefore stays on screen for exactly as long as its words
+    are actually spoken — fixing the case where a coarse proportional split cut a
+    subtitle off before the speaker finished saying it.
+
+    To avoid blank flashes during the natural pauses between phrases, each block
+    is held until the next block's first word begins (the last block ends at its
+    own last spoken word).
 
     Times are the real spoken times — the voice plays from t=0 in the final
     video, so subtitles match those times directly (no offset).
@@ -210,22 +216,33 @@ def _assign_blocks_by_words(
     n = len(words)
     if start_word_idx >= n or not subtitle_blocks:
         return None
-    span_start = words[start_word_idx].start
-    span_end = words[-1].end
-    span = span_end - span_start
-    if span <= 0:
+    prayer_words = words[start_word_idx:]
+    total_words = len(prayer_words)
+    if total_words == 0:
         return None
 
     lengths = [max(1, len(normalize(b["text"]))) for b in subtitle_blocks]
-    total = sum(lengths)
+    total_len = sum(lengths)
+    num_blocks = len(subtitle_blocks)
 
+    # Partition the word sequence into one contiguous run per block. Boundaries
+    # come from cumulative character share, but every block must get ≥1 word and
+    # the runs must stay within [cursor, total_words].
     result: list[dict[str, Any]] = []
-    cum = 0
-    for block, length in zip(subtitle_blocks, lengths):
-        start = round(span_start + span * (cum / total), 6)
-        cum += length
-        end = round(span_start + span * (cum / total), 6)
-        end = round(max(end, start + 0.001), 6)
+    cursor = 0
+    cum_len = 0
+    for bi, (block, length) in enumerate(zip(subtitle_blocks, lengths)):
+        cum_len += length
+        if bi == num_blocks - 1:
+            end_word = total_words
+        else:
+            target = round(total_words * cum_len / total_len)
+            # Leave at least one word for each remaining block.
+            max_end = total_words - (num_blocks - 1 - bi)
+            end_word = max(cursor + 1, min(target, max_end))
+        block_words = prayer_words[cursor:end_word] or [prayer_words[min(cursor, total_words - 1)]]
+        start = round(block_words[0].start, 6)
+        end = round(max(block_words[-1].end, start + 0.001), 6)
         result.append({
             "index": block["index"],
             "text": block["text"],
@@ -233,6 +250,14 @@ def _assign_blocks_by_words(
             "startTime": start,
             "endTime": end,
         })
+        cursor = end_word
+
+    # Hold each subtitle until the next one begins so pauses between phrases do
+    # not leave the screen blank (the final block keeps its own spoken end).
+    for i in range(len(result) - 1):
+        next_start = result[i + 1]["startTime"]
+        if next_start > result[i]["endTime"]:
+            result[i]["endTime"] = next_start
     return result
 
 
