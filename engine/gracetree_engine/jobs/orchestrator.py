@@ -17,7 +17,20 @@ from ..scripts.parser import parse_script as _parse_script
 from ..speech.aligner import AlignmentError, align_speech as _align_speech
 from ..speech.config import DEFAULT_SPEECH_CONFIG
 from .attempt_repository import AttemptRepository
-from ..resource_resolver import contracts_dir as _contracts_dir
+from ..resource_resolver import contracts_dir as _contracts_dir, fonts_dir as _fonts_dir
+from ..subtitles.generator import (
+    SubtitleError,
+    generate_subtitles as _generate_subtitles,
+)
+from ..media.background import (
+    BackgroundError,
+    compose_background as _compose_background,
+)
+from ..media.compose import ComposeError, compose_video_audio as _compose_video_audio
+from ..media.validation import (
+    ValidationError as MediaValidationError,
+    validate_final_artifacts as _validate_final_artifacts,
+)
 
 _CONTRACTS_DIR = _contracts_dir()
 
@@ -235,6 +248,32 @@ def _find_voice_path(snapshot: dict[str, Any]) -> str | None:
     return None
 
 
+def _find_input_path(snapshot: dict[str, Any], role: str) -> str | None:
+    """스냅샷 inputs에서 주어진 role의 ready managed_path를 반환한다."""
+    for inp in snapshot.get("inputs", []):
+        if inp.get("role") == role and inp.get("status") == "ready":
+            return inp.get("managedPath")
+    return None
+
+
+def _find_resource_path(snapshot: dict[str, Any], resource_type: str) -> str | None:
+    """스냅샷 resources에서 주어진 type의 ready managed_path를 반환한다."""
+    res = snapshot.get("resources", {}).get(resource_type)
+    if res and res.get("status") == "ready" and res.get("managedPath"):
+        return str(res["managedPath"])
+    return None
+
+
+def _resolve_within_root(path_str: str, approved_root: Path) -> Path | None:
+    """절대경로로 정규화하고 허가된 루트 안인지 검증한다. 위반 시 None."""
+    p = Path(path_str).resolve()
+    try:
+        _assert_within_root(p, approved_root)
+    except ValueError:
+        return None
+    return p
+
+
 Emit = Callable[[dict[str, Any]], None]
 
 
@@ -385,118 +424,147 @@ def _run_start_job_stages(
             _fail("PROCESS_FAILED", "speech_alignment", False, None, "음성 파일 경로가 허가된 범위 밖입니다.")
             return
 
-    if voice_path is not None and script_ast:
+    # 실제 생성 파이프라인은 음성+스크립트가 전제다.
+    if voice_path is None or not script_ast:
+        _fail(
+            "PROCESS_FAILED", "speech_alignment", True, None,
+            "음성 또는 스크립트 입력이 준비되지 않았습니다.",
+        )
+        return
+
+    def _progress(stage_id: str, percent: int) -> None:
+        emit(_make_event("progress", job_id, {
+            "attemptId": attempt_id, "stageId": stage_id, "percent": percent,
+        }))
+
+    def _stage(stage_id: str, stage_name: str) -> None:
         _check_cancel(cancel_event)
-        align_fn = _align if _align is not None else _align_speech
         emit(_make_event("stage_started", job_id, {
-            "attemptId": attempt_id,
-            "stageId": "speech_alignment",
-            "stageName": "음성 정렬",
-        }))
-        emit(_make_event("progress", job_id, {
-            "attemptId": attempt_id,
-            "stageId": "speech_alignment",
-            "percent": 5,
-        }))
-        try:
-            align_fn(
-                voice_path=voice_path,
-                script_ast=script_ast,
-                attempt_dir=attempt_dir,
-                config=DEFAULT_SPEECH_CONFIG,
-            )
-        except AlignmentError as exc:
-            recoverable = exc.recoverable
-            if recoverable:
-                details = (
-                    f"{exc} — "
-                    "스크립트의 첫 번째 기도 문장과 음성 녹음의 첫 기도 문장이 일치하는지 확인하세요."
-                )
-            else:
-                details = None
-            _fail(exc.error_code, "speech_alignment", recoverable, details, str(exc))
-            return
-        except Exception as exc:
-            _fail("PROCESS_FAILED", "speech_alignment", False, None, str(exc))
-            return
-        _check_cancel(cancel_event)
-        emit(_make_event("progress", job_id, {
-            "attemptId": attempt_id,
-            "stageId": "speech_alignment",
-            "percent": 25,
+            "attemptId": attempt_id, "stageId": stage_id, "stageName": stage_name,
         }))
 
-    _check_cancel(cancel_event)
-    emit(_make_event("stage_started", job_id, {
-        "attemptId": attempt_id,
-        "stageId": "vertical_slice",
-        "stageName": "수직 슬라이스 진단",
-    }))
-    emit(_make_event("progress", job_id, {
-        "attemptId": attempt_id,
-        "stageId": "vertical_slice",
-        "percent": 30,
-    }))
-    artifact_path = attempt_dir / "vertical-slice.mp4"
-
-    ffmpeg_args = [
-        "-y",
-        "-f", "lavfi",
-        "-i", "color=black:size=64x64:rate=30:duration=2",
-        "-f", "lavfi",
-        "-i", "sine=frequency=440:duration=2",
-        "-c:v", "libx264",
-        "-c:a", "aac",
-        "-shortest",
-        str(artifact_path),
-    ]
-
-    emit(_make_event("progress", job_id, {
-        "attemptId": attempt_id,
-        "stageId": "vertical_slice",
-        "percent": 50,
-    }))
-
+    # ── Stage 1: 음성 정렬 → timing.json ──────────────────────────
+    align_fn = _align if _align is not None else _align_speech
+    _stage("speech_alignment", "음성 정렬")
+    _progress("speech_alignment", 5)
     try:
-        result = _run_ffmpeg_cancellable(ffmpeg_args, cancel_event)
-    except JobCancelledError:
-        raise
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        _fail("PROCESS_FAILED", "vertical_slice", False, None, "FFmpeg 실행 실패 또는 시간 초과.")
+        timing_path = align_fn(
+            voice_path=voice_path, script_ast=script_ast,
+            attempt_dir=attempt_dir, config=DEFAULT_SPEECH_CONFIG,
+        )
+    except AlignmentError as exc:
+        details = (
+            f"{exc} — 스크립트의 첫 번째 기도 문장과 음성 녹음의 첫 기도 문장이 일치하는지 확인하세요."
+            if exc.recoverable else None
+        )
+        _fail(exc.error_code, "speech_alignment", exc.recoverable, details, str(exc))
+        return
+    except Exception as exc:
+        _fail("PROCESS_FAILED", "speech_alignment", False, None, str(exc))
+        return
+    try:
+        timing_file = Path(timing_path) if timing_path else attempt_dir / "timing.json"
+        timing = json.loads(timing_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        _fail("PROCESS_FAILED", "speech_alignment", False, None, f"timing.json 읽기 실패: {exc}")
+        return
+    _progress("speech_alignment", 25)
+
+    # ── 필수 입력/리소스 경로 해석 (허가된 루트 검증) ─────────────
+    intro_str = _find_resource_path(snapshot, "title_scripture_video")
+    loop_str = _find_resource_path(snapshot, "prayer_loop_video")
+    thumb_str = _find_input_path(snapshot, "thumbnail")
+    bgm_str = _find_input_path(snapshot, "bgm") or _find_resource_path(snapshot, "default_bgm")
+    missing = [
+        name for name, val in (
+            ("제목·말씀 영상", intro_str), ("기도 반복 영상", loop_str),
+            ("썸네일", thumb_str), ("배경음악", bgm_str),
+        ) if not val
+    ]
+    if missing:
+        _fail(
+            "PROCESS_FAILED", "background_composition", True, None,
+            f"필수 입력/리소스가 없습니다: {', '.join(missing)}",
+        )
+        return
+    intro_p = _resolve_within_root(intro_str, approved_root)
+    loop_p = _resolve_within_root(loop_str, approved_root)
+    thumb_p = _resolve_within_root(thumb_str, approved_root)
+    bgm_p = _resolve_within_root(bgm_str, approved_root)
+    if None in (intro_p, loop_p, thumb_p, bgm_p):
+        _fail("PROCESS_FAILED", "background_composition", False, None, "입력 경로가 허가된 범위 밖입니다.")
         return
 
+    # ── Stage 2: 자막(.ass) 생성 ──────────────────────────────────
+    _stage("subtitle_generation", "자막 생성")
+    try:
+        subtitle_path = _generate_subtitles(script_ast, timing, attempt_dir)
+    except SubtitleError as exc:
+        _fail(exc.error_code, "subtitle_generation", True, str(exc), str(exc))
+        return
+    except Exception as exc:
+        _fail("PROCESS_FAILED", "subtitle_generation", False, None, str(exc))
+        return
+    _progress("subtitle_generation", 40)
+
+    # ── Stage 3: 배경 영상 구성 ───────────────────────────────────
+    _stage("background_composition", "배경 영상 구성")
+    try:
+        background_path = _compose_background(intro_p, loop_p, timing, attempt_dir)
+    except BackgroundError as exc:
+        _fail(exc.error_code, "background_composition", True, str(exc), str(exc))
+        return
+    except Exception as exc:
+        _fail("PROCESS_FAILED", "background_composition", False, None, str(exc))
+        return
+    _progress("background_composition", 60)
+
+    # ── Stage 4: 음성·BGM·썸네일·자막 합성 → final.mp4 ────────────
+    _stage("final_composition", "최종 합성")
+    try:
+        final_path = _compose_video_audio(
+            background_path, voice_path, bgm_p, thumb_p, attempt_dir,
+            subtitle_path=subtitle_path, fontsdir=_fonts_dir(),
+        )
+    except ComposeError as exc:
+        _fail(exc.error_code, "final_composition", True, str(exc), str(exc))
+        return
+    except Exception as exc:
+        _fail("PROCESS_FAILED", "final_composition", False, None, str(exc))
+        return
+    _progress("final_composition", 85)
+
+    # ── Stage 5: 최종 산출물 검증 (1080×1920/30fps/스트림) ────────
+    _stage("artifact_validation", "산출물 검증")
+    try:
+        _validate_final_artifacts(attempt_dir)
+    except MediaValidationError as exc:
+        _fail(exc.error_code, "artifact_validation", False, str(exc), str(exc))
+        return
+    except Exception as exc:
+        _fail("PROCESS_FAILED", "artifact_validation", False, None, str(exc))
+        return
+    _progress("artifact_validation", 95)
     _check_cancel(cancel_event)
 
-    emit(_make_event("progress", job_id, {
-        "attemptId": attempt_id,
-        "stageId": "vertical_slice",
-        "percent": 70,
-    }))
-
-    if result.returncode != 0:
-        _fail("PROCESS_FAILED", "vertical_slice", False, None, "FFmpeg 비정상 종료.")
-        return
-
-    emit(_make_event("progress", job_id, {
-        "attemptId": attempt_id,
-        "stageId": "vertical_slice",
-        "percent": 90,
-    }))
-
-    if not _verify_mp4(artifact_path):
-        _fail("PROCESS_FAILED", "vertical_slice", False, None, "생성된 MP4 파일 검증 실패.")
-        return
-
-    # AC 4: output 디렉터리로 원자적 이동 (pending 마커 → os.replace → DB 완료)
+    # ── 원자적 커밋: final.mp4 + 부산물(timing/subtitles/render_log)을 output/로 ──
     output_dir = work_path / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / artifact_path.name
+    output_path = output_dir / final_path.name
     try:
-        repo.mark_artifact_commit_pending(job_id=job_id, artifact_path=str(artifact_path))
-        os.replace(str(artifact_path), str(output_path))
+        repo.mark_artifact_commit_pending(job_id=job_id, artifact_path=str(final_path))
+        os.replace(str(final_path), str(output_path))
+        # 부산물 복사(있으면) — 실패해도 최종 산출물 커밋은 유지
+        for name in ("subtitles.ass", "timing.json", "render_log.txt"):
+            src = attempt_dir / name
+            if src.is_file():
+                try:
+                    shutil.copy2(str(src), str(output_dir / name))
+                except OSError:
+                    pass
         repo.complete_attempt(attempt_id=attempt_id, artifact_path=str(output_path))
     except Exception as exc:
-        _fail("PROCESS_FAILED", "vertical_slice", False, None, f"산출물 저장 실패: {exc}")
+        _fail("PROCESS_FAILED", "artifact_validation", False, None, f"산출물 저장 실패: {exc}")
         return
 
     shutil.rmtree(attempt_dir, ignore_errors=True)
@@ -507,7 +575,6 @@ def _run_start_job_stages(
         "artifactPath": str(output_path),
         "artifactName": artifact_name,
     }))
-
     emit(_make_event("job_completed", job_id, {
         "attemptId": attempt_id,
         "artifactPath": str(output_path),

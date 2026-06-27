@@ -77,6 +77,38 @@ class TestRunSafe:
         # run_safe should not raise for non-zero (caller decides), but it returns the result
         assert result.returncode == 1
 
+    # ── Story 2.18 Task 3: bundled ffmpeg path resolution via env ──
+    def test_resolves_ffmpeg_from_env(self, monkeypatch):
+        """GRACETREE_FFMPEG 설정 시 argv[0]을 절대경로로 치환한다(번들 ffmpeg)."""
+        monkeypatch.setenv("GRACETREE_FFMPEG", "/opt/ff/ffmpeg")
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            run_safe(["ffmpeg", "-version"])
+        argv = mock_run.call_args[0][0]
+        assert argv[0] == "/opt/ff/ffmpeg"
+        assert argv[1:] == ["-version"]
+
+    def test_resolves_ffprobe_from_env(self, monkeypatch):
+        monkeypatch.setenv("GRACETREE_FFPROBE", "/opt/ff/ffprobe")
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            run_safe(["ffprobe", "-version"])
+        assert mock_run.call_args[0][0][0] == "/opt/ff/ffprobe"
+
+    def test_no_env_uses_bare_name(self, monkeypatch):
+        monkeypatch.delenv("GRACETREE_FFMPEG", raising=False)
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            run_safe(["ffmpeg", "-version"])
+        assert mock_run.call_args[0][0][0] == "ffmpeg"
+
+    def test_env_does_not_bypass_allowlist(self, monkeypatch):
+        """env가 설정돼도 허용 목록 밖 실행 파일은 거부된다(보안)."""
+        monkeypatch.setenv("GRACETREE_FFMPEG", "/opt/ff/ffmpeg")
+        with pytest.raises(RunnerError) as exc:
+            run_safe(["rm", "-rf", "/"])
+        assert exc.value.error_code == "DISALLOWED_EXECUTABLE"
+
 
 # ─────────────────────── Task 2: 오디오 stream 검증 ────────────────────────
 

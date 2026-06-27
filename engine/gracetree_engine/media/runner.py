@@ -8,10 +8,20 @@ Enforces:
 """
 from __future__ import annotations
 
+import os
 import subprocess
 
 ALLOWED_EXECUTABLES: frozenset[str] = frozenset({"ffmpeg", "ffprobe"})
 STDERR_MAX_CHARS = 500
+
+# The bundled ffmpeg/ffprobe binaries are not on PATH. The trusted host
+# (Electron main, or a dev shell) points these env vars at the bundled
+# executables; the allowlist is still enforced on the *logical* name so the
+# env override cannot introduce an arbitrary executable.
+_EXECUTABLE_ENV: dict[str, str] = {
+    "ffmpeg": "GRACETREE_FFMPEG",
+    "ffprobe": "GRACETREE_FFPROBE",
+}
 
 
 class RunnerError(Exception):
@@ -34,9 +44,14 @@ def run_safe(
             "DISALLOWED_EXECUTABLE",
             f"실행 파일이 허용 목록에 없습니다: {executable!r}",
         )
+    # Resolve the logical name to the bundled binary when the host configured it.
+    resolved = list(cmd)
+    override = os.environ.get(_EXECUTABLE_ENV[cmd[0]])
+    if override:
+        resolved[0] = override
     try:
         result = subprocess.run(
-            cmd,
+            resolved,
             capture_output=True,
             text=True,
             shell=False,
