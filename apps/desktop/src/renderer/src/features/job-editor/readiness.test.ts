@@ -245,14 +245,14 @@ describe('computeReadiness', () => {
       expect(result.commonResourcesReady).toBe(false)
     })
 
-    it('is false when subtitle_font is missing', () => {
+    it('is true when subtitle_font is missing (optional override, bundled font used)', () => {
       const resources = [
         makeResource('title_scripture_video', 'ready'),
         makeResource('prayer_loop_video', 'ready'),
         makeResource('subtitle_font', 'missing'),
       ]
       const result = computeReadiness([], null, resources)
-      expect(result.commonResourcesReady).toBe(false)
+      expect(result.commonResourcesReady).toBe(true)
     })
 
     it('is false when no resources are provided', () => {

@@ -62,6 +62,26 @@ def test_migrations_dir_uses_meipass_when_bundled(tmp_path):
     assert d == fake_meipass / "migrations"
 
 
+def test_fonts_dir_returns_path_in_dev_mode():
+    d = resource_resolver.fonts_dir()
+    assert d.name == "fonts"
+    assert d.parent.name == "resources"
+
+
+def test_bundled_korean_font_exists_in_dev_mode():
+    fonts = list(resource_resolver.fonts_dir().glob("*.ttf"))
+    assert fonts, "번들 한글 폰트(.ttf)가 resources/fonts/에 있어야 한다"
+
+
+def test_fonts_dir_uses_meipass_when_bundled(tmp_path):
+    fake_meipass = tmp_path / "bundle"
+    (fake_meipass / "fonts").mkdir(parents=True)
+    fake_sys = types.SimpleNamespace(frozen=True, _MEIPASS=str(fake_meipass))
+    with patch.object(resource_resolver, "_sys", fake_sys):
+        d = resource_resolver.fonts_dir()
+    assert d == fake_meipass / "fonts"
+
+
 def test_is_bundled_false_in_dev_mode():
     assert not resource_resolver._is_bundled()
 

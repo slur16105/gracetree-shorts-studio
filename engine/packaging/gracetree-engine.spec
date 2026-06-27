@@ -28,6 +28,7 @@ _proj_root   = _engine_root.parent                  # project root
 _contracts_schemas = _proj_root / "packages" / "contracts" / "schemas"
 _migrations        = _engine_root / "migrations"
 _licenses          = _proj_root / "resources" / "licenses"
+_fonts             = _proj_root / "resources" / "fonts"
 
 a = Analysis(
     [str(_engine_root / "gracetree_engine" / "__main__.py")],
@@ -40,6 +41,9 @@ a = Analysis(
         (str(_migrations), "migrations"),
         # Third-party license notices
         (str(_licenses), "licenses"),
+        # Bundled Korean font referenced by resource_resolver.fonts_dir()
+        # (libass fontsdir for subtitle burn-in)
+        (str(_fonts), "fonts"),
     ],
     hiddenimports=[
         # Engine sub-packages (PyInstaller may miss them without explicit listing)

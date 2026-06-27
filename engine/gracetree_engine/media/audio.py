@@ -61,6 +61,19 @@ def probe_audio_duration(path: Path, timeout: int = 60) -> float:
     return dur
 
 
+def _escape_filter_path(path: str) -> str:
+    """Escape a path for use as an ffmpeg filtergraph option value.
+
+    Within a filtergraph, an option value is terminated by ``:`` and the graph
+    parser also treats ``\\`` and ``'`` specially. Escape these so paths with a
+    Windows drive (``C:\\``) or quotes survive intact. Spaces are literal.
+    """
+    out = path.replace("\\", "\\\\")
+    out = out.replace(":", "\\:")
+    out = out.replace("'", "\\'")
+    return out
+
+
 def build_compose_cmd(
     background_path: Path,
     voice_path: Path,
@@ -69,6 +82,8 @@ def build_compose_cmd(
     output_path: Path,
     total_duration: float,
     config: object,  # ComposeConfig — imported lazily to avoid circular
+    subtitle_path: Path | None = None,
+    fontsdir: Path | None = None,
 ) -> list[str]:
     """Build FFmpeg command list for final composition.
 
@@ -80,6 +95,8 @@ def build_compose_cmd(
 
     Filter graph:
       - Thumbnail overlay on first frame
+      - Subtitle (.ass) burn-in via libass when subtitle_path is given,
+        with fontsdir so the Korean font is found (else glyphs fall back/break)
       - BGM afade in+out (clamped if BGM too short)
       - amix voice+BGM
     """
@@ -99,10 +116,19 @@ def build_compose_cmd(
 
     parts: list[str] = []
 
-    # Thumbnail overlay for first frame
+    # Thumbnail overlay for first frame. When subtitles are burned in, the
+    # overlay output feeds the ass filter; otherwise it is the final video.
+    overlay_out = "[vov]" if subtitle_path is not None else "[vout]"
     parts.append(
-        f"[0:v][3:v]overlay=x=0:y=0:enable='lte(t,{frame_dur:.6f})'[vout]"
+        f"[0:v][3:v]overlay=x=0:y=0:enable='lte(t,{frame_dur:.6f})'{overlay_out}"
     )
+
+    # Subtitle burn-in (libass). fontsdir ensures the Korean font is resolved.
+    if subtitle_path is not None:
+        ass_opts = f"ass=filename={_escape_filter_path(str(subtitle_path))}"
+        if fontsdir is not None:
+            ass_opts += f":fontsdir={_escape_filter_path(str(fontsdir))}"
+        parts.append(f"[vov]{ass_opts}[vout]")
 
     # BGM fade in + fade out (consistent precision)
     parts.append(

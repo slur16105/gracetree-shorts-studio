@@ -50,3 +50,18 @@ def migrations_dir() -> Path:
         return _meipass() / "migrations"
     # parents[1] = engine/
     return Path(__file__).resolve().parents[1] / "migrations"
+
+
+def fonts_dir() -> Path:
+    """Return the bundled fonts directory (contains the default Korean font).
+
+    Bundle layout:  <_MEIPASS>/fonts/*.ttf
+    Source layout:  <project_root>/resources/fonts/*.ttf
+
+    Used as the libass ``fontsdir`` so subtitle glyphs render with the bundled
+    font even when the host has no Korean font installed.
+    """
+    if _is_bundled():
+        return _meipass() / "fonts"
+    # parents[2] = project root
+    return Path(__file__).resolve().parents[2] / "resources" / "fonts"

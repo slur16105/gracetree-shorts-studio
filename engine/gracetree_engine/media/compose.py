@@ -29,8 +29,13 @@ def compose_video_audio(
     thumbnail_path: Path,
     attempt_dir: Path,
     config: ComposeConfig = DEFAULT_COMPOSE_CONFIG,
+    subtitle_path: Path | None = None,
+    fontsdir: Path | None = None,
 ) -> Path:
     """Compose final.mp4 from background video, voice, BGM, and thumbnail.
+
+    When subtitle_path is given, the .ass subtitle is burned into the video via
+    libass; fontsdir lets libass resolve the Korean font.
 
     Raises ComposeError on probe or ffmpeg failure.
     Does not modify any source file.
@@ -62,6 +67,8 @@ def compose_video_audio(
         output_path=output_path,
         total_duration=total_duration,
         config=config,
+        subtitle_path=subtitle_path,
+        fontsdir=fontsdir,
     )
 
     try:

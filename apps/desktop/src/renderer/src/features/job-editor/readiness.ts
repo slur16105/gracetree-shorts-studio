@@ -80,7 +80,10 @@ export function computeReadiness(
   const blockingReasons = slots.filter((s) => !s.satisfied).map((s) => s.missingAction)
   const nextAction = blockingReasons[0] ?? null
 
-  const COMMON_RESOURCE_TYPES = ['title_scripture_video', 'prayer_loop_video', 'subtitle_font'] as const
+  // subtitle_font is an OPTIONAL override: the engine burns subtitles with a
+  // bundled Korean font when no font resource is provided, so it must not gate
+  // generation. Only the background videos are required common resources.
+  const COMMON_RESOURCE_TYPES = ['title_scripture_video', 'prayer_loop_video'] as const
   const commonResourcesReady = COMMON_RESOURCE_TYPES.every(
     (type) => resources.find((r) => r.type === type)?.status === 'ready',
   )

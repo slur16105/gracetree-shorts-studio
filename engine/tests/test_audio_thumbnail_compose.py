@@ -196,6 +196,39 @@ class TestBuildComposeCmd:
         # Should not raise; fade durations should be clamped (e.g., 1.5 each for 3s BGM)
         assert "afade" in fg
 
+    # ── Story 2.18 Task 1: subtitle burn-in ──────────────────────
+    def test_no_subtitle_path_has_no_ass_filter(self):
+        """subtitle_path 미지정 시 기존 동작 유지 — ass 필터 없음."""
+        cmd = self._base_cmd()
+        fg = cmd[cmd.index("-filter_complex") + 1]
+        assert "ass=" not in fg
+
+    def test_subtitle_path_adds_ass_filter_on_video_chain(self):
+        """subtitle_path 지정 시 비디오 체인에 ass 자막 번인 필터가 추가된다."""
+        cmd = self._base_cmd(subtitle_path=Path("/work/attempt/subtitles.ass"))
+        fg = cmd[cmd.index("-filter_complex") + 1]
+        assert "ass=" in fg
+        assert "subtitles.ass" in fg
+        # 최종 출력 비디오 라벨은 여전히 [vout]이어야 한다
+        assert "[vout]" in fg
+        assert "-map" in cmd and "[vout]" in cmd
+
+    def test_subtitle_burn_in_includes_fontsdir(self):
+        """fontsdir 지정 시 ass 필터에 fontsdir 옵션이 포함된다(한글 폰트 보장)."""
+        cmd = self._base_cmd(
+            subtitle_path=Path("/work/attempt/subtitles.ass"),
+            fontsdir=Path("/app/resources/fonts"),
+        )
+        fg = cmd[cmd.index("-filter_complex") + 1]
+        assert "fontsdir=" in fg
+
+    def test_subtitle_overlay_precedes_ass(self):
+        """썸네일 오버레이 후 자막을 굽는다 — overlay와 ass가 모두 비디오 체인에 있다."""
+        cmd = self._base_cmd(subtitle_path=Path("/work/attempt/subtitles.ass"))
+        fg = cmd[cmd.index("-filter_complex") + 1]
+        assert "overlay" in fg and "ass=" in fg
+        assert fg.index("overlay") < fg.index("ass=")
+
 
 # ─────────────────────── Task 5: compose_video_audio (orchestration) ────────────────────────
 
@@ -222,6 +255,26 @@ class TestComposeVideoAudio:
             result = compose_video_audio(bg, voice, bgm, thumb, attempt)
         assert result.name == "final.mp4"
         assert result.parent == attempt
+
+    def test_passes_subtitle_path_and_fontsdir_to_cmd(self, tmp_path):
+        """compose_video_audio가 subtitle_path/fontsdir를 명령에 전달해 자막을 굽는다."""
+        bg, voice, bgm, thumb, attempt = self._setup_files(tmp_path)
+        sub = attempt / "subtitles.ass"
+        sub.write_text("[Script Info]\n", encoding="utf-8")
+        fontsdir = tmp_path / "fonts"
+        fontsdir.mkdir()
+        with patch("gracetree_engine.media.compose.probe_audio_duration") as mock_dur, \
+             patch("gracetree_engine.media.compose.run_safe") as mock_run:
+            mock_dur.side_effect = [20.0, 120.0]
+            mock_run.return_value = MagicMock(returncode=0)
+            compose_video_audio(
+                bg, voice, bgm, thumb, attempt,
+                subtitle_path=sub, fontsdir=fontsdir,
+            )
+        cmd = mock_run.call_args[0][0]
+        fg = cmd[cmd.index("-filter_complex") + 1]
+        assert "ass=" in fg
+        assert "fontsdir=" in fg
 
     def test_raises_compose_error_if_audio_probe_fails(self, tmp_path):
         bg, voice, bgm, thumb, attempt = self._setup_files(tmp_path)
