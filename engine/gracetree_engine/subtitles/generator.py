@@ -160,10 +160,12 @@ def _styles(config: SubtitleConfig) -> str:
     mv = config.margin_v_top
 
     def _style(name: str, size: int, color: str, alignment: int, margin_v: int) -> str:
+        # Bold=0: Black Han Sans is already a black weight; synthetic bold would
+        # fill in counters and look blobby. Use the font's natural weight.
         return (
             f"Style: {name},{config.font_name},{size},{color},&H000000FF,"
             f"{config.color_outline},{config.color_shadow},"
-            f"-1,0,0,0,100,100,0,0,1,"
+            f"0,0,0,0,100,100,0,0,1,"
             f"{config.outline_thickness},{config.shadow_depth},"
             f"{alignment},{mh},{mh},{margin_v},1"
         )
@@ -178,8 +180,20 @@ def _styles(config: SubtitleConfig) -> str:
     )
 
 
-def _dialogue(start: float, end: float, style: str, text: str, fade_in: int, fade_out: int) -> str:
-    fad = f"{{\\fad({fade_in},{fade_out})}}"
+def _dialogue(
+    start: float,
+    end: float,
+    style: str,
+    text: str,
+    fade_in: int,
+    fade_out: int,
+    center: tuple[int, int] | None = None,
+) -> str:
+    # When `center` is given, anchor the text's middle (\an5) at that point so a
+    # multi-line block stays centred there regardless of its height — used to keep
+    # the title/scripture centred inside the intro black band.
+    pos = f"\\pos({center[0]},{center[1]})\\an5" if center is not None else ""
+    fad = f"{{{pos}\\fad({fade_in},{fade_out})}}"
     return (
         f"Dialogue: 0,{_format_time(start)},{_format_time(end)},"
         f"{style},,0,0,0,,{fad}{_escape_ass(text)}"
@@ -208,10 +222,26 @@ def _events(
     else:
         first_prayer_start = timing.get("voiceOffset", 2.0)
 
-    # Title and scripture: from 0 to first prayer start
+    # Title and scripture: shown sequentially (never on screen together) across
+    # the intro window [0, first_prayer_start]. The title appears first, then the
+    # scripture, each taking an equal slice. When only one is present it spans the
+    # whole intro window.
     fi, fo = config.fade_in_ms, config.fade_out_ms
-    lines.append(_dialogue(0.0, first_prayer_start, "Title", script_ast.get("title", ""), fi, fo))
-    lines.append(_dialogue(0.0, first_prayer_start, "Scripture", script_ast.get("scripture", ""), fi, fo))
+    intro = [
+        (style, text)
+        for style, text in (
+            ("Title", script_ast.get("title", "")),
+            ("Scripture", script_ast.get("scripture", "")),
+        )
+        if text.strip()
+    ]
+    band_center = (config.play_res_x // 2, config.title_band_center_v)
+    if intro and first_prayer_start > 0:
+        slot = first_prayer_start / len(intro)
+        for k, (style, text) in enumerate(intro):
+            seg_start = round(k * slot, 6)
+            seg_end = first_prayer_start if k == len(intro) - 1 else round((k + 1) * slot, 6)
+            lines.append(_dialogue(seg_start, seg_end, style, text, fi, fo, center=band_center))
 
     # Prayer blocks
     for i, block in enumerate(timing_blocks):

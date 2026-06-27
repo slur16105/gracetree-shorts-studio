@@ -11,14 +11,20 @@ class SubtitleConfig:
     play_res_y: int = 1920
 
     # Font
-    font_name: str = "나눔고딕"
-    font_size_title: int = 72
-    font_size_scripture: int = 52
-    font_size_prayer: int = 60
+    # Black Han Sans (검은고딕): heavy single-weight display font matching the
+    # CapCut Shorts caption look. Matched by its ASCII family name via libass
+    # fontsdir. NanumGothic stays bundled as a per-glyph fallback for any
+    # syllable this display font does not cover.
+    font_name: str = "Black Han Sans"
+    # Sizes doubled from the original 72/52/60 for a punchy Shorts look. libass
+    # wraps within margin_h so the larger text does not clip horizontally.
+    font_size_title: int = 144
+    font_size_scripture: int = 104
+    font_size_prayer: int = 120
 
     # ASS colors: &HAABBGGRR (alpha, blue, green, red)
     color_title: str = "&H00FFFFFF"       # white
-    color_scripture: str = "&H00AAAAAA"   # light gray
+    color_scripture: str = "&H00FFFFFF"   # white
     color_prayer: str = "&H00FFFFFF"      # white
     color_outline: str = "&H00000000"     # black
     color_shadow: str = "&H80000000"      # 50% transparent black
@@ -37,6 +43,11 @@ class SubtitleConfig:
 
     # Vertical gap between title and scripture text
     title_scripture_gap: int = 20
+
+    # The intro background has a black band across the top ~30% of the 1080×1920
+    # frame. Title and scripture are anchored to this point (\pos + \an5) so they
+    # sit centred in that band regardless of line count. Tune if the band moves.
+    title_band_center_v: int = 288  # ≈ centre of the top 30% (0–576px) band
 
     # 아멘 hold and fade
     amen_hold_seconds: float = 2.0
