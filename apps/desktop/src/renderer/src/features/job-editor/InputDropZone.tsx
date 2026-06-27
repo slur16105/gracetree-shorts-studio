@@ -59,6 +59,11 @@ function InputDropZoneContent({
   })
 
   useEffect(() => {
+    // Re-affirm on setup so React StrictMode's mount→unmount→mount cycle (which
+    // fires the cleanup once before the real mount) does not leave activeRef
+    // permanently false — that would make every post-registration state update
+    // (and the pending-file cleanup) silently no-op, freezing files on "등록 중".
+    activeRef.current = true
     return () => {
       activeRef.current = false
     }
