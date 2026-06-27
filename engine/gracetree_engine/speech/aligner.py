@@ -19,10 +19,20 @@ from typing import Any, Callable, NamedTuple
 from .config import SpeechConfig, TARGET_VOICE_START_SECONDS
 
 
+class Word(NamedTuple):
+    start: float
+    end: float
+    text: str
+
+
 class Segment(NamedTuple):
     start: float
     end: float
     text: str
+    # Per-word timestamps (empty when unavailable, e.g. in tests). When present,
+    # block timing is derived from words for accurate per-phrase sync instead of
+    # a coarse 1-block-per-segment mapping.
+    words: tuple[Word, ...] = ()
 
 
 class AlignmentError(Exception):
@@ -134,8 +144,15 @@ def _default_transcribe(voice_path: Path, config: SpeechConfig) -> list[Segment]
         language=config.language,
         beam_size=config.beam_size,
         vad_filter=config.vad_filter,
+        word_timestamps=True,
     )
-    return [Segment(s.start, s.end, s.text) for s in raw_segments]
+    return [
+        Segment(
+            s.start, s.end, s.text,
+            tuple(Word(w.start, w.end, w.word) for w in (s.words or [])),
+        )
+        for s in raw_segments
+    ]
 
 
 # ─────────────────────── block→segment mapping ────────────────────────
@@ -169,6 +186,85 @@ def _assign_blocks(
             "endTime": end,
         })
     return result
+
+
+def _assign_blocks_by_words(
+    words: list[Word],
+    subtitle_blocks: list[dict[str, Any]],
+    start_word_idx: int,
+) -> list[dict[str, Any]] | None:
+    """Distribute blocks across the prayer's word span, proportional to text length.
+
+    The prayer is spoken contiguously from start_word_idx to the last word.
+    Whisper's transcription rarely matches the script word-for-word (e.g. 아픈
+    vs 아픔), so fragile per-word text matching mis-aligns. Instead we map each
+    block onto the real spoken time span [first word start, last word end] in
+    proportion to its character length. This keeps timing monotonic, pause-aware
+    at the span level, and free of overflow pile-ups.
+
+    Times are the real spoken times — the voice plays from t=0 in the final
+    video, so subtitles match those times directly (no offset).
+
+    Returns None if alignment cannot proceed (caller falls back to segments).
+    """
+    n = len(words)
+    if start_word_idx >= n or not subtitle_blocks:
+        return None
+    span_start = words[start_word_idx].start
+    span_end = words[-1].end
+    span = span_end - span_start
+    if span <= 0:
+        return None
+
+    lengths = [max(1, len(normalize(b["text"]))) for b in subtitle_blocks]
+    total = sum(lengths)
+
+    result: list[dict[str, Any]] = []
+    cum = 0
+    for block, length in zip(subtitle_blocks, lengths):
+        start = round(span_start + span * (cum / total), 6)
+        cum += length
+        end = round(span_start + span * (cum / total), 6)
+        end = round(max(end, start + 0.001), 6)
+        result.append({
+            "index": block["index"],
+            "text": block["text"],
+            "lines": block["lines"],
+            "startTime": start,
+            "endTime": end,
+        })
+    return result
+
+
+def _find_prayer_start_word(words: list[Word], first_block: dict[str, Any], hint_time: float) -> int | None:
+    """Find the word index where the first prayer block begins.
+
+    Scans candidate start positions and returns the one whose forward-consumed
+    words best cover the first block's text, preferring matches near hint_time
+    (the boundary segment's start) to avoid earlier identical phrases.
+    """
+    target = normalize(first_block.get("text", "") if not first_block.get("lines")
+                        else "".join(first_block["lines"]))
+    if not target or not words:
+        return None
+    best: tuple[float, int] | None = None  # (score, idx)
+    n = len(words)
+    for i in range(n):
+        acc = ""
+        j = i
+        while j < n and len(acc) < len(target) * 2:
+            acc += normalize(words[j].text)
+            if lcs_ratio(acc, target) >= 0.75 and len(acc) >= len(target):
+                break
+            j += 1
+        score = lcs_ratio(acc, target)
+        if score >= 0.75:
+            # Prefer candidates near the hint time (closer = better).
+            proximity = -abs(words[i].start - hint_time)
+            key = (score, proximity)
+            if best is None or key > best[0]:  # type: ignore[index]
+                best = (key, i)  # type: ignore[assignment]
+    return best[1] if best is not None else None
 
 
 # ─────────────────────── main entry point ────────────────────────
@@ -254,8 +350,20 @@ def align_speech(
 
     boundary_idx = candidates[0]
 
-    # Map blocks to segments.
-    timed_blocks = _assign_blocks(segments, boundary_idx, subtitle_blocks, voice_offset)
+    # Prefer word-level timing when the transcription provides per-word
+    # timestamps: it tracks each spoken phrase instead of cramming overflow
+    # blocks onto one coarse segment. Fall back to segment mapping otherwise.
+    all_words: list[Word] = [w for seg in segments for w in seg.words]
+    timed_blocks: list[dict[str, Any]] | None = None
+    if all_words:
+        start_word = _find_prayer_start_word(
+            all_words, subtitle_blocks[0], segments[boundary_idx].start
+        )
+        if start_word is not None:
+            timed_blocks = _assign_blocks_by_words(all_words, subtitle_blocks, start_word)
+    if timed_blocks is None:
+        # Map blocks to segments (no word timing available).
+        timed_blocks = _assign_blocks(segments, boundary_idx, subtitle_blocks, voice_offset)
 
     timing = {
         "version": 1,

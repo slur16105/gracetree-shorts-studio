@@ -12,6 +12,7 @@ import pytest
 from gracetree_engine.speech.aligner import (
     AlignmentError,
     Segment,
+    Word,
     align_speech,
     find_prayer_boundary,
 )
@@ -424,6 +425,46 @@ class TestSpeechConfig:
 
 
 # ─────────────────────── Task 2: 음절 분할 대응 ────────────────────────
+
+class TestWordLevelTiming:
+    """단어 타임스탬프가 있으면 블록을 발화 구간 전체에 분배해야 한다(몰림 방지)."""
+
+    def test_blocks_distributed_across_word_span_not_piled(self, tmp_path):
+        voice = _make_silent_wav(tmp_path / "voice.wav")
+        attempt_dir = tmp_path / "attempt"
+        attempt_dir.mkdir()
+        # 1개의 긴 세그먼트(Whisper가 합침) + 단어 타임스탬프 0~30초
+        words = tuple(Word(float(i), float(i) + 0.9, w) for i, w in enumerate([
+            "주님", "감사합니다", "오늘도", "지켜주세요", "이", "나라를",
+            "위해", "기도합니다", "아멘", "주님께", "영광을", "돌립니다",
+        ]))
+        # 첫 블록 텍스트가 단어 스트림 앞부분과 매칭되도록 구성
+        segments = [
+            Segment(0.0, 12.0, "주님 감사합니다 오늘도 지켜주세요 이 나라를 위해 기도합니다", words),
+        ]
+        ast = {
+            "title": "t", "scripture": "s",
+            "subtitleBlocks": [
+                {"index": 0, "text": "주님 감사합니다.", "lines": ["주님 감사합니다."]},
+                {"index": 1, "text": "오늘도 지켜주세요.", "lines": ["오늘도 지켜주세요."]},
+                {"index": 2, "text": "이 나라를 위해 기도합니다.", "lines": ["이 나라를 위해 기도합니다."]},
+                {"index": 3, "text": "아멘.", "lines": ["아멘."]},
+            ],
+        }
+        path = align_speech(
+            voice_path=voice, script_ast=ast, attempt_dir=attempt_dir,
+            config=DEFAULT_SPEECH_CONFIG, _transcribe=_mock_transcribe(segments),
+        )
+        blocks = json.loads(path.read_text())["subtitleBlocks"]
+        starts = [b["startTime"] for b in blocks]
+        # 단조 증가
+        assert starts == sorted(starts)
+        # 몰림 아님: 시작 시각이 모두 다르고 마지막 블록이 첫 블록보다 충분히 뒤
+        assert len(set(starts)) == len(starts)
+        assert blocks[-1]["startTime"] - blocks[0]["startTime"] > 3.0
+        # 각 블록은 양의 길이
+        assert all(b["endTime"] > b["startTime"] for b in blocks)
+
 
 class TestSplitSegmentBoundary:
     def test_split_first_line_still_finds_boundary(self, tmp_path):
