@@ -219,6 +219,7 @@ def _run_full(
     compose=None,
     validate=None,
     snapshot_override: dict | None = None,
+    emit=None,
 ) -> tuple[list[dict], Path, Path, Path, str]:
     """완전한 스냅샷 + 모킹된 파이프라인으로 start_job을 실행한다."""
     managed_root = tmp_path / "managed"
@@ -244,13 +245,19 @@ def _run_full(
         else _make_command(job_id, managed_root, work_path)
     )
     emitted: list[dict] = []
+
+    def _collect(event: dict) -> None:
+        emitted.append(event)
+        if emit is not None:
+            emit(event)
+
     with _patch_pipeline(
         snapshot, generate=generate, background=background, compose=compose, validate=validate
     ):
         start_job(
             command=command,
             approved_root=managed_root,
-            emit=emitted.append,
+            emit=_collect,
             cancel_event=cancel_event,
             _align=align or _make_align(),
         )
@@ -307,6 +314,30 @@ class TestVerifyMp4:
         with mock.patch("subprocess.run") as m:
             m.return_value = subprocess.CompletedProcess([], 0, stdout=json.dumps(info).encode(), stderr=b"")
             assert _verify_mp4(p) is True
+
+
+class TestEmittedEventsMatchSchema:
+    """모든 stage 이벤트가 실제 engine-event 스키마를 통과해야 한다.
+
+    회귀 방지: 새 stageId(subtitle_generation 등)가 스키마 enum에 없으면 엔진의
+    _emit이 ValidationError를 던져 워커 스레드가 죽고 UI가 멈춘다(실제 발생 버그).
+    """
+
+    def test_all_emitted_events_validate_against_event_schema(self, tmp_path):
+        from gracetree_engine.cli import EVENT_VALIDATOR
+
+        failures: list[str] = []
+
+        def _validate(event: dict) -> None:
+            try:
+                EVENT_VALIDATOR.validate(event)
+            except Exception as exc:  # noqa: BLE001 — 검증 실패를 수집
+                stage = event.get("payload", {}).get("stageId")
+                failures.append(f"{event.get('type')}({stage}): {str(exc)[:120]}")
+
+        emitted, *_ = _run_full(tmp_path, emit=_validate)
+        assert emitted[-1]["type"] == "job_completed"
+        assert not failures, "스키마 검증 실패 이벤트:\n" + "\n".join(failures)
 
 
 class TestStartJobUnit:

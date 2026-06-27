@@ -274,8 +274,8 @@ describe('EngineClient.streamJob', () => {
 
     const events = [
       generationEvent('job_accepted', JOB_UUID_GEN),
-      generationEvent('stage_started', JOB_UUID_GEN, { stageId: 'vertical_slice', stageName: '수직' }),
-      generationEvent('progress', JOB_UUID_GEN, { stageId: 'vertical_slice', percent: 30 }),
+      generationEvent('stage_started', JOB_UUID_GEN, { stageId: 'final_composition', stageName: '최종 합성' }),
+      generationEvent('progress', JOB_UUID_GEN, { stageId: 'final_composition', percent: 30 }),
       generationEvent('job_completed', JOB_UUID_GEN, { artifactPath: '/p/a.mp4', artifactName: 'a.mp4' })
     ]
     for (const ev of events) {
@@ -300,7 +300,7 @@ describe('EngineClient.streamJob', () => {
       `${JSON.stringify(generationEvent('job_accepted', JOB_UUID_FAIL))}\n`
     )
     child.stdout.write(
-      `${JSON.stringify(generationEvent('job_failed', JOB_UUID_FAIL, { errorCode: 'PROCESS_FAILED', stageId: 'vertical_slice', recoverable: false, details: null }))}\n`
+      `${JSON.stringify(generationEvent('job_failed', JOB_UUID_FAIL, { errorCode: 'PROCESS_FAILED', stageId: 'final_composition', recoverable: false, details: null }))}\n`
     )
     await expect(done).resolves.toBeUndefined()
     client.stop()

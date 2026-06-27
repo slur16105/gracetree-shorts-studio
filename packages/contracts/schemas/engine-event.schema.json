@@ -423,7 +423,7 @@
           "required": ["attemptId", "stageId", "stageName"],
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
-            "stageId": { "enum": ["speech_alignment", "vertical_slice"] },
+            "stageId": { "enum": ["speech_alignment", "subtitle_generation", "background_composition", "final_composition", "artifact_validation"] },
             "stageName": { "type": "string", "minLength": 1 }
           }
         }
@@ -444,7 +444,7 @@
           "required": ["attemptId", "stageId", "percent"],
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
-            "stageId": { "enum": ["speech_alignment", "vertical_slice"] },
+            "stageId": { "enum": ["speech_alignment", "subtitle_generation", "background_composition", "final_composition", "artifact_validation"] },
             "percent": { "type": "integer", "minimum": 0, "maximum": 99 }
           }
         }
@@ -508,7 +508,7 @@
           "properties": {
             "attemptId": { "type": "string", "format": "uuid" },
             "errorCode": { "type": "string", "minLength": 1 },
-            "stageId": { "oneOf": [{ "enum": ["speech_alignment", "vertical_slice"] }, { "type": "null" }] },
+            "stageId": { "oneOf": [{ "enum": ["speech_alignment", "subtitle_generation", "background_composition", "final_composition", "artifact_validation"] }, { "type": "null" }] },
             "recoverable": { "type": "boolean" },
             "details": { "type": ["string", "null"] }
           }

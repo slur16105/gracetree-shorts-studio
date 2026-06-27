@@ -21,7 +21,7 @@ function accepted(): EngineEvent {
   };
 }
 
-function stageStarted(stageId = "vertical_slice" as const, stageName = "수직 슬라이스"): EngineEvent {
+function stageStarted(stageId = "subtitle_generation" as const, stageName = "자막 생성"): EngineEvent {
   return {
     protocolVersion: 1,
     type: "stage_started",
@@ -37,7 +37,7 @@ function progress(percent: number): EngineEvent {
     type: "progress",
     jobId: JOB_ID,
     timestamp: TS,
-    payload: { attemptId: ATTEMPT_ID, stageId: "vertical_slice", percent },
+    payload: { attemptId: ATTEMPT_ID, stageId: "subtitle_generation", percent },
   };
 }
 
@@ -65,7 +65,7 @@ function failed(
     type: "job_failed",
     jobId: JOB_ID,
     timestamp: TS,
-    payload: { attemptId: ATTEMPT_ID, errorCode, stageId: "vertical_slice", recoverable, details },
+    payload: { attemptId: ATTEMPT_ID, errorCode, stageId: "subtitle_generation", recoverable, details },
   };
 }
 
@@ -134,8 +134,8 @@ describe("applyJobEvent — stage_started", () => {
   it("updates stageId and stageName", () => {
     let s = applyJobEvent(INITIAL_JOB_RUN_STATE, accepted(), JOB_ID) as Extract<JobRunState, { status: "running" }>;
     s = applyJobEvent(s, stageStarted(), JOB_ID) as Extract<JobRunState, { status: "running" }>;
-    expect(s.stageId).toBe("vertical_slice");
-    expect(s.stageName).toBe("수직 슬라이스");
+    expect(s.stageId).toBe("subtitle_generation");
+    expect(s.stageName).toBe("자막 생성");
   });
 
   it("ignores stage_started for different attemptId", () => {
@@ -145,7 +145,7 @@ describe("applyJobEvent — stage_started", () => {
       type: "stage_started",
       jobId: JOB_ID,
       timestamp: TS,
-      payload: { attemptId: "different-attempt", stageId: "vertical_slice", stageName: "x" },
+      payload: { attemptId: "different-attempt", stageId: "subtitle_generation", stageName: "x" },
     };
     expect(applyJobEvent(running, event, JOB_ID)).toBe(running);
   });
@@ -173,7 +173,7 @@ describe("applyJobEvent — progress", () => {
       type: "progress",
       jobId: JOB_ID,
       timestamp: TS,
-      payload: { attemptId: ATTEMPT_ID, stageId: "vertical_slice", percent: 99 },
+      payload: { attemptId: ATTEMPT_ID, stageId: "subtitle_generation", percent: 99 },
     };
     const after = applyJobEvent(s, event, JOB_ID);
     expect((after as Extract<JobRunState, { status: "running" }>).percent).toBe(99);
@@ -182,7 +182,7 @@ describe("applyJobEvent — progress", () => {
       type: "progress",
       jobId: JOB_ID,
       timestamp: TS,
-      payload: { attemptId: ATTEMPT_ID, stageId: "vertical_slice", percent: 99 },
+      payload: { attemptId: ATTEMPT_ID, stageId: "subtitle_generation", percent: 99 },
     };
     applyJobEvent(after, event100, JOB_ID);
   });

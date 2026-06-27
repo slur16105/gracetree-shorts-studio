@@ -1,6 +1,9 @@
 const STAGE_LABELS: Record<string, string> = {
   speech_alignment: '음성 정렬',
-  vertical_slice: '수직 슬라이스 진단',
+  subtitle_generation: '자막 생성',
+  background_composition: '배경 영상 구성',
+  final_composition: '최종 합성',
+  artifact_validation: '산출물 검증',
 }
 
 const ERROR_MESSAGES: Record<string, string> = {

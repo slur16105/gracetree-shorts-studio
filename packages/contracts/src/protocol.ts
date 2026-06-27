@@ -254,7 +254,10 @@ export interface ScriptValidatedEvent {
 
 export const GENERATION_STAGES = [
   "speech_alignment",
-  "vertical_slice",
+  "subtitle_generation",
+  "background_composition",
+  "final_composition",
+  "artifact_validation",
 ] as const;
 export type GenerationStage = (typeof GENERATION_STAGES)[number];
 
