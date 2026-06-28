@@ -30,14 +30,9 @@ _A fully-offline desktop studio that turns a voice recording + script into a fin
 - **프로덕션급 안전 설계** — 허용목록 기반 서브프로세스, 경로 경계 검사, 원자적 커밋, 취소·실패 복구를 1차 안전선으로 둔다.
 - **크로스플랫폼** — Windows / macOS 설치 패키지, 코드 서명 게이트, 오프라인 설치 스모크 테스트 포함.
 
-> 📸 _데모 이미지는 `docs/screenshots/`에 추가하세요._
->
-> <!-- 이미지 추가 후 아래 주석을 해제하세요
-> <p align="center">
->   <img src="docs/screenshots/home.png" width="45%" alt="홈 작업 화면"/>
->   <img src="docs/screenshots/result.png" width="45%" alt="자막 번인 결과"/>
-> </p>
-> -->
+<p align="center">
+  <img src="docs/screenshots/home.png" width="88%" alt="GraceTree Shorts Studio 홈 작업 화면 — 파일 등록·준비율·완료 목록" />
+</p>
 
 ---
 
