@@ -17,6 +17,10 @@ _A fully-offline desktop studio that turns a voice recording + script into a fin
 ![Tests](https://img.shields.io/badge/tests-661%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
 
+<br/>
+
+### 🌐 [홈페이지](https://slur16105.github.io/gracetree-shorts-studio/) · ⬇️ [다운로드](https://github.com/slur16105/gracetree-shorts-studio/releases)
+
 </div>
 
 ---
