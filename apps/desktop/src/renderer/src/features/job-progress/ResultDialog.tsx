@@ -7,16 +7,14 @@ import styles from '../../styles/App.module.css'
 interface ResultDialogProps {
   title: string | null
   publishDate: string
-  completedAt: string
-  resultPath: string
+  onOpenFolder: () => void
   onClose: () => void
 }
 
 export function ResultDialog({
   title,
   publishDate,
-  completedAt,
-  resultPath,
+  onOpenFolder,
   onClose
 }: ResultDialogProps): React.JSX.Element {
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
@@ -38,24 +36,21 @@ export function ResultDialog({
         role="dialog"
       >
         <div className={styles.dialogHeader}>
-          <div>
-            <p className={styles.eyebrow}>생성 완료</p>
-            <h2 id="result-dialog-title">영상이 완성되었습니다</h2>
-          </div>
+          <h2 id="result-dialog-title">
+            <span aria-hidden="true" className={styles.resultCheck}>
+              ✓
+            </span>{' '}
+            영상이 완성되었습니다
+          </h2>
         </div>
 
         {title ? <p className={styles.dialogDescription}>{title}</p> : null}
-
-        <dl className={styles.resultMeta}>
-          <dt>게시 날짜</dt>
-          <dd>{formatDate(publishDate)}</dd>
-          <dt>실제 생성일</dt>
-          <dd>{formatDate(completedAt)}</dd>
-          <dt>결과 위치</dt>
-          <dd>{resultPath}</dd>
-        </dl>
+        <p className={styles.resultPublish}>게시 {formatDate(publishDate)}</p>
 
         <div className={styles.resultDialogActions}>
+          <button className={styles.secondaryButton} onClick={onOpenFolder} type="button">
+            폴더 열기
+          </button>
           <button
             className={styles.primaryButton}
             onClick={onClose}

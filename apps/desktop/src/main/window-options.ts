@@ -21,6 +21,14 @@ export function createWindowOptions(
     useContentSize: true,
     show: false,
     autoHideMenuBar: true,
+    // Match the app base surface so there is no white flash before paint.
+    backgroundColor: '#0a0a0b',
+    // macOS: hide the native title bar but keep inset traffic lights, letting the
+    // dark content reach the top edge for a native-app feel. The renderer reserves
+    // space and a drag region in the sidebar.
+    ...(platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 16, y: 14 } }
+      : {}),
     ...(platform === 'linux' && linuxIcon ? { icon: linuxIcon } : {}),
     webPreferences: {
       preload,

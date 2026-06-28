@@ -41,6 +41,7 @@ export function RegenerateConfirmDialog({ onClose, onConfirm }: RegenerateConfir
 
         <div className={styles.resultDialogActions}>
           <button
+            className={styles.secondaryButton}
             onClick={onClose}
             type="button"
           >

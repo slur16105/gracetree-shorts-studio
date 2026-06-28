@@ -128,7 +128,6 @@ export function SettingsDialog({ managedRoot, onClose }: SettingsDialogProps): R
                 <div className={styles.resourceRowMain}>
                   <div className={styles.resourceInfo}>
                     <span className={styles.resourceLabel}>{row.label}</span>
-                    <span className={styles.resourceFormats}>{row.formats}</span>
                   </div>
                   <div className={styles.resourceStatus} data-status={status}>
                     <span aria-hidden="true" className={styles.resourceStatusIcon}>

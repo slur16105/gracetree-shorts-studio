@@ -1,13 +1,13 @@
 import type { CompletedJobSummary } from '@gracetree/contracts/desktop-api'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { showToast } from '../../components/toast-store'
 import { formatDate } from '../../utils/format-date'
 import styles from './CompletionList.module.css'
 
 interface CompletionListProps {
   managedRoot: string
   refreshKey?: number
-  onJobSelected?: (jobId: string) => void
   onJobsLoaded?: (jobs: CompletedJobSummary[]) => void
 }
 
@@ -16,13 +16,10 @@ type LoadState = 'idle' | 'loading' | 'loaded' | 'error'
 export function CompletionList({
   managedRoot,
   refreshKey,
-  onJobSelected,
   onJobsLoaded
 }: CompletionListProps): React.JSX.Element {
   const [jobs, setJobs] = useState<CompletedJobSummary[]>([])
   const [loadState, setLoadState] = useState<LoadState>('idle')
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
-  const [openError, setOpenError] = useState<string | null>(null)
 
   const managedRootRef = useRef(managedRoot)
   managedRootRef.current = managedRoot
@@ -50,24 +47,11 @@ export function CompletionList({
     void load()
   }, [load, managedRoot, refreshKey])
 
-  function handleRowClick(jobId: string): void {
-    setSelectedJobId(jobId)
-    onJobSelected?.(jobId)
-  }
-
-  function handleRowKeyDown(event: React.KeyboardEvent, jobId: string): void {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      handleRowClick(jobId)
-    }
-  }
-
   function handleOpenClick(event: React.MouseEvent, job: CompletedJobSummary): void {
     event.stopPropagation()
-    setOpenError(null)
     window.desktopApi.openResultFolder(job.id).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : '폴더를 열 수 없습니다.'
-      setOpenError(message)
+      showToast(message, 'danger')
     })
   }
 
@@ -75,22 +59,34 @@ export function CompletionList({
 
   return (
     <div className={styles.container}>
-      <div className={styles.toolbar}>
+      <div className={styles.header}>
+        <h2 className={styles.heading} id="completed-title">
+          완료 목록
+        </h2>
         <button
+          aria-label="새로고침"
           className={styles.refreshButton}
           disabled={isLoading}
           onClick={() => void load()}
+          title="새로고침"
           type="button"
         >
-          {isLoading ? '로딩 중…' : '새로고침'}
+          <svg
+            aria-hidden="true"
+            fill="none"
+            height="16"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            width="16"
+          >
+            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+            <path d="M21 3v6h-6" />
+          </svg>
         </button>
       </div>
-
-      {openError ? (
-        <div className={styles.errorState} role="alert">
-          <p>{openError}</p>
-        </div>
-      ) : null}
 
       {loadState === 'error' ? (
         <div className={styles.errorState}>
@@ -101,40 +97,28 @@ export function CompletionList({
           <p>아직 완료된 작업이 없습니다. 날짜를 선택해 새 작업을 등록하고 첫 영상을 제작해보세요.</p>
         </div>
       ) : (
-        <ul aria-label="완료된 작업 목록" className={styles.list} role="listbox">
+        <ul aria-label="완료된 작업 목록" className={styles.list}>
           {jobs.map((job) => {
-            const isSelected = job.id === selectedJobId
             const publishDateLabel = formatDate(job.publishDate)
             const label = job.title
               ? `${job.title} — ${publishDateLabel}`
               : publishDateLabel
 
             return (
-              <li
-                aria-label={label}
-                aria-selected={isSelected}
-                className={styles.row}
-                key={job.id}
-                onClick={() => handleRowClick(job.id)}
-                onKeyDown={(e) => handleRowKeyDown(e, job.id)}
-                role="option"
-                tabIndex={0}
-              >
-                <span aria-hidden="true" className={styles.selectionIcon}>
-                  {isSelected ? '✓' : ''}
-                </span>
-
+              <li aria-label={label} className={styles.row} key={job.id}>
                 <div className={styles.rowContent}>
-                  <span className={styles.publishDate}>{publishDateLabel}</span>
-                  <div className={styles.rowMeta}>
+                  <div className={styles.rowTop}>
+                    <span className={styles.publishDate}>{publishDateLabel}</span>
                     {job.title ? (
                       <span className={styles.title} title={job.title}>
                         {job.title}
                       </span>
                     ) : null}
-                    <span>생성: {formatDate(job.completedAt)}</span>
+                  </div>
+                  <div className={styles.rowMeta}>
+                    <span>생성 {formatDate(job.completedAt)}</span>
                     {!job.resultExists ? (
-                      <span>결과 폴더를 찾을 수 없습니다</span>
+                      <span className={styles.missing}>결과 폴더 없음</span>
                     ) : null}
                   </div>
                 </div>

@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CompletedJobSummary } from '@gracetree/contracts/desktop-api'
 
 import { CompletionList } from './CompletionList'
+import { showToast } from '../../components/toast-store'
+
+vi.mock('../../components/toast-store', () => ({ showToast: vi.fn() }))
 
 const MANAGED_ROOT = '/managed'
 
@@ -28,6 +31,7 @@ describe('CompletionList', () => {
     listCompletedJobs.mockReset()
     openResultFolder.mockReset()
     openResultFolder.mockResolvedValue(undefined)
+    vi.mocked(showToast).mockClear()
     Object.defineProperty(window, 'desktopApi', {
       configurable: true,
       value: {
@@ -63,8 +67,8 @@ describe('CompletionList', () => {
     listCompletedJobs.mockResolvedValue([older, newer])
     render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
-    const list = await screen.findByRole('listbox', { name: '완료된 작업 목록' })
-    const items = list.querySelectorAll('[role="option"]')
+    const list = await screen.findByRole('list', { name: '완료된 작업 목록' })
+    const items = list.querySelectorAll('li')
     expect(items[0]).toHaveAttribute('aria-label', expect.stringContaining('2026'))
     // 첫 번째 항목이 newer(2026-06-20)이어야 함
     expect(items[0]?.textContent).toContain('2026')
@@ -80,63 +84,17 @@ describe('CompletionList', () => {
     expect(openButton).toBeDisabled()
   })
 
-  it('행 클릭 시 onJobSelected가 jobId와 함께 호출된다', async () => {
+  it('"열기" 버튼 클릭 시 openResultFolder가 호출된다', async () => {
     const user = userEvent.setup()
     const job = makeJob()
     listCompletedJobs.mockResolvedValue([job])
-    const onJobSelected = vi.fn()
-    render(<CompletionList managedRoot={MANAGED_ROOT} onJobSelected={onJobSelected} />)
-
-    const row = await screen.findByRole('option')
-    await user.click(row)
-
-    expect(onJobSelected).toHaveBeenCalledOnce()
-    expect(onJobSelected).toHaveBeenCalledWith(job.id)
-  })
-
-  it('Enter 키로 행 선택 시 onJobSelected가 호출된다', async () => {
-    const user = userEvent.setup()
-    const job = makeJob()
-    listCompletedJobs.mockResolvedValue([job])
-    const onJobSelected = vi.fn()
-    render(<CompletionList managedRoot={MANAGED_ROOT} onJobSelected={onJobSelected} />)
-
-    const row = await screen.findByRole('option')
-    row.focus()
-    await user.keyboard('{Enter}')
-
-    expect(onJobSelected).toHaveBeenCalledOnce()
-    expect(onJobSelected).toHaveBeenCalledWith(job.id)
-  })
-
-  it('Space 키로 행 선택 시 onJobSelected가 호출된다', async () => {
-    const user = userEvent.setup()
-    const job = makeJob()
-    listCompletedJobs.mockResolvedValue([job])
-    const onJobSelected = vi.fn()
-    render(<CompletionList managedRoot={MANAGED_ROOT} onJobSelected={onJobSelected} />)
-
-    const row = await screen.findByRole('option')
-    row.focus()
-    await user.keyboard(' ')
-
-    expect(onJobSelected).toHaveBeenCalledOnce()
-    expect(onJobSelected).toHaveBeenCalledWith(job.id)
-  })
-
-  it('"열기" 버튼 클릭 시 openResultFolder가 호출되고 onJobSelected는 호출되지 않는다', async () => {
-    const user = userEvent.setup()
-    const job = makeJob()
-    listCompletedJobs.mockResolvedValue([job])
-    const onJobSelected = vi.fn()
-    render(<CompletionList managedRoot={MANAGED_ROOT} onJobSelected={onJobSelected} />)
+    render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
     const openButton = await screen.findByRole('button', { name: '열기' })
     await user.click(openButton)
 
     expect(openResultFolder).toHaveBeenCalledOnce()
     expect(openResultFolder).toHaveBeenCalledWith(job.id)
-    expect(onJobSelected).not.toHaveBeenCalled()
   })
 
   it('긴 제목은 title 속성에 전체 제목이 포함된다', async () => {
@@ -145,7 +103,7 @@ describe('CompletionList', () => {
     listCompletedJobs.mockResolvedValue([job])
     render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
-    await screen.findByRole('option')
+    await screen.findByRole('listitem')
     const titleEl = screen.getByTitle(longTitle)
     expect(titleEl).toBeInTheDocument()
   })
@@ -155,26 +113,12 @@ describe('CompletionList', () => {
     listCompletedJobs.mockResolvedValue([job])
     render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
-    const row = await screen.findByRole('option')
+    const row = await screen.findByRole('listitem')
     // 제목 텍스트를 감싸는 title 속성 span이 없어야 함 (열기 버튼의 title은 별개)
     const titleSpans = row.querySelectorAll('span[title]')
     expect(titleSpans).toHaveLength(0)
     // aria-label은 날짜 형식
     expect(row).toHaveAttribute('aria-label', expect.stringContaining('2026'))
-  })
-
-  it('선택된 행의 aria-selected가 true로 변경된다', async () => {
-    const user = userEvent.setup()
-    const job = makeJob()
-    listCompletedJobs.mockResolvedValue([job])
-    render(<CompletionList managedRoot={MANAGED_ROOT} />)
-
-    const row = await screen.findByRole('option')
-    expect(row).toHaveAttribute('aria-selected', 'false')
-
-    await user.click(row)
-
-    expect(row).toHaveAttribute('aria-selected', 'true')
   })
 
   it('새로고침 버튼 클릭 시 목록을 다시 불러온다', async () => {
@@ -189,7 +133,7 @@ describe('CompletionList', () => {
 
     await user.click(screen.getByRole('button', { name: '새로고침' }))
 
-    await screen.findByRole('option')
+    await screen.findByRole('listitem')
     expect(listCompletedJobs).toHaveBeenCalledTimes(2)
   })
 
@@ -214,7 +158,7 @@ describe('CompletionList', () => {
     expect(onJobsLoaded).toHaveBeenCalledWith([job])
   })
 
-  it('openResultFolder 실패 시 오류 메시지를 표시한다', async () => {
+  it('openResultFolder 실패 시 토스트로 오류를 안내한다', async () => {
     const user = userEvent.setup()
     const job = makeJob()
     listCompletedJobs.mockResolvedValue([job])
@@ -225,7 +169,7 @@ describe('CompletionList', () => {
     await user.click(openButton)
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('엔진 오류')
+      expect(showToast).toHaveBeenCalledWith('엔진 오류', 'danger')
     })
   })
 
@@ -240,6 +184,6 @@ describe('CompletionList', () => {
     rerender(<CompletionList managedRoot={MANAGED_ROOT} refreshKey={1} />)
 
     await waitFor(() => expect(listCompletedJobs).toHaveBeenCalledTimes(2))
-    await screen.findByRole('option')
+    await screen.findByRole('listitem')
   })
 })

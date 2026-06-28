@@ -1,9 +1,10 @@
 import type { JobDto, JobInputDto, ResourceDto } from '@gracetree/contracts'
 import type { ScriptValidationDto } from '@gracetree/contracts/desktop-api'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { DatePicker } from './DatePicker'
 import { InputDropZone } from './InputDropZone'
+import styles from './JobEditor.module.css'
 import { JobSummary } from './JobSummary'
 import { ReadinessProgress } from './ReadinessProgress'
 import { computeReadiness } from './readiness'
@@ -21,9 +22,17 @@ interface JobEditorProps {
   managedRoot: string
   onManagedRootResolved?: (managedRoot: string) => void
   onOpenSettings?: () => void
+  onTitleChange?: (title: string | null) => void
+  completionList?: ReactNode
 }
 
-export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }: JobEditorProps): React.JSX.Element {
+export function JobEditor({
+  managedRoot,
+  onManagedRootResolved,
+  onOpenSettings,
+  onTitleChange,
+  completionList,
+}: JobEditorProps): React.JSX.Element {
   const [job, setJob] = useState<JobDto | null>(null)
   const [inputs, setInputs] = useState<JobInputDto[]>([])
   const [scriptValidation, setScriptValidation] = useState<ScriptValidationDto | null>(null)
@@ -149,6 +158,17 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
 
   const readiness = computeReadiness(inputs, scriptValidation, resources)
 
+  // 파싱된 스크립트 제목을 상위(푸터 "현재 작업")로 올린다.
+  const onTitleChangeRef = useRef(onTitleChange)
+  useEffect(() => {
+    onTitleChangeRef.current = onTitleChange
+  })
+  useEffect(() => {
+    const title =
+      scriptValidation?.status === 'valid' ? (scriptValidation.oneLiner ?? null) : null
+    onTitleChangeRef.current?.(title)
+  }, [scriptValidation])
+
   const handleStartGeneration = useCallback(async () => {
     if (!job || !managedRoot || isRunning || isStarting) return
     setIsStarting(true)
@@ -208,58 +228,80 @@ export function JobEditor({ managedRoot, onManagedRootResolved, onOpenSettings }
     }
   }, [job, attemptId, jobRunState])
 
+  const generateAction = !job ? (
+    <button className={styles.primaryButton} disabled type="button">
+      영상 생성
+    </button>
+  ) : isRunning ? (
+    <button
+      className={styles.secondaryButton}
+      disabled={isCancelling}
+      onClick={handleCancelClick}
+      ref={cancelButtonRef}
+      type="button"
+    >
+      {isCancelling ? '취소 중...' : '취소'}
+    </button>
+  ) : isJobCompleted ? (
+    <>
+      <button
+        className={styles.secondaryButton}
+        onClick={() => window.desktopApi.openResultFolder(job.id).catch(() => {})}
+        type="button"
+      >
+        결과 폴더 열기
+      </button>
+      <button
+        aria-busy={isStarting}
+        className={styles.primaryButton}
+        disabled={isStarting || isRunning}
+        onClick={handleRegenerateClick}
+        ref={regenerateButtonRef}
+        type="button"
+      >
+        {isStarting ? '시작 중...' : '다시 생성'}
+      </button>
+    </>
+  ) : (
+    <button
+      aria-busy={isStarting}
+      className={styles.primaryButton}
+      disabled={!canGenerate}
+      onClick={handleStartGeneration}
+      type="button"
+    >
+      {isStarting ? '시작 중...' : '영상 생성'}
+    </button>
+  )
+
   return (
     <>
-      <DatePicker onJobLoaded={handleJobLoaded} />
-      <InputDropZone
-        initialInputs={job?.inputMetadata}
-        jobId={job?.id ?? null}
-        onInputsChanged={handleInputsChanged}
-      />
-      {job ? (
-        <>
-          <ReadinessProgress isParsing={isParsing} onOpenSettings={onOpenSettings} readiness={readiness} />
-          <JobSummary isParsing={isParsing} scriptValidation={scriptValidation} />
-          {isRunning ? (
-            <button
-              disabled={isCancelling}
-              onClick={handleCancelClick}
-              ref={cancelButtonRef}
-              type="button"
-            >
-              {isCancelling ? '취소 중...' : '취소'}
-            </button>
-          ) : isJobCompleted ? (
-            <div>
-              <p>이미 생성됨</p>
-              <button
-                onClick={() => window.desktopApi.openResultFolder(job!.id).catch(() => {})}
-                type="button"
-              >
-                결과 폴더 열기
-              </button>
-              <button
-                aria-busy={isStarting}
-                disabled={isStarting || isRunning}
-                onClick={handleRegenerateClick}
-                ref={regenerateButtonRef}
-                type="button"
-              >
-                {isStarting ? '시작 중...' : '다시 생성'}
-              </button>
-            </div>
-          ) : (
-            <button
-              aria-busy={isStarting}
-              disabled={!canGenerate}
-              onClick={handleStartGeneration}
-              type="button"
-            >
-              {isStarting ? '시작 중...' : '생성 시작'}
-            </button>
-          )}
-        </>
-      ) : null}
+      <div className={styles.homeLayout}>
+        <section aria-label="입력" className={styles.workspaceRegion}>
+          <div className={styles.topRow}>
+            <DatePicker onJobLoaded={handleJobLoaded} />
+            <div className={styles.topActions}>{generateAction}</div>
+          </div>
+          <InputDropZone
+            initialInputs={job?.inputMetadata}
+            jobId={job?.id ?? null}
+            onInputsChanged={handleInputsChanged}
+          />
+          {job ? <JobSummary isParsing={isParsing} scriptValidation={scriptValidation} /> : null}
+        </section>
+        <aside aria-label="완료 목록" className={styles.completedRegion}>
+          {job ? (
+            <section aria-label="입력 준비" className={styles.readinessRegion}>
+              <ReadinessProgress
+                isParsing={isParsing}
+                onOpenSettings={onOpenSettings}
+                readiness={readiness}
+              />
+            </section>
+          ) : null}
+          {completionList}
+        </aside>
+      </div>
 
       {cancelConfirmOpen ? (
         <CancelConfirmDialog onClose={handleCancelDialogClose} onConfirm={handleCancelConfirm} />

@@ -41,8 +41,8 @@
 
 .navButton[aria-current='true'] {
   color: var(--color-text-primary);
-  border-color: color-mix(in srgb, var(--color-brand) 52%, transparent);
-  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-raised));
+  border-color: color-mix(in srgb, var(--color-accent) 52%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-selected));
 }
 
 .navButton[aria-current='true']::before {
@@ -52,7 +52,7 @@
   width: 3px;
   height: 20px;
   border-radius: 0 3px 3px 0;
-  background: var(--color-brand);
+  background: var(--color-accent);
   content: '';
   transform: translateY(-50%);
 }
@@ -105,7 +105,7 @@
 
 .cardStep {
   margin: 0 0 var(--space-2);
-  color: var(--color-brand);
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;

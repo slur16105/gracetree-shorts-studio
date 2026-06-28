@@ -1,0 +1,71 @@
+.region {
+  position: fixed;
+  bottom: calc(var(--status-height) + var(--space-4));
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 70vw;
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-raised);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 48%);
+  pointer-events: auto;
+  animation: toast-in-out 3500ms ease forwards;
+}
+
+/* a small leading dot conveys tone without relying on color alone elsewhere */
+.toast::before {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-progress);
+  content: '';
+}
+
+.toast[data-tone='warning']::before {
+  background: var(--color-warning);
+}
+
+.toast[data-tone='danger']::before {
+  background: var(--color-danger);
+}
+
+.toast[data-tone='info']::before {
+  background: var(--color-text-secondary);
+}
+
+@keyframes toast-in-out {
+  0% {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  9% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  86% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

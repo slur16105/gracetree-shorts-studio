@@ -7,19 +7,28 @@ import { ResultDialog } from './ResultDialog'
 const DEFAULT_PROPS = {
   title: '오늘의 은혜',
   publishDate: '2026-06-20',
-  completedAt: '2026-06-20T10:30:00.000Z',
-  resultPath: '/managed/jobs/2026-06-20/output',
+  onOpenFolder: vi.fn(),
   onClose: vi.fn()
 }
 
 describe('ResultDialog', () => {
-  it('게시 날짜·실제 생성일·결과 위치를 표시한다', () => {
+  it('제목과 게시 날짜를 표시하고 폴더 열기 동작을 제공한다', () => {
     render(<ResultDialog {...DEFAULT_PROPS} />)
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByText('오늘의 은혜')).toBeInTheDocument()
-    expect(screen.getAllByText(/2026/).length).toBeGreaterThanOrEqual(2)
-    expect(screen.getByText(DEFAULT_PROPS.resultPath)).toBeInTheDocument()
+    expect(screen.getByText(/2026/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '폴더 열기' })).toBeInTheDocument()
+  })
+
+  it('폴더 열기 버튼 클릭 시 onOpenFolder를 호출한다', async () => {
+    const user = userEvent.setup()
+    const onOpenFolder = vi.fn()
+    render(<ResultDialog {...DEFAULT_PROPS} onOpenFolder={onOpenFolder} />)
+
+    await user.click(screen.getByRole('button', { name: '폴더 열기' }))
+
+    expect(onOpenFolder).toHaveBeenCalledOnce()
   })
 
   it('title이 null이면 제목 영역을 표시하지 않는다', () => {
@@ -60,10 +69,11 @@ describe('ResultDialog', () => {
     render(<ResultDialog {...DEFAULT_PROPS} />)
 
     const confirmButton = screen.getByRole('button', { name: '확인' })
+    const openButton = screen.getByRole('button', { name: '폴더 열기' })
     confirmButton.focus()
     await user.tab()
-    // 버튼이 하나뿐이면 포커스가 첫 버튼으로 돌아온다
-    expect(confirmButton).toHaveFocus()
+    // 마지막 버튼(확인)에서 Tab 시 첫 버튼(폴더 열기)으로 순환한다
+    expect(openButton).toHaveFocus()
   })
 
   it('role="dialog"과 aria-modal="true"를 가진다', () => {

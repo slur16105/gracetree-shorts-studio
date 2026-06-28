@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { SettingsDialog } from './components/SettingsDialog'
 import { SidebarIcon } from './components/SidebarIcon'
+import { Toast } from './components/Toast'
 import { GuideView } from './features/guide/GuideView'
 import { CompletionList } from './features/job-history/CompletionList'
 import { JobEditor } from './features/job-editor/JobEditor'
@@ -17,6 +18,11 @@ import {
 import styles from './styles/App.module.css'
 
 type View = 'home' | 'guide'
+
+// macOS hides the native title bar (hiddenInset); render our own full-width
+// draggable strip so the window still has a grab area.
+const isMac =
+  typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh')
 
 function getStatusLabel(state: ReturnType<typeof useJobRunState>): string {
   if (state.status === 'running') {
@@ -38,6 +44,7 @@ function App(): React.JSX.Element {
   const [managedRoot, setManagedRoot] = useState('')
   const [completionRefreshKey, setCompletionRefreshKey] = useState(0)
   const [resultDialogJob, setResultDialogJob] = useState<CompletedJobSummary | null>(null)
+  const [currentTitle, setCurrentTitle] = useState<string | null>(null)
   const settingsButtonRef = useRef<HTMLButtonElement>(null)
   const settingsWasOpen = useRef(false)
   const resultDialogPrevFocusRef = useRef<Element | null>(null)
@@ -151,10 +158,25 @@ function App(): React.JSX.Element {
   }, [])
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-titlebar={isMac || undefined}>
+      {isMac ? <div aria-hidden="true" className={styles.titlebar} /> : null}
       <nav aria-label="전역 탐색" className={styles.sidebar}>
         <div aria-hidden="true" className={styles.brandMark}>
-          G
+          <svg
+            fill="none"
+            height="28"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            viewBox="0 0 32 32"
+            width="28"
+          >
+            <path d="M16 24 V12.5" />
+            <path d="M16 18 C11.4 18 9.2 14.4 10.2 9.6 C14.8 10.5 16 14.4 16 18 Z" />
+            <path d="M16 14.8 C20.6 14.8 22.8 11.2 21.8 6.4 C17.2 7.3 16 11.2 16 14.8 Z" />
+            <path d="M7 24 Q16 20.5 25 24" />
+          </svg>
         </div>
         <div className={styles.primaryNavigation}>
           <button
@@ -192,20 +214,13 @@ function App(): React.JSX.Element {
       <main className={styles.main}>
         {view === 'home' ? (
           <section aria-labelledby="home-title" className={styles.view}>
-            <p className={styles.eyebrow}>GraceTree Shorts Studio</p>
-            <h1 id="home-title">영상 작업</h1>
-            <div className={styles.homeLayout}>
-              <section aria-labelledby="workspace-title" className={styles.workspaceRegion}>
-                <h2 id="workspace-title">새 영상 준비</h2>
-                <JobEditor
-                  managedRoot={managedRoot}
-                  onManagedRootResolved={handleManagedRootResolved}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                />
-              </section>
-              <aside aria-labelledby="completed-title" className={styles.completedRegion}>
-                <h2 id="completed-title">완료 목록</h2>
-                {managedRoot ? (
+            <header className={styles.homeHeader}>
+              <p className={styles.eyebrow}>GraceTree Shorts Studio</p>
+              <h1 id="home-title">영상 작업</h1>
+            </header>
+            <JobEditor
+              completionList={
+                managedRoot ? (
                   <CompletionList
                     managedRoot={managedRoot}
                     onJobsLoaded={handleJobsLoaded}
@@ -215,9 +230,13 @@ function App(): React.JSX.Element {
                   <div className={styles.compactEmptyState}>
                     <p>완료된 영상이 없습니다.</p>
                   </div>
-                )}
-              </aside>
-            </div>
+                )
+              }
+              managedRoot={managedRoot}
+              onManagedRootResolved={handleManagedRootResolved}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onTitleChange={setCurrentTitle}
+            />
           </section>
         ) : (
           <section aria-labelledby="guide-title" className={styles.view}>
@@ -229,23 +248,38 @@ function App(): React.JSX.Element {
       </main>
 
       <footer className={styles.statusBar}>
-        <span
-          className={styles.statusIndicator}
-          data-running={jobState.status === 'running' || jobState.status === 'cancelling' ? '' : undefined}
-        />
-        <span>{getStatusLabel(jobState)}</span>
-        {jobState.status === 'running' ? (
-          <span className={styles.statusDetail}>
-            {jobState.stageId ? `단계: ${jobState.stageName ?? jobState.stageId}` : '준비 중'}
-          </span>
-        ) : (
-          <span className={styles.statusDetail}>모든 기능은 로컬에서 실행됩니다</span>
-        )}
+        <div className={styles.statusBarInner}>
+          <div className={styles.currentJob}>
+            <span
+              className={styles.statusIndicator}
+              data-running={jobState.status === 'running' || jobState.status === 'cancelling' ? '' : undefined}
+            />
+            <span className={styles.currentJobText}>
+              {currentTitle ? `현재 작업: ${currentTitle}` : getStatusLabel(jobState)}
+            </span>
+          </div>
+          <div className={styles.footerProgress}>
+            {jobState.status === 'running' ? (
+              <>
+                <span aria-hidden="true" className={styles.spinner} />
+                <div className={styles.footerProgressTrack}>
+                  <div
+                    className={styles.footerProgressFill}
+                    style={{ width: `${jobState.percent}%` }}
+                  />
+                </div>
+                <span className={styles.footerPercent}>{jobState.percent}%</span>
+              </>
+            ) : null}
+          </div>
+        </div>
       </footer>
 
       <div aria-atomic="true" aria-live="polite" className={styles.srOnly}>
         {liveAnnouncement}
       </div>
+
+      <Toast />
 
       {settingsOpen ? (
         <SettingsDialog managedRoot={managedRoot} onClose={() => setSettingsOpen(false)} />
@@ -253,10 +287,9 @@ function App(): React.JSX.Element {
 
       {resultDialogJob ? (
         <ResultDialog
-          completedAt={resultDialogJob.completedAt}
           onClose={handleResultDialogClose}
+          onOpenFolder={() => window.desktopApi.openResultFolder(resultDialogJob.id).catch(() => {})}
           publishDate={resultDialogJob.publishDate}
-          resultPath={resultDialogJob.resultPath}
           title={resultDialogJob.title}
         />
       ) : null}

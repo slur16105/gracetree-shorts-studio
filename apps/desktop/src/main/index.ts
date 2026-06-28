@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeImage } from 'electron'
 import { join, resolve } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -50,6 +50,12 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.gracetree.shorts-studio')
+  // Show the GraceTree sprout icon in the macOS dock during development
+  // (packaged builds get the icon from the app bundle).
+  if (process.platform === 'darwin' && app.dock) {
+    const dockIcon = nativeImage.createFromPath(icon)
+    if (!dockIcon.isEmpty()) app.dock.setIcon(dockIcon)
+  }
   const userDataPath = app.getPath('userData')
   const managedRoot = createManagedJobPaths(userDataPath, '2000-01-01').managedRoot
   // Resolve the bundled ffmpeg/ffprobe (libass build). In dev, prefer the

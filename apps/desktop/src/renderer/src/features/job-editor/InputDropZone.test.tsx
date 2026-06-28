@@ -9,6 +9,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { InputDropZone } from './InputDropZone'
+import { showToast } from '../../components/toast-store'
+
+vi.mock('../../components/toast-store', () => ({ showToast: vi.fn() }))
 
 const jobId = '11111111-1111-4111-8111-111111111111'
 const nextJobId = '22222222-2222-4222-8222-222222222222'
@@ -70,6 +73,7 @@ describe('InputDropZone', () => {
     assignInputRole.mockReset()
     removeInput.mockReset()
     replaceInput.mockReset()
+    vi.mocked(showToast).mockClear()
     Object.defineProperty(window, 'desktopApi', {
       configurable: true,
       value: {
@@ -95,7 +99,7 @@ describe('InputDropZone', () => {
     ])
 
     const dropped = new File(['script'], 'script.txt', { type: 'text/plain' })
-    fireEvent.drop(screen.getByText(/파일을 한 번에 놓으세요/).parentElement!, {
+    fireEvent.drop(screen.getByTestId('dropzone'), {
       dataTransfer: { files: [dropped] }
     })
     await waitFor(() => expect(registerInputFiles).toHaveBeenLastCalledWith(jobId, [dropped]))
@@ -123,8 +127,7 @@ describe('InputDropZone', () => {
 
     await user.click(screen.getByRole('button', { name: '파일 선택' }))
 
-    expect(screen.getByText('파일 등록 완료: 성공 1개, 거부 1개')).toBeVisible()
-    const rejected = screen.getByText('bad.exe').closest('li')
+    const rejected = (await screen.findByText('bad.exe')).closest('li')
     expect(rejected).toHaveAttribute('aria-describedby')
     expect(screen.getByText('지원하지 않는 파일 형식입니다.')).toBeVisible()
     expect(screen.getByRole('button', { name: '파일 다시 선택' })).toBeVisible()
@@ -146,7 +149,7 @@ describe('InputDropZone', () => {
       )
       .mockResolvedValueOnce(batch([registeredResult('second.txt')]))
     render(<InputDropZone jobId={jobId} />)
-    const zone = screen.getByText(/파일을 한 번에 놓으세요/).parentElement!
+    const zone = screen.getByTestId('dropzone')
     const first = new File(['first'], 'first.txt')
     const second = new File(['second'], 'second.txt')
 
@@ -181,7 +184,7 @@ describe('InputDropZone', () => {
     resolveRegistration?.(batch([registeredResult('voice.mp3')]))
 
     await waitFor(() => expect(screen.queryByText('voice.mp3')).not.toBeInTheDocument())
-    expect(screen.queryByText(/파일 등록 완료/)).not.toBeInTheDocument()
+    expect(showToast).not.toHaveBeenCalled()
   })
 
   it('reports file-picker failures', async () => {
@@ -190,12 +193,17 @@ describe('InputDropZone', () => {
 
     await userEvent.setup().click(screen.getByRole('button', { name: '파일 선택' }))
 
-    expect(screen.getByText('파일 선택을 완료하지 못했습니다. 다시 시도해주세요.')).toBeVisible()
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(
+        '파일 선택을 완료하지 못했습니다. 다시 시도해주세요.',
+        'danger'
+      )
+    )
   })
 
   it('provides drag-entry feedback', () => {
     render(<InputDropZone jobId={jobId} />)
-    const zone = screen.getByText(/파일을 한 번에 놓으세요/).parentElement!
+    const zone = screen.getByTestId('dropzone')
 
     fireEvent.dragEnter(zone)
     expect(zone).toHaveAttribute('data-drag-active', 'true')
@@ -203,19 +211,16 @@ describe('InputDropZone', () => {
     expect(zone).not.toHaveAttribute('data-drag-active')
   })
 
-  it('replaces the live region for identical consecutive summaries', async () => {
+  it('does not toast on successful registration — the slot shows the file', async () => {
     selectInputFiles.mockResolvedValue([{ name: 'voice.mp3', sourcePath: '/voice.mp3' }])
     registerInputFiles.mockResolvedValue(batch([registeredResult('voice.mp3')]))
     render(<InputDropZone jobId={jobId} />)
     const user = userEvent.setup()
 
     await user.click(screen.getByRole('button', { name: '파일 선택' }))
-    const firstAnnouncement = screen.getByText('파일 등록 완료: 성공 1개, 거부 0개')
-    await user.click(screen.getByRole('button', { name: '파일 선택' }))
+    await waitFor(() => expect(registerInputFiles).toHaveBeenCalledTimes(1))
 
-    await waitFor(() => {
-      expect(screen.getByText('파일 등록 완료: 성공 1개, 거부 0개')).not.toBe(firstAnnouncement)
-    })
+    expect(showToast).not.toHaveBeenCalled()
   })
 
   it('shows role, filename, and non-color state text and assigns a role by keyboard', async () => {
@@ -225,23 +230,26 @@ describe('InputDropZone', () => {
     render(<InputDropZone initialInputs={[unknown]} jobId={jobId} />)
 
     expect(screen.getByRole('list', { name: '파일 슬롯' })).toHaveTextContent(
-      '미분류recording.mp3미분류 · 역할을 선택하거나 제거하세요'
+      '미분류recording.mp3✕미분류 · 역할을 선택하거나 제거하세요'
     )
     const roleSelect = screen.getByRole('combobox', { name: 'recording.mp3 역할' })
     roleSelect.focus()
     await userEvent.setup().selectOptions(roleSelect, 'voice')
 
     expect(assignInputRole).toHaveBeenCalledWith(jobId, unknown.id, 'voice')
-    expect(await screen.findByText('정상')).toBeVisible()
+    expect(await screen.findByText('준비됨')).toBeVisible()
   })
 
   it('shows missing slots with an icon and actionable text', () => {
     render(<InputDropZone initialInputs={[]} jobId={jobId} />)
 
     const slots = screen.getByRole('list', { name: '파일 슬롯' })
-    expect(slots).toHaveTextContent('썸네일파일 없음누락 · 파일을 등록하세요')
-    expect(slots).toHaveTextContent('음성파일 없음누락 · 파일을 등록하세요')
-    expect(screen.getAllByText('−')).toHaveLength(4)
+    expect(slots).toHaveTextContent('썸네일파일 없음')
+    expect(slots).toHaveTextContent('음성파일 없음')
+    // 작업별 BGM은 선택 항목으로 맨 아래에 표시된다
+    expect(slots).toHaveTextContent('작업별 BGM선택파일 없음')
+    expect(screen.getAllByText('−')).toHaveLength(3)
+    expect(screen.getByText('+')).toBeInTheDocument()
   })
 
   it('marks duplicate candidates as conflicts without choosing an active input', () => {

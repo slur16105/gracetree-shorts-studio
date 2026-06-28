@@ -1,14 +1,11 @@
 .container {
   position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(200px, max-content) 1fr;
+  display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-5);
 }
 
-.label,
-.jobStatus {
+.label {
   color: var(--color-text-secondary);
   font-size: 14px;
 }
@@ -84,8 +81,8 @@
 }
 
 .day[aria-selected='true'] {
-  border-color: var(--color-brand);
-  background: var(--color-brand);
+  border-color: var(--color-accent);
+  background: var(--color-accent);
   color: var(--color-base);
   font-weight: 900;
 }

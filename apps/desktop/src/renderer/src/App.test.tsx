@@ -40,7 +40,7 @@ describe('App shell', () => {
     expect(home).toHaveAttribute('aria-current', 'page')
     expect(guide).not.toHaveAttribute('aria-current')
     expect(settings).not.toHaveAttribute('aria-current')
-    expect(screen.getByRole('region', { name: '새 영상 준비' })).toBeVisible()
+    expect(screen.getByRole('region', { name: '입력' })).toBeVisible()
     expect(screen.getByRole('complementary', { name: '완료 목록' })).toBeVisible()
 
     await user.click(guide)

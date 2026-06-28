@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DatePicker } from './DatePicker'
+import { showToast } from '../../components/toast-store'
+
+vi.mock('../../components/toast-store', () => ({ showToast: vi.fn() }))
 
 const job: JobDto = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -28,6 +31,7 @@ describe('DatePicker', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(new Date(2026, 5, 20, 9))
     getOrCreateJobForDate.mockClear()
+    vi.mocked(showToast).mockClear()
     Object.defineProperty(window, 'desktopApi', {
       configurable: true,
       value: { getOrCreateJobForDate }
@@ -98,7 +102,7 @@ describe('DatePicker', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<DatePicker />)
 
-    expect(await screen.findByRole('status')).toHaveTextContent('관리 폴더 확인 필요')
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('관리 폴더 확인 필요', 'warning'))
     await user.click(screen.getByRole('button', { name: /게시 날짜/ }))
     await user.keyboard('{ArrowRight} ')
     expect(getOrCreateJobForDate).toHaveBeenLastCalledWith('2026-06-21')
@@ -108,14 +112,14 @@ describe('DatePicker', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(<DatePicker />)
 
-    expect(await screen.findByRole('status')).toHaveTextContent('날짜별 작업 복원됨')
+    await waitFor(() => expect(showToast).toHaveBeenCalledWith('날짜별 작업 복원됨', 'progress'))
     await user.click(screen.getByRole('button', { name: /게시 날짜/ }))
     await user.click(screen.getByRole('gridcell', { name: '2026-06-20' }))
 
     await waitFor(() => {
       expect(getOrCreateJobForDate).toHaveBeenCalledTimes(2)
     })
-    expect(screen.getByRole('status')).toHaveTextContent('날짜별 작업 복원됨')
+    expect(showToast).toHaveBeenCalledWith('날짜별 작업 복원됨', 'progress')
   })
 
   it('clears the parent job before loading a newly selected date', async () => {

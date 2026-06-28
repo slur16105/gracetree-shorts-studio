@@ -13,19 +13,23 @@ const ROLE_LABELS: Record<InputRole, string> = {
 }
 
 export function MissingFileSlot({
-  role
+  role,
+  optional = false
 }: {
   role: Exclude<InputRole, 'unclassified'>
+  optional?: boolean
 }): React.JSX.Element {
   return (
-    <li className={styles.fileSlot} data-state="missing">
+    <li className={styles.fileSlot} data-state={optional ? 'optional' : 'missing'}>
       <span aria-hidden="true" className={styles.stateIcon}>
-        −
+        {optional ? '+' : '−'}
       </span>
       <div className={styles.slotDetails}>
-        <strong>{ROLE_LABELS[role]}</strong>
+        <strong>
+          {ROLE_LABELS[role]}
+          {optional ? <span className={styles.optionalBadge}>선택</span> : null}
+        </strong>
         <span>파일 없음</span>
-        <span className={styles.stateText}>누락 · 파일을 등록하세요</span>
       </div>
     </li>
   )
@@ -43,13 +47,15 @@ interface FileSlotProps {
   onAssignRole(inputId: string, role: InputRole): Promise<void>
   onRemove(inputId: string): Promise<void>
   onReplace(inputId: string, file: InputFileCandidate): Promise<void>
+  optional?: boolean
 }
 
 export function FileSlot({
   input,
   onAssignRole,
   onRemove,
-  onReplace
+  onReplace,
+  optional = false
 }: FileSlotProps): React.JSX.Element {
   const [confirmation, setConfirmation] = useState<'remove' | 'replace' | null>(null)
   const [replacement, setReplacement] = useState<InputFileCandidate | null>(null)
@@ -117,58 +123,76 @@ export function FileSlot({
         {state.icon}
       </span>
       <div className={styles.slotDetails}>
-        <strong>{ROLE_LABELS[input.role]}</strong>
-        <span>{input.originalName}</span>
-        <span className={styles.stateText}>{state.text}</span>
+        <strong>
+          {ROLE_LABELS[input.role]}
+          {optional ? <span className={styles.optionalBadge}>선택</span> : null}
+        </strong>
+        <span className={styles.nameRow}>
+          <span className={styles.fileName}>{input.originalName}</span>
+          <button
+            aria-label={`${input.originalName} 제거`}
+            className={styles.deleteIcon}
+            disabled={busy}
+            onClick={() => {
+              restoreTarget.current = 'remove'
+              setConfirmation('remove')
+            }}
+            ref={removeButtonRef}
+            type="button"
+          >
+            ✕
+          </button>
+        </span>
+        {input.status !== 'ready' ? (
+          <span className={styles.stateText}>{state.text}</span>
+        ) : null}
       </div>
-      <label className={styles.roleControl}>
-        <span>역할</span>
-        <select
-          aria-label={`${input.originalName} 역할`}
-          disabled={busy}
-          onChange={async (event) => {
-            setBusy(true)
-            setError('')
-            try {
-              await onAssignRole(input.id, event.target.value as InputRole)
-            } catch {
-              setError('역할을 변경하지 못했습니다.')
-            } finally {
-              setBusy(false)
-            }
-          }}
-          value={input.role}
-        >
-          {Object.entries(ROLE_LABELS).map(([role, label]) => (
-            <option key={role} value={role}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <div className={styles.slotActions}>
-        <button
-          aria-label={`${input.originalName} 교체`}
-          disabled={busy}
-          onClick={chooseReplacement}
-          ref={replaceButtonRef}
-          type="button"
-        >
-          교체
-        </button>
-        <button
-          aria-label={`${input.originalName} 제거`}
-          disabled={busy}
-          onClick={() => {
-            restoreTarget.current = 'remove'
-            setConfirmation('remove')
-          }}
-          ref={removeButtonRef}
-          type="button"
-        >
-          제거
-        </button>
-      </div>
+      {input.status === 'ready' ? (
+        <div className={styles.slotStatus}>
+          <span className={styles.readyTag}>
+            <span aria-hidden="true" className={styles.readyCheck}>
+              ✓
+            </span>
+            <span>준비됨</span>
+          </span>
+          <button
+            aria-label={`${input.originalName} 교체`}
+            className={styles.replaceButton}
+            disabled={busy}
+            onClick={chooseReplacement}
+            ref={replaceButtonRef}
+            type="button"
+          >
+            다시 선택
+          </button>
+        </div>
+      ) : (
+        <label className={styles.roleControl}>
+          <span>역할</span>
+          <select
+            aria-label={`${input.originalName} 역할`}
+            disabled={busy}
+            onChange={async (event) => {
+              setBusy(true)
+              setError('')
+              try {
+                await onAssignRole(input.id, event.target.value as InputRole)
+              } catch {
+                setError('역할을 변경하지 못했습니다.')
+              } finally {
+                setBusy(false)
+              }
+            }}
+            value={input.role}
+          >
+            {Object.entries(ROLE_LABELS).map(([role, label]) => (
+              <option key={role} value={role}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {confirmation ? (
         <div className={styles.confirmation} role="group" aria-label={`${input.originalName} 확인`}>
           <span>

@@ -39,7 +39,8 @@ describe('Studio Black tokens', () => {
       4.5
     )
     expect(contrast(tokens['color-focus'], tokens['color-base'])).toBeGreaterThanOrEqual(3)
-    expect(contrast(tokens['color-brand'], tokens['color-base'])).toBeGreaterThanOrEqual(3)
+    expect(contrast(tokens['color-accent'], tokens['color-base'])).toBeGreaterThanOrEqual(3)
+    expect(contrast(tokens['color-progress'], tokens['color-base'])).toBeGreaterThanOrEqual(3)
   })
 
   it('contains reduced-motion and scroll-safe zoom rules', () => {

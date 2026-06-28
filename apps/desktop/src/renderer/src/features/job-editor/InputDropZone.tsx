@@ -2,8 +2,11 @@ import type { InputFileCandidate, SelectedInputFile } from '@gracetree/contracts
 import type { InputRegistrationResult, InputRole, JobInputDto } from '@gracetree/contracts'
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 
+import { showToast, type ToastTone } from '../../components/toast-store'
 import styles from './InputDropZone.module.css'
 import { FileSlot, MissingFileSlot } from './FileSlot'
+
+const REQUIRED_ROLES = ['thumbnail', 'voice', 'script'] as const
 
 interface InputDropZoneProps {
   jobId: string | null
@@ -20,8 +23,6 @@ const ERROR_MESSAGES: Record<Exclude<InputRegistrationResult['errorCode'], null>
   NAME_CONFLICT: '같은 이름의 파일이 이미 있습니다. 교체는 다음 단계에서 지원됩니다.',
   COPY_FAILED: '파일 복사에 실패했습니다. 다시 선택해주세요.'
 }
-
-const SLOT_ROLES = ['thumbnail', 'voice', 'script', 'bgm'] as const
 
 export function InputDropZone({
   jobId,
@@ -45,7 +46,6 @@ function InputDropZoneContent({
 }: InputDropZoneProps): React.JSX.Element {
   const [results, setResults] = useState<InputRegistrationResult[]>([])
   const [inputs, setInputs] = useState<JobInputDto[]>(initialInputs)
-  const [summary, setSummary] = useState({ id: 0, text: '' })
   const onInputsChangedRef = useRef(onInputsChanged)
   const [pendingFiles, setPendingFiles] = useState<Array<{ id: string; name: string }>>([])
   const [dragActive, setDragActive] = useState(false)
@@ -69,8 +69,9 @@ function InputDropZoneContent({
     }
   }, [])
 
-  const announce = (text: string): void => {
-    setSummary((current) => ({ id: current.id + 1, text }))
+  // 등록 결과 같은 일회성 안내는 하단 토스트로 보여준다.
+  const announce = (text: string, tone: ToastTone = 'info'): void => {
+    showToast(text, tone)
   }
 
   const updateInputs = (nextInputs: JobInputDto[]): void => {
@@ -94,13 +95,10 @@ function InputDropZoneContent({
         if (!activeRef.current) return
         setResults(batch.results)
         if (batch.inputs) updateInputs(batch.inputs)
-        const nextResults = batch.results
-        const successCount = nextResults.filter((item) => item.status === 'registered').length
-        const rejectedCount = nextResults.length - successCount
-        announce(`파일 등록 완료: 성공 ${successCount}개, 거부 ${rejectedCount}개`)
+        // 등록 성공은 슬롯에 파일명이 바로 보이므로 별도 안내를 띄우지 않는다.
       } catch {
         if (activeRef.current) {
-          announce('파일 등록을 완료하지 못했습니다. 다시 선택해주세요.')
+          announce('파일 등록을 완료하지 못했습니다. 다시 선택해주세요.', 'danger')
         }
       } finally {
         if (activeRef.current) {
@@ -130,6 +128,11 @@ function InputDropZoneContent({
     updateInputs(await window.desktopApi.replaceInput(jobId, inputId, file))
   }
   const occupiedRoles = new Set(inputs.map((input) => input.role))
+  const requiredMissing = REQUIRED_ROLES.filter((role) => !occupiedRoles.has(role))
+  const bgmInputs = inputs.filter((input) => input.role === 'bgm')
+  const nonBgmInputs = inputs.filter((input) => input.role !== 'bgm')
+  // 등록 성공은 슬롯으로 보이므로, 결과 리스트엔 거부된 파일만 남긴다.
+  const rejectedResults = results.filter((result) => result.status !== 'registered')
 
   const selectFiles = async (): Promise<void> => {
     if (!jobId) return
@@ -137,7 +140,7 @@ function InputDropZoneContent({
       const selected: SelectedInputFile[] = await window.desktopApi.selectInputFiles()
       await register(selected)
     } catch {
-      announce('파일 선택을 완료하지 못했습니다. 다시 시도해주세요.')
+      announce('파일 선택을 완료하지 못했습니다. 다시 시도해주세요.', 'danger')
     }
   }
 
@@ -149,8 +152,7 @@ function InputDropZoneContent({
   }
 
   return (
-    <section aria-labelledby="input-files-title" className={styles.section}>
-      <h3 id="input-files-title">입력 파일</h3>
+    <section aria-label="입력 파일" className={styles.section}>
       <div
         className={styles.dropZone}
         data-disabled={!jobId || undefined}
@@ -167,31 +169,70 @@ function InputDropZoneContent({
         }}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
+        data-testid="dropzone"
       >
-        <p>썸네일, 음성, 영상, 스크립트 파일을 한 번에 놓으세요.</p>
-        <button disabled={!jobId} onClick={selectFiles} type="button">
-          파일 선택
-        </button>
+        {jobId ? (
+          <>
+            <div className={styles.dzHead}>
+              <span aria-hidden="true" className={styles.dzIcon}>
+                <svg
+                  fill="none"
+                  height="18"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  width="18"
+                >
+                  <path d="M12 16V4" />
+                  <path d="M7 9l5-5 5 5" />
+                  <path d="M5 20h14" />
+                </svg>
+              </span>
+              <div className={styles.dzHeadText}>
+                <div className={styles.dzTitle}>파일 {inputs.length}개</div>
+                <div className={styles.dzSub}>끌어다 놓거나 선택해 등록·교체할 수 있어요</div>
+              </div>
+              <button className={styles.dzSelect} disabled={!jobId} onClick={selectFiles} type="button">
+                파일 선택
+              </button>
+            </div>
+            <ul aria-label="파일 슬롯" className={styles.slots}>
+              {requiredMissing.map((role) => (
+                <MissingFileSlot key={role} role={role} />
+              ))}
+              {nonBgmInputs.map((input) => (
+                <FileSlot
+                  input={input}
+                  key={input.id}
+                  onAssignRole={assignRole}
+                  onRemove={removeInput}
+                  onReplace={replaceInput}
+                />
+              ))}
+              {bgmInputs.length === 0 ? <MissingFileSlot key="bgm" optional role="bgm" /> : null}
+              {bgmInputs.map((input) => (
+                <FileSlot
+                  input={input}
+                  key={input.id}
+                  onAssignRole={assignRole}
+                  onRemove={removeInput}
+                  onReplace={replaceInput}
+                  optional
+                />
+              ))}
+            </ul>
+          </>
+        ) : (
+          <div className={styles.dzEmpty}>
+            <p>썸네일, 음성, 영상, 스크립트 파일을 한 번에 놓으세요.</p>
+            <button disabled={!jobId} onClick={selectFiles} type="button">
+              파일 선택
+            </button>
+          </div>
+        )}
       </div>
-      <p aria-atomic="true" aria-live="polite" className={styles.summary} key={summary.id}>
-        {summary.text}
-      </p>
-      {jobId ? (
-        <ul aria-label="파일 슬롯" className={styles.slots}>
-          {SLOT_ROLES.filter((role) => !occupiedRoles.has(role)).map((role) => (
-            <MissingFileSlot key={role} role={role} />
-          ))}
-          {inputs.map((input) => (
-            <FileSlot
-              input={input}
-              key={input.id}
-              onAssignRole={assignRole}
-              onRemove={removeInput}
-              onReplace={replaceInput}
-            />
-          ))}
-        </ul>
-      ) : null}
       {pendingFiles.length > 0 ? (
         <ul aria-label="파일 등록 처리 상태" className={styles.results}>
           {pendingFiles.map((file) => (
@@ -202,9 +243,9 @@ function InputDropZoneContent({
           ))}
         </ul>
       ) : null}
-      {results.length > 0 ? (
+      {rejectedResults.length > 0 ? (
         <ul aria-label="파일 등록 결과" className={styles.results}>
-          {results.map((result, index) => {
+          {rejectedResults.map((result, index) => {
             const errorId = `input-error-${index}`
             return (
               <li
@@ -213,13 +254,7 @@ function InputDropZoneContent({
                 key={`${result.originalName}-${index}`}
               >
                 <span>{result.originalName}</span>
-                <strong>
-                  {result.status === 'registered'
-                    ? '등록됨'
-                    : result.status === 'conflict'
-                      ? '충돌'
-                      : '거부됨'}
-                </strong>
+                <strong>{result.status === 'conflict' ? '충돌' : '거부됨'}</strong>
                 {result.errorCode ? (
                   <span className={styles.error} id={errorId}>
                     {ERROR_MESSAGES[result.errorCode]}
@@ -230,7 +265,7 @@ function InputDropZoneContent({
           })}
         </ul>
       ) : null}
-      {results.some((result) => result.status !== 'registered') ? (
+      {rejectedResults.length > 0 ? (
         <button className={styles.retry} onClick={selectFiles} type="button">
           파일 다시 선택
         </button>

@@ -48,12 +48,11 @@ describe('ReadinessProgress', () => {
     expect(screen.getByText('100%')).toBeVisible()
   })
 
-  it('shows progressbar with aria-valuenow=0 and nextAction when nothing is ready', () => {
+  it('shows progressbar with aria-valuenow=0 and counts when nothing is ready', () => {
     render(<ReadinessProgress isParsing={false} readiness={makeReadiness(0)} />)
 
     const progressbar = screen.getByRole('progressbar')
     expect(progressbar).toHaveAttribute('aria-valuenow', '0')
-    expect(screen.getByText('썸네일 이미지를 등록하세요.')).toBeVisible()
     expect(screen.getByText('필수 입력 0/4')).toBeVisible()
     expect(screen.getByText('0%')).toBeVisible()
   })
@@ -80,11 +79,11 @@ describe('ReadinessProgress', () => {
     expect(screen.getByText('스크립트')).toBeVisible()
   })
 
-  it('shows aria-live region for state changes', () => {
-    render(<ReadinessProgress isParsing={false} readiness={makeReadiness(0)} />)
+  it('shows aria-live region while parsing the script', () => {
+    render(<ReadinessProgress isParsing={true} readiness={makeReadiness(2)} />)
 
     // live region이 존재하는지 확인 (polite + atomic)
-    const liveRegion = screen.getByText('썸네일 이미지를 등록하세요.').parentElement
+    const liveRegion = screen.getByText('스크립트를 확인하고 있습니다…').parentElement
     expect(liveRegion).toHaveAttribute('aria-live', 'polite')
     expect(liveRegion).toHaveAttribute('aria-atomic', 'true')
   })

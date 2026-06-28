@@ -41,6 +41,7 @@ export function CancelConfirmDialog({ onClose, onConfirm }: CancelConfirmDialogP
 
         <div className={styles.resultDialogActions}>
           <button
+            className={styles.secondaryButton}
             onClick={onClose}
             ref={cancelButtonRef}
             type="button"

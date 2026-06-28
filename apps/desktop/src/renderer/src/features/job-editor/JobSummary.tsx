@@ -22,14 +22,9 @@ export function JobSummary({ scriptValidation, isParsing }: JobSummaryProps): Re
     return null
   }
 
-  if (scriptValidation.status === 'valid' && scriptValidation.oneLiner != null) {
-    return (
-      <div className={styles.container}>
-        <h4 className={styles.oneLiner} title={scriptValidation.oneLiner}>
-          {scriptValidation.oneLiner}
-        </h4>
-      </div>
-    )
+  // 유효한 스크립트의 제목은 인라인이 아니라 하단 푸터("현재 작업")에 표시한다.
+  if (scriptValidation.status === 'valid') {
+    return null
   }
 
   if (scriptValidation.status === 'invalid' && scriptValidation.errors.length > 0) {

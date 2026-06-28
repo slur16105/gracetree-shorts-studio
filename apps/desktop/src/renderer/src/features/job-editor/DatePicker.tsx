@@ -1,6 +1,7 @@
 import type { JobDto } from '@gracetree/contracts'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
+import { showToast } from '../../components/toast-store'
 import styles from './DatePicker.module.css'
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -108,6 +109,16 @@ export function DatePicker({ onJobLoaded }: DatePickerProps = {}): React.JSX.Ele
     if (open) dayRefs.current.get(focusedDate)?.focus()
   }, [focusedDate, open])
 
+  // 날짜별 작업 로드 결과는 게시일 옆에 상주시키지 않고 하단 토스트로 일회성 안내한다.
+  useEffect(() => {
+    if (loadError) {
+      showToast('작업을 불러오지 못했습니다', 'danger')
+    } else if (job) {
+      if (job.pathState === 'missing') showToast('관리 폴더 확인 필요', 'warning')
+      else showToast('날짜별 작업 복원됨', 'progress')
+    }
+  }, [job, loadError])
+
   const close = (): void => {
     setOpen(false)
     queueMicrotask(() => triggerRef.current?.focus())
@@ -203,16 +214,6 @@ export function DatePicker({ onJobLoaded }: DatePickerProps = {}): React.JSX.Ele
       >
         {formatDate(selectedDate)}
       </button>
-      <span className={styles.jobStatus} role="status">
-        {loadError
-          ? '작업을 불러오지 못했습니다'
-          : job?.pathState === 'missing'
-            ? '관리 폴더 확인 필요'
-            : job
-              ? '날짜별 작업 복원됨'
-              : '작업 불러오는 중'}
-      </span>
-
       {open ? (
         <div
           aria-label="게시 날짜 선택"

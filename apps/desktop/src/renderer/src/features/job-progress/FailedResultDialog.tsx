@@ -18,13 +18,10 @@ interface FailedResultDialogProps {
 export function FailedResultDialog({
   jobId,
   attemptId,
-  errorCode: _errorCode,
   message,
   stageId,
   recoverable,
-  details,
   onClose,
-  onOpenSettings,
 }: FailedResultDialogProps): React.JSX.Element {
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -40,11 +37,6 @@ export function FailedResultDialog({
     })
   }
 
-  const handleOpenSettings = (): void => {
-    onClose()
-    onOpenSettings()
-  }
-
   return (
     <div className={styles.dialogBackdrop}>
       <div
@@ -57,49 +49,26 @@ export function FailedResultDialog({
       >
         <div className={styles.dialogHeader}>
           <div>
-            <p className={styles.eyebrow}>생성 실패 — {stageLabel(stageId)}</p>
+            <p className={`${styles.eyebrow} ${styles.failStage}`}>{stageLabel(stageId)}</p>
             <h2 id="failed-dialog-title">영상 생성에 실패했습니다</h2>
           </div>
         </div>
 
         <div className={styles.errorBanner}>
           <p className={styles.errorBannerTitle}>{message}</p>
-          {details ? <p className={styles.errorBannerDetail}>{details}</p> : null}
         </div>
 
         <div className={styles.failedDialogActions}>
-          {recoverable ? (
-            <button
-              className={styles.primaryButton}
-              onClick={onClose}
-              ref={closeButtonRef}
-              type="button"
-            >
-              입력 수정
-            </button>
-          ) : (
-            <button
-              className={styles.secondaryButton}
-              onClick={onClose}
-              ref={closeButtonRef}
-              type="button"
-            >
-              닫기
-            </button>
-          )}
           <button
-            className={styles.secondaryButton}
-            onClick={handleOpenSettings}
+            className={recoverable ? styles.primaryButton : styles.secondaryButton}
+            onClick={onClose}
+            ref={closeButtonRef}
             type="button"
           >
-            설정 이동
+            {recoverable ? '입력 수정' : '닫기'}
           </button>
-          <button
-            className={styles.secondaryButton}
-            onClick={handleOpenLog}
-            type="button"
-          >
-            로그 폴더 열기
+          <button className={styles.secondaryButton} onClick={handleOpenLog} type="button">
+            로그 폴더
           </button>
         </div>
       </div>

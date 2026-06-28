@@ -1,99 +1,90 @@
 .container {
   margin-top: var(--space-5);
-  padding: var(--space-4);
+  padding: var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-panel);
 }
 
-.header {
+.cardTitle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-3);
-}
-
-.label {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.percent {
-  font-size: 14px;
-  font-weight: 600;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
   color: var(--color-text-primary);
+  font-size: var(--text-title-sm);
+  font-weight: 700;
 }
 
 .progressTrack {
   height: 8px;
-  border-radius: var(--radius-md);
-  background: var(--color-border);
   overflow: hidden;
-  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-raised);
 }
 
 .progressFill {
   height: 100%;
-  border-radius: var(--radius-md);
-  background: var(--color-brand);
+  border-radius: var(--radius-full);
+  background: var(--color-progress);
   transition: width 0.3s ease;
 }
 
-.progressFill[data-ready='true'] {
-  background: var(--color-success);
-}
-
-.slots {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-2);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.slot {
+.readyRow {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  text-align: center;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--space-4);
 }
 
-.slot[data-satisfied='true'] {
-  border-color: var(--color-success);
-}
-
-.slot[data-satisfied='false'] {
-  border-color: var(--color-warning);
-}
-
-.slotIcon {
-  display: inline-flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid currentcolor;
-  border-radius: 50%;
-  font-size: 11px;
+.readyPct {
+  color: var(--color-text-primary);
+  font-size: 22px;
   font-weight: 700;
 }
 
-.slotIcon[data-satisfied='true'] {
-  color: var(--color-success);
-}
-
-.slotIcon[data-satisfied='false'] {
-  color: var(--color-warning);
-}
-
-.slotLabel {
-  font-size: 12px;
+.meta {
   color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-raised);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.chipDot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-progress);
+}
+
+.chip[data-satisfied='false'] .chipDot {
+  background: var(--color-text-disabled);
+}
+
+.chipLabel {
+  line-height: 1;
 }
 
 .statusArea {
@@ -102,28 +93,28 @@
 }
 
 .readyText {
+  color: var(--color-progress);
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-success);
 }
 
 .nextAction {
-  font-size: 13px;
   color: var(--color-text-secondary);
+  font-size: 13px;
 }
 
 .parsingText {
-  font-size: 13px;
   color: var(--color-text-secondary);
+  font-size: 13px;
   font-style: italic;
 }
 
 .openSettingsButton {
-  background: none;
-  border: none;
   padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
   font-size: 13px;
-  color: var(--color-brand);
-  cursor: pointer;
   text-decoration: underline;
+  cursor: pointer;
 }

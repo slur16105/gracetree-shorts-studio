@@ -12,14 +12,18 @@ export function ReadinessProgress({
   isParsing,
   onOpenSettings,
 }: ReadinessProgressProps): React.JSX.Element {
-  const { slots, satisfiedCount, total, percent, isReady, nextAction, commonResourcesReady } = readiness
+  const { slots, satisfiedCount, total, percent, isReady, commonResourcesReady } = readiness
   const fullyReady = isReady && commonResourcesReady
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <span className={styles.label}>필수 입력 {satisfiedCount}/{total}</span>
-        <span className={styles.percent}>{percent}%</span>
+      <div className={styles.cardTitle}>
+        <span>입력 준비</span>
+        {fullyReady ? (
+          <span className={styles.readyText} role="status">
+            준비 완료
+          </span>
+        ) : null}
       </div>
       <div className={styles.progressTrack}>
         <div
@@ -33,47 +37,41 @@ export function ReadinessProgress({
           style={{ width: `${percent}%` }}
         />
       </div>
-      <ul className={styles.slots}>
+      <div className={styles.readyRow}>
+        <span className={styles.readyPct}>{percent}%</span>
+        <span className={styles.meta}>필수 입력 {satisfiedCount}/{total}</span>
+      </div>
+      <ul className={styles.chips}>
         {slots.map((slot) => (
           <li
             aria-label={`${slot.label}: ${slot.satisfied ? '완료' : '미완료'}`}
-            className={styles.slot}
+            className={styles.chip}
             data-satisfied={slot.satisfied}
             key={slot.role}
           >
-            <span
-              aria-hidden="true"
-              className={styles.slotIcon}
-              data-satisfied={slot.satisfied}
-            >
-              {slot.satisfied ? '✓' : '✗'}
-            </span>
-            <span aria-hidden="true" className={styles.slotLabel}>{slot.label}</span>
+            <i aria-hidden="true" className={styles.chipDot} />
+            <span className={styles.chipLabel}>{slot.label}</span>
           </li>
         ))}
       </ul>
-      <div aria-atomic="true" aria-live="polite" className={styles.statusArea}>
-        {fullyReady ? (
-          <span className={styles.readyText} role="status">
-            준비 완료
-          </span>
-        ) : isParsing ? (
-          <span className={styles.parsingText} role="status">
-            스크립트를 확인하고 있습니다…
-          </span>
-        ) : isReady && !commonResourcesReady ? (
-          <span className={styles.nextAction} role="status">
-            공통 리소스를 설정하세요.{' '}
-            {onOpenSettings ? (
-              <button className={styles.openSettingsButton} onClick={onOpenSettings} type="button">
-                설정 열기
-              </button>
-            ) : null}
-          </span>
-        ) : nextAction != null ? (
-          <span className={styles.nextAction}>{nextAction}</span>
-        ) : null}
-      </div>
+      {isParsing || (isReady && !commonResourcesReady && !fullyReady) ? (
+        <div aria-atomic="true" aria-live="polite" className={styles.statusArea}>
+          {isParsing ? (
+            <span className={styles.parsingText} role="status">
+              스크립트를 확인하고 있습니다…
+            </span>
+          ) : (
+            <span className={styles.nextAction} role="status">
+              공통 리소스를 설정하세요.{' '}
+              {onOpenSettings ? (
+                <button className={styles.openSettingsButton} onClick={onOpenSettings} type="button">
+                  설정 열기
+                </button>
+              ) : null}
+            </span>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }
