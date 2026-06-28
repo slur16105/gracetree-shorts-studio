@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GraceTree Shorts Studio — 색 테마 방향 비교</title>
+<style>
+/* =====================================================================
+   GraceTree Shorts Studio — Dark color-theme comparison
+   4 directions, identical markup, per-direction CSS custom properties.
+   System font stack only, no JS, no external assets.
+   =====================================================================
+
+   SEMANTIC ROLES (all directions define every one of these):
+     --surface-base    app background (deepest layer)
+     --surface-nav     sidebar rail
+     --surface-panel   main content panel
+     --surface-raised  cards / rows
+     --surface-hover   hover state
+     --surface-sel     selected state
+     --border-subtle   hairline dividers
+     --border-strong   emphasized borders
+     --text-primary    filenames / titles / dates
+     --text-secondary  labels
+     --text-disabled   muted meta
+     --accent          brand + SELECTION ONLY
+     --accent-ink      readable text/icon on accent fill
+     --success         readiness / progress / success ONLY
+     --warning         needs-attention
+     --danger          failure / destructive
+     --primary-bg      primary action pill background
+     --primary-fg      primary action pill text
+
+   ---------------------------------------------------------------------
+   DIRECTION A — "Studio Black" (baseline spec, faithful)
+     base #080909 · nav #090A0A · panel #0D0F0F · raised #171919
+     hover #202424 · selected #242727 · border-subtle #292D2D · strong #686E6E
+     text #F4F5F5 / #9FA4A4 / #666B6B
+     accent (selection only) hot-pink #FF2F62 · success #36D399
+     warning #F2B84B · danger #F05D5E
+     primary pill = bright/light #F4F5F5 bg, #0D0F0F text
+   ---------------------------------------------------------------------
+   DIRECTION B — "Ink & Amber" (warm faith-tool)
+     warm charcoal w/ brown undertone.
+     base #0B0A09 · nav #0C0B09 · panel #12100D · raised #1C1916
+     hover #262219 · selected #2B271D · border-subtle #2E2A22 · strong #6E665A
+     text #F5F2EC / #A6A095 / #6B655B
+     accent (selection only) amber/gold #F5A623 · success #4FC58B (warm-leaning green)
+     warning #E8A93A · danger #E26A5C
+     primary pill = amber #F5A623 bg, dark #1C1410 text (warm finished pill)
+   ---------------------------------------------------------------------
+   DIRECTION C — "Slate & Sky" (cool editorial pro)
+     blue-undertone slate surfaces.
+     base #0A0C0F · nav #0B0E12 · panel #10141A · raised #1A2029
+     hover #232B36 · selected #28313D · border-subtle #2A323D · strong #647284
+     text #EEF2F6 / #99A6B3 / #5F6B79
+     accent (selection only) sky/azure #5BA3D0 · success mint #3FD1A6
+     warning #E9B65A · danger #EA6B6B
+     primary pill = sky #5BA3D0 bg, deep-navy #07141E text
+   ---------------------------------------------------------------------
+   DIRECTION D — "Mono Focus" (절제 / near-grayscale)
+     surfaces & text carry the design; ONE muted indigo accent, used
+     extremely sparingly (selection + brand only).
+     base #0B0B0C · nav #0D0D0E · panel #131315 · raised #1C1C1F
+     hover #242427 · selected #2A2A2E · border-subtle #2C2C30 · strong #6A6A70
+     text #F1F1F2 / #9A9AA0 / #636368
+     accent (selection only) muted indigo #7C84E8
+     PROGRESS DECISION: To keep the screen near-monochrome we DO NOT
+     introduce a separate green. --success is a slightly brighter tint of
+     the same indigo (#9AA0F2) so readiness reads as "the one accent,
+     intensified" rather than a second color. warning/danger remain
+     desaturated and only ever appear on genuine attention/failure states.
+     warning #C9A24B · danger #D06E6E
+     primary pill = light #F1F1F2 bg, dark #131315 text (mono, no hue)
+   ===================================================================== */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Pretendard, sans-serif;
+}
+
+html, body {
+  background: #141414;
+  color: #e8e8e8;
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+}
+
+body { padding: 40px 32px 56px; }
+
+.page-head { max-width: 1640px; margin: 0 auto 32px; }
+.page-head h1 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #f4f4f4;
+}
+.page-head p {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #9a9a9a;
+}
+
+.grid {
+  max-width: 1640px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+@media (max-width: 1280px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+/* ---- per-direction palettes ------------------------------------- */
+.dir-a {
+  --surface-base:#080909; --surface-nav:#090A0A; --surface-panel:#0D0F0F;
+  --surface-raised:#171919; --surface-hover:#202424; --surface-sel:#242727;
+  --border-subtle:#292D2D; --border-strong:#686E6E;
+  --text-primary:#F4F5F5; --text-secondary:#9FA4A4; --text-disabled:#666B6B;
+  --accent:#FF2F62; --accent-ink:#FFFFFF;
+  --success:#36D399; --warning:#F2B84B; --danger:#F05D5E;
+  --primary-bg:#F4F5F5; --primary-fg:#0D0F0F;
+}
+.dir-b {
+  --surface-base:#0B0A09; --surface-nav:#0C0B09; --surface-panel:#12100D;
+  --surface-raised:#1C1916; --surface-hover:#262219; --surface-sel:#2B271D;
+  --border-subtle:#2E2A22; --border-strong:#6E665A;
+  --text-primary:#F5F2EC; --text-secondary:#A6A095; --text-disabled:#6B655B;
+  --accent:#F5A623; --accent-ink:#1C1410;
+  --success:#4FC58B; --warning:#E8A93A; --danger:#E26A5C;
+  --primary-bg:#F5A623; --primary-fg:#1C1410;
+}
+.dir-c {
+  --surface-base:#0A0C0F; --surface-nav:#0B0E12; --surface-panel:#10141A;
+  --surface-raised:#1A2029; --surface-hover:#232B36; --surface-sel:#28313D;
+  --border-subtle:#2A323D; --border-strong:#647284;
+  --text-primary:#EEF2F6; --text-secondary:#99A6B3; --text-disabled:#5F6B79;
+  --accent:#5BA3D0; --accent-ink:#07141E;
+  --success:#3FD1A6; --warning:#E9B65A; --danger:#EA6B6B;
+  --primary-bg:#5BA3D0; --primary-fg:#07141E;
+}
+.dir-d {
+  --surface-base:#0B0B0C; --surface-nav:#0D0D0E; --surface-panel:#131315;
+  --surface-raised:#1C1C1F; --surface-hover:#242427; --surface-sel:#2A2A2E;
+  --border-subtle:#2C2C30; --border-strong:#6A6A70;
+  --text-primary:#F1F1F2; --text-secondary:#9A9AA0; --text-disabled:#636368;
+  --accent:#7C84E8; --accent-ink:#0B0B14;
+  --success:#9AA0F2; --warning:#C9A24B; --danger:#D06E6E;
+  --primary-bg:#F1F1F2; --primary-fg:#131315;
+}
+
+/* ---- column shell ----------------------------------------------- */
+.col {
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.col-head {
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-panel);
+}
+.col-head .name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.col-head .name .dot {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 9999px;
+  background: var(--accent);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.col-head .register {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* ---- token chips ------------------------------------------------ */
+.chips {
+  padding: 14px 16px;
+  background: var(--surface-base);
+  border-bottom: 1px solid var(--border-subtle);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.chip .sw {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
+  flex: none;
+}
+.chip .lab {
+  min-width: 0;
+  line-height: 1.25;
+}
+.chip .role {
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip .hex {
+  font-size: 10px;
+  color: var(--text-disabled);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ---- app snippet ------------------------------------------------ */
+.app {
+  background: var(--surface-base);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.app-body { display: flex; flex: 1; }
+
+/* sidebar rail */
+.rail {
+  width: 56px;
+  flex: none;
+  background: var(--surface-nav);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 8px;
+}
+.brand {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+.nav-btn {
+  position: relative;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  color: var(--text-secondary);
+}
+.nav-btn.active {
+  background: var(--surface-sel);
+  color: var(--text-primary);
+}
+.nav-btn.active::before {
+  content: "";
+  position: absolute;
+  left: -8px; top: 9px;
+  width: 3px; height: 22px;
+  border-radius: 9999px;
+  background: var(--accent);
+}
+
+/* main */
+.main {
+  flex: 1;
+  background: var(--surface-panel);
+  padding: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  min-width: 0;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.title {
+  margin-top: 6px;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.datepick {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 9999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.datepick .cal { color: var(--text-secondary); font-size: 13px; }
+
+/* readiness panel */
+.card {
+  margin-top: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.progress {
+  margin-top: 10px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--surface-hover);
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 9999px;
+  background: var(--success);
+}
+.progress-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.slots {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.slot .ok {
+  width: 16px; height: 16px;
+  border-radius: 9999px;
+  background: var(--success);
+  color: var(--surface-base);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 900;
+  flex: none;
+}
+.slot .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot .st { font-size: 11px; color: var(--success); font-weight: 600; }
+
+/* button row */
+.btn-row {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+}
+.pill {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid transparent;
+}
+.pill.secondary {
+  background: var(--surface-raised);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.pill.primary {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+
+/* right: 완료 region */
+.done-head {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.rows {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+}
+.row.selected {
+  background: var(--surface-sel);
+  border-color: var(--accent);
+}
+.row .glyph {
+  width: 18px; height: 18px;
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 900;
+  flex: none;
+}
+.row .glyph.ok { background: var(--success); color: var(--surface-base); }
+.row .glyph.warn { background: var(--warning); color: var(--surface-base); }
+.row .info { flex: 1; min-width: 0; }
+.row .date {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row .meta {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-disabled);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row .meta.warn { color: var(--warning); }
+.row .folder {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-hover);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+/* bottom status bar */
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: var(--surface-nav);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.statusbar .left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+.statusbar .left .s-dot {
+  width: 7px; height: 7px;
+  border-radius: 9999px;
+  background: var(--success);
+  flex: none;
+}
+.statusbar .left span {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.statusbar .right { color: var(--text-disabled); flex: none; }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>GraceTree Shorts Studio — 색 테마 방향 비교</h1>
+  <p>네 방향을 나란히 비교하세요. 마크업/레이아웃은 동일하고 색만 다릅니다.</p>
+</div>
+
+<div class="grid">
+
+  <!-- ===================== DIRECTION A ===================== -->
+  <section class="col dir-a">
+    <div class="col-head">
+      <div class="name"><span class="dot"></span>A — Studio Black</div>
+      <div class="register">차갑고 선명한 기본형. 분홍은 선택에만, 초록은 진행/완료에만.</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="sw" style="background:var(--surface-base)"></span><span class="lab"><div class="role">surface base</div><div class="hex">#080909</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-panel)"></span><span class="lab"><div class="role">panel</div><div class="hex">#0D0F0F</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-raised)"></span><span class="lab"><div class="role">raised</div><div class="hex">#171919</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-sel)"></span><span class="lab"><div class="role">selected</div><div class="hex">#242727</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--border-strong)"></span><span class="lab"><div class="role">border strong</div><div class="hex">#686E6E</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-primary)"></span><span class="lab"><div class="role">text primary</div><div class="hex">#F4F5F5</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-secondary)"></span><span class="lab"><div class="role">text secondary</div><div class="hex">#9FA4A4</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--accent)"></span><span class="lab"><div class="role">accent (선택)</div><div class="hex">#FF2F62</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--success)"></span><span class="lab"><div class="role">success</div><div class="hex">#36D399</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--warning)"></span><span class="lab"><div class="role">warning</div><div class="hex">#F2B84B</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--danger)"></span><span class="lab"><div class="role">danger</div><div class="hex">#F05D5E</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--primary-bg)"></span><span class="lab"><div class="role">primary pill</div><div class="hex">#F4F5F5</div></span></div>
+    </div>
+    <div class="app">
+      <div class="app-body">
+        <div class="rail">
+          <div class="brand">GT</div>
+          <div class="nav-btn active">⌂</div>
+          <div class="nav-btn">?</div>
+          <div class="nav-btn">⚙</div>
+        </div>
+        <div class="main">
+          <div class="work">
+            <div class="eyebrow">새 작업</div>
+            <div class="title">오늘의 말씀기도 쇼츠</div>
+            <div class="datepick"><span class="cal">▦</span>2026-06-28 · Sat</div>
+            <div class="card">
+              <div class="card-title">입력 준비</div>
+              <div class="progress"><span></span></div>
+              <div class="progress-meta">100% · 필수 입력 4/4</div>
+            </div>
+            <div class="slots">
+              <div class="slot"><span class="ok">✓</span><span class="nm">자막 script.txt</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">말씀 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">기도 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">배경음악</span><span class="st">준비됨</span></div>
+            </div>
+            <div class="btn-row">
+              <div class="pill secondary">파일 다시 선택</div>
+              <div class="pill primary">영상 생성</div>
+            </div>
+          </div>
+          <div class="done">
+            <div class="done-head">완료</div>
+            <div class="rows">
+              <div class="row selected">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-27 · Fri</div><div class="meta">실제 생성 2026-06-27 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-26 · Thu</div><div class="meta">실제 생성 2026-06-26 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph warn">!</span>
+                <div class="info"><div class="date">2026-06-25 · Wed</div><div class="meta warn">결과 폴더 없음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar">
+        <div class="left"><span class="s-dot"></span><span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</span></div>
+        <div class="right">준비 완료</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DIRECTION B ===================== -->
+  <section class="col dir-b">
+    <div class="col-head">
+      <div class="name"><span class="dot"></span>B — Ink &amp; Amber</div>
+      <div class="register">따뜻한 제작 도구. 네온 대신 금빛 앰버로 선택을, 초록은 준비 완료에.</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="sw" style="background:var(--surface-base)"></span><span class="lab"><div class="role">surface base</div><div class="hex">#0B0A09</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-panel)"></span><span class="lab"><div class="role">panel</div><div class="hex">#12100D</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-raised)"></span><span class="lab"><div class="role">raised</div><div class="hex">#1C1916</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-sel)"></span><span class="lab"><div class="role">selected</div><div class="hex">#2B271D</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--border-strong)"></span><span class="lab"><div class="role">border strong</div><div class="hex">#6E665A</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-primary)"></span><span class="lab"><div class="role">text primary</div><div class="hex">#F5F2EC</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-secondary)"></span><span class="lab"><div class="role">text secondary</div><div class="hex">#A6A095</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--accent)"></span><span class="lab"><div class="role">accent (선택)</div><div class="hex">#F5A623</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--success)"></span><span class="lab"><div class="role">success</div><div class="hex">#4FC58B</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--warning)"></span><span class="lab"><div class="role">warning</div><div class="hex">#E8A93A</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--danger)"></span><span class="lab"><div class="role">danger</div><div class="hex">#E26A5C</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--primary-bg)"></span><span class="lab"><div class="role">primary pill</div><div class="hex">#F5A623</div></span></div>
+    </div>
+    <div class="app">
+      <div class="app-body">
+        <div class="rail">
+          <div class="brand">GT</div>
+          <div class="nav-btn active">⌂</div>
+          <div class="nav-btn">?</div>
+          <div class="nav-btn">⚙</div>
+        </div>
+        <div class="main">
+          <div class="work">
+            <div class="eyebrow">새 작업</div>
+            <div class="title">오늘의 말씀기도 쇼츠</div>
+            <div class="datepick"><span class="cal">▦</span>2026-06-28 · Sat</div>
+            <div class="card">
+              <div class="card-title">입력 준비</div>
+              <div class="progress"><span></span></div>
+              <div class="progress-meta">100% · 필수 입력 4/4</div>
+            </div>
+            <div class="slots">
+              <div class="slot"><span class="ok">✓</span><span class="nm">자막 script.txt</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">말씀 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">기도 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">배경음악</span><span class="st">준비됨</span></div>
+            </div>
+            <div class="btn-row">
+              <div class="pill secondary">파일 다시 선택</div>
+              <div class="pill primary">영상 생성</div>
+            </div>
+          </div>
+          <div class="done">
+            <div class="done-head">완료</div>
+            <div class="rows">
+              <div class="row selected">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-27 · Fri</div><div class="meta">실제 생성 2026-06-27 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-26 · Thu</div><div class="meta">실제 생성 2026-06-26 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph warn">!</span>
+                <div class="info"><div class="date">2026-06-25 · Wed</div><div class="meta warn">결과 폴더 없음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar">
+        <div class="left"><span class="s-dot"></span><span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</span></div>
+        <div class="right">준비 완료</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DIRECTION C ===================== -->
+  <section class="col dir-c">
+    <div class="col-head">
+      <div class="name"><span class="dot"></span>C — Slate &amp; Sky</div>
+      <div class="register">차분한 프로. 푸른 슬레이트 면에 하늘빛 선택, 진행은 민트로.</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="sw" style="background:var(--surface-base)"></span><span class="lab"><div class="role">surface base</div><div class="hex">#0A0C0F</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-panel)"></span><span class="lab"><div class="role">panel</div><div class="hex">#10141A</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-raised)"></span><span class="lab"><div class="role">raised</div><div class="hex">#1A2029</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-sel)"></span><span class="lab"><div class="role">selected</div><div class="hex">#28313D</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--border-strong)"></span><span class="lab"><div class="role">border strong</div><div class="hex">#647284</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-primary)"></span><span class="lab"><div class="role">text primary</div><div class="hex">#EEF2F6</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-secondary)"></span><span class="lab"><div class="role">text secondary</div><div class="hex">#99A6B3</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--accent)"></span><span class="lab"><div class="role">accent (선택)</div><div class="hex">#5BA3D0</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--success)"></span><span class="lab"><div class="role">success</div><div class="hex">#3FD1A6</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--warning)"></span><span class="lab"><div class="role">warning</div><div class="hex">#E9B65A</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--danger)"></span><span class="lab"><div class="role">danger</div><div class="hex">#EA6B6B</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--primary-bg)"></span><span class="lab"><div class="role">primary pill</div><div class="hex">#5BA3D0</div></span></div>
+    </div>
+    <div class="app">
+      <div class="app-body">
+        <div class="rail">
+          <div class="brand">GT</div>
+          <div class="nav-btn active">⌂</div>
+          <div class="nav-btn">?</div>
+          <div class="nav-btn">⚙</div>
+        </div>
+        <div class="main">
+          <div class="work">
+            <div class="eyebrow">새 작업</div>
+            <div class="title">오늘의 말씀기도 쇼츠</div>
+            <div class="datepick"><span class="cal">▦</span>2026-06-28 · Sat</div>
+            <div class="card">
+              <div class="card-title">입력 준비</div>
+              <div class="progress"><span></span></div>
+              <div class="progress-meta">100% · 필수 입력 4/4</div>
+            </div>
+            <div class="slots">
+              <div class="slot"><span class="ok">✓</span><span class="nm">자막 script.txt</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">말씀 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">기도 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">배경음악</span><span class="st">준비됨</span></div>
+            </div>
+            <div class="btn-row">
+              <div class="pill secondary">파일 다시 선택</div>
+              <div class="pill primary">영상 생성</div>
+            </div>
+          </div>
+          <div class="done">
+            <div class="done-head">완료</div>
+            <div class="rows">
+              <div class="row selected">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-27 · Fri</div><div class="meta">실제 생성 2026-06-27 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-26 · Thu</div><div class="meta">실제 생성 2026-06-26 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph warn">!</span>
+                <div class="info"><div class="date">2026-06-25 · Wed</div><div class="meta warn">결과 폴더 없음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar">
+        <div class="left"><span class="s-dot"></span><span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</span></div>
+        <div class="right">준비 완료</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DIRECTION D ===================== -->
+  <section class="col dir-d">
+    <div class="col-head">
+      <div class="name"><span class="dot"></span>D — Mono Focus</div>
+      <div class="register">절제. 거의 무채색, 단 하나의 인디고만 선택·진행에 아주 드물게.</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="sw" style="background:var(--surface-base)"></span><span class="lab"><div class="role">surface base</div><div class="hex">#0B0B0C</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-panel)"></span><span class="lab"><div class="role">panel</div><div class="hex">#131315</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-raised)"></span><span class="lab"><div class="role">raised</div><div class="hex">#1C1C1F</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--surface-sel)"></span><span class="lab"><div class="role">selected</div><div class="hex">#2A2A2E</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--border-strong)"></span><span class="lab"><div class="role">border strong</div><div class="hex">#6A6A70</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-primary)"></span><span class="lab"><div class="role">text primary</div><div class="hex">#F1F1F2</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--text-secondary)"></span><span class="lab"><div class="role">text secondary</div><div class="hex">#9A9AA0</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--accent)"></span><span class="lab"><div class="role">accent (선택)</div><div class="hex">#7C84E8</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--success)"></span><span class="lab"><div class="role">progress 틴트</div><div class="hex">#9AA0F2</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--warning)"></span><span class="lab"><div class="role">warning</div><div class="hex">#C9A24B</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--danger)"></span><span class="lab"><div class="role">danger</div><div class="hex">#D06E6E</div></span></div>
+      <div class="chip"><span class="sw" style="background:var(--primary-bg)"></span><span class="lab"><div class="role">primary pill</div><div class="hex">#F1F1F2</div></span></div>
+    </div>
+    <div class="app">
+      <div class="app-body">
+        <div class="rail">
+          <div class="brand">GT</div>
+          <div class="nav-btn active">⌂</div>
+          <div class="nav-btn">?</div>
+          <div class="nav-btn">⚙</div>
+        </div>
+        <div class="main">
+          <div class="work">
+            <div class="eyebrow">새 작업</div>
+            <div class="title">오늘의 말씀기도 쇼츠</div>
+            <div class="datepick"><span class="cal">▦</span>2026-06-28 · Sat</div>
+            <div class="card">
+              <div class="card-title">입력 준비</div>
+              <div class="progress"><span></span></div>
+              <div class="progress-meta">100% · 필수 입력 4/4</div>
+            </div>
+            <div class="slots">
+              <div class="slot"><span class="ok">✓</span><span class="nm">자막 script.txt</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">말씀 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">기도 영상</span><span class="st">준비됨</span></div>
+              <div class="slot"><span class="ok">✓</span><span class="nm">배경음악</span><span class="st">준비됨</span></div>
+            </div>
+            <div class="btn-row">
+              <div class="pill secondary">파일 다시 선택</div>
+              <div class="pill primary">영상 생성</div>
+            </div>
+          </div>
+          <div class="done">
+            <div class="done-head">완료</div>
+            <div class="rows">
+              <div class="row selected">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-27 · Fri</div><div class="meta">실제 생성 2026-06-27 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph ok">✓</span>
+                <div class="info"><div class="date">2026-06-26 · Thu</div><div class="meta">실제 생성 2026-06-26 · 결과 폴더 있음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+              <div class="row">
+                <span class="glyph warn">!</span>
+                <div class="info"><div class="date">2026-06-25 · Wed</div><div class="meta warn">결과 폴더 없음</div></div>
+                <div class="folder">폴더 열기</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="statusbar">
+        <div class="left"><span class="s-dot"></span><span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</span></div>
+        <div class="right">준비 완료</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>

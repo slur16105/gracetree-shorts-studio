@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraceTree Shorts Studio — 로고 컨셉</title>
+<style>
+  :root{
+    --bg:#141414; --panel:#0F0F10; --border:#2A2A2D;
+    --rail:#0C0C0D; --raised:#18181A; --near-black:#0A0A0B;
+    --txt:#F3F3F4; --txt2:#9C9CA1; --accent:#7C84E8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+    padding:40px 32px 64px;
+  }
+  header{max-width:1280px;margin:0 auto 36px;}
+  h1{font-size:24px;font-weight:650;letter-spacing:-0.01em;margin:0 0 10px;}
+  header p{margin:0;color:var(--txt2);font-size:14px;max-width:760px;}
+  .grid{
+    max-width:1280px;margin:0 auto;
+    display:grid;gap:20px;
+    grid-template-columns:repeat(auto-fill,minmax(360px,1fr));
+  }
+  .card{
+    background:var(--panel);border:1px solid var(--border);
+    border-radius:16px;padding:22px 22px 24px;
+    display:flex;flex-direction:column;gap:18px;
+  }
+  .cname{font-size:15px;font-weight:620;letter-spacing:-0.01em;margin:0;}
+  .crat{font-size:12.5px;color:var(--txt2);margin:4px 0 0;line-height:1.45;}
+
+  .ctx-label{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6A6A70;margin:0 0 9px;}
+  .ctx-block{display:flex;flex-direction:column;}
+  .ctx-row{display:flex;align-items:center;gap:20px;}
+
+  /* sidebar rail mock */
+  .rail{
+    width:56px;background:var(--rail);border:1px solid var(--border);
+    border-radius:16px;padding:8px;display:flex;flex-direction:column;
+    align-items:center;gap:10px;
+  }
+  .brand44{
+    width:44px;height:44px;background:var(--raised);border:1px solid var(--border);
+    border-radius:12px;display:flex;align-items:center;justify-content:center;
+    color:var(--txt);
+  }
+  .ph{width:30px;height:30px;border-radius:9px;background:#161618;
+    display:flex;align-items:center;justify-content:center;}
+  .ph span{width:15px;height:2px;border-radius:2px;background:#37373b;box-shadow:0 5px 0 #37373b,0 -5px 0 #37373b;}
+  .rail-note{font-size:11px;color:var(--txt2);}
+
+  /* app icon tiles */
+  .icons{display:flex;align-items:center;gap:16px;}
+  .ic-wrap{display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .icon96{
+    width:96px;height:96px;border-radius:22px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .icon96.mono{background:var(--raised);border:1px solid var(--border);color:var(--txt);}
+  .icon96.accent{background:var(--near-black);border:1px solid #1d1d22;color:var(--accent);}
+  .ic-cap{font-size:10.5px;color:#6A6A70;}
+
+  /* tiny 24 legibility */
+  .tiny{display:flex;align-items:center;gap:12px;}
+  .tiny24{width:24px;height:24px;color:var(--txt);}
+  .tiny-cap{font-size:11px;color:var(--txt2);}
+
+  .sep{height:1px;background:var(--border);border:0;margin:2px 0;width:100%;}
+
+  svg{display:block;}
+</style>
+</head>
+<body>
+
+<!-- ============ SHARED SYMBOL DEFINITIONS ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 1 Tree-G monogram -->
+    <symbol id="m1" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M24 10.6 A8.5 8.5 0 1 0 23 18.4"/>
+        <path d="M23 18.4 H16.4"/>
+        <path d="M16 22 V27"/>
+        <path d="M12.4 27 H19.6"/>
+      </g>
+    </symbol>
+
+    <!-- 2 Sprout / two-leaf -->
+    <symbol id="m2" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 27 V13.5"/>
+        <path d="M16 19 C11 19 8.6 15 9.6 9.8 C14.6 10.8 16 15 16 19 Z"/>
+        <path d="M16 15.5 C21 15.5 23.4 11.6 22.4 6.6 C17.4 7.6 16 11.6 16 15.5 Z"/>
+      </g>
+    </symbol>
+
+    <!-- 3 Branch + Play -->
+    <symbol id="m3" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 5 C23 10.5 23 18.5 16 25 C9 18.5 9 10.5 16 5 Z"/>
+        <path d="M16 25 V28.5"/>
+      </g>
+      <path d="M13.6 11.6 L20.6 16 L13.6 20.4 Z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+    </symbol>
+
+    <!-- 4 Geometric canopy -->
+    <symbol id="m4" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="16" cy="12.5" r="8"/>
+        <path d="M11.5 19.5 A8 8 0 0 0 20.5 19.5"/>
+        <path d="M16 20.5 V27"/>
+        <path d="M11.5 27 H20.5"/>
+      </g>
+    </symbol>
+
+    <!-- 5 Refined GT ligature -->
+    <symbol id="m5" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 8 H23"/>
+        <path d="M16 8 V26"/>
+        <path d="M19.5 12.3 A6.5 6.5 0 1 0 19.1 21.1"/>
+        <path d="M19.1 21.1 H16"/>
+      </g>
+    </symbol>
+
+    <!-- 6 Wildcard: tree in 9:16 shorts frame -->
+    <symbol id="m6" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="4" width="14" height="24" rx="4.5"/>
+        <circle cx="16" cy="12.6" r="4.3"/>
+        <path d="M16 16.9 V22.4"/>
+        <path d="M12.8 22.4 H19.2"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>GraceTree Shorts Studio — 로고 컨셉</h1>
+  <p>6개 마크를 사이드바(44px)와 앱 아이콘(96px) 맥락에서 비교하세요. 색은 임시 인디고이며, 형태를 먼저 고릅니다.</p>
+</header>
+
+<main class="grid">
+
+  <!-- ============ CARD 1 ============ -->
+  <section class="card">
+    <div>
+      <p class="cname">1 — Tree-G monogram</p>
+      <p class="crat">‘G’의 곡선이 곧 나무의 수관과 줄기가 되는 모노그램 — 글자와 자연을 하나로.</p>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row">
+        <div class="rail">
+          <div class="brand44"><svg width="26" height="26"><use href="#m1"/></svg></div>
+          <div class="ph"><span></span></div>
+          <div class="ph"><span></span></div>
+        </div>
+        <span class="rail-note">실제 사이드바 크기</span>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#m1"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#m1"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#m1"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- ============ CARD 2 ============ -->
+  <section class="card">
+    <div>
+      <p class="cname">2 — Sprout / single leaf</p>
+      <p class="crat">두 잎의 새싹 — 자라나는 은혜를 가장 단순하고 고요하게 표현.</p>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row">
+        <div class="rail">
+          <div class="brand44"><svg width="26" height="26"><use href="#m2"/></svg></div>
+          <div class="ph"><span></span></div>
+          <div class="ph"><span></span></div>
+        </div>
+        <span class="rail-note">실제 사이드바 크기</span>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#m2"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#m2"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#m2"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- ============ CARD 3 ============ -->
+  <section class="card">
+    <div>
+      <p class="cname">3 — Branch + Play</p>
+      <p class="crat">잎 안에 재생(▶) 삼각형 — 영상 제작과 ‘은혜의 나무’를 한 형태로 연결.</p>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row">
+        <div class="rail">
+          <div class="brand44"><svg width="26" height="26"><use href="#m3"/></svg></div>
+          <div class="ph"><span></span></div>
+          <div class="ph"><span></span></div>
+        </div>
+        <span class="rail-note">실제 사이드바 크기</span>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#m3"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#m3"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#m3"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- ============ CARD 4 ============ -->
+  <section class="card">
+    <div>
+      <p class="cname">4 — Geometric canopy</p>
+      <p class="crat">짧은 줄기 위 둥근 수관 — 순수 기하 모노라인으로 차분하고 견고하게.</p>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row">
+        <div class="rail">
+          <div class="brand44"><svg width="26" height="26"><use href="#m4"/></svg></div>
+          <div class="ph"><span></span></div>
+          <div class="ph"><span></span></div>
+        </div>
+        <span class="rail-note">실제 사이드바 크기</span>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#m4"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#m4"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#m4"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- ============ CARD 5 ============ -->
+  <section class="card">
+    <div>
+      <p class="cname">5 — Refined GT ligature</p>
+      <p class="crat">정교하게 설계한 커스텀 GT 합자 — 기존 맨텍스트 ‘GT’를 한 단계 끌어올림.</p>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row">
+        <div class="rail">
+          <div class="brand44"><svg width="26" height="26"><use href="#m5"/></svg></div>
+          <div class="ph"><span></span></div>
+          <div class="ph"><span></span></div>
+        </div>
+        <span class="rail-note">실제 사이드바 크기</span>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#m5"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#m5"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#m5"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- ============ CARD 6 ============ -->
+  <section class="card">
+    <div>
+      <p class="cname">6 — Wildcard · Tree-in-Shorts</p>
+      <p class="crat">9:16 쇼츠 프레임 안의 나무 — 빛(수관)·성장·세로 영상을 하나로 융합.</p>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row">
+        <div class="rail">
+          <div class="brand44"><svg width="26" height="26"><use href="#m6"/></svg></div>
+          <div class="ph"><span></span></div>
+          <div class="ph"><span></span></div>
+        </div>
+        <span class="rail-note">실제 사이드바 크기</span>
+      </div>
+    </div>
+    <div class="ctx-block">
+      <p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#m6"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#m6"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#m6"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+</main>
+</body>
+</html>

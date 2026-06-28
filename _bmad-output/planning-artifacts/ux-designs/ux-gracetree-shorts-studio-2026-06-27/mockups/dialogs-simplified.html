@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>팝업 단순화 — 핵심만</title>
+<style>
+  :root{
+    --base:#0a0a0b; --nav:#0c0c0d; --panel:#0f0f10; --raised:#18181a;
+    --hover:#202023; --selected:#262629;
+    --tx:#f3f3f4; --tx2:#9c9ca1; --tx-dis:#66666b;
+    --bd:#2a2a2d; --bd-strong:#5c5c61;
+    --accent:#7c84e8; --progress:#9aa0f2; --warn:#f2b84b; --danger:#f05d5e;
+    --r-card:12px; --r-soft:18px;
+    font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:#161618;color:var(--tx);font-size:14px;line-height:1.45;
+    padding:40px 32px 72px;display:flex;flex-direction:column;align-items:center;
+    -webkit-font-smoothing:antialiased;
+  }
+  .pagehead{width:100%;max-width:1140px;margin-bottom:24px;}
+  .pagehead .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .pagehead h1{font-size:28px;font-weight:700;margin-top:4px;}
+  .pagehead p{color:var(--tx2);font-size:13px;margin-top:6px;}
+
+  .grid{width:100%;max-width:1140px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;}
+  .cell{flex:1;min-width:330px;display:flex;flex-direction:column;gap:12px;}
+  .cell .celltitle{font-size:13px;font-weight:700;color:var(--tx2);letter-spacing:.04em;text-transform:uppercase;}
+
+  /* dimmed backdrop swatch holding the modal */
+  .backdrop{
+    position:relative;border-radius:var(--r-soft);overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(124,132,232,.06), transparent 60%),
+      rgba(0,0,0,.62);
+    border:1px solid var(--bd);
+    padding:36px 26px;display:flex;justify-content:center;align-items:center;min-height:300px;
+    backdrop-filter:blur(1px);
+  }
+  .backdrop::before{
+    content:"";position:absolute;inset:0;background:var(--base);opacity:.55;z-index:0;
+  }
+
+  /* modal */
+  .modal{
+    position:relative;z-index:1;width:100%;max-width:380px;background:var(--raised);
+    border:1px solid var(--bd-strong);border-radius:var(--r-soft);
+    box-shadow:0 30px 70px -24px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.02) inset;
+    padding:24px;display:flex;flex-direction:column;gap:16px;
+  }
+  .modal-x{
+    position:absolute;top:14px;right:16px;width:28px;height:28px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;color:var(--tx2);font-size:16px;
+    border:1px solid transparent;cursor:pointer;
+  }
+
+  .m-title{font-size:18px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:9px;letter-spacing:-.01em;}
+  .m-title .ok{color:var(--progress);}
+  .m-title.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .stage-tag{
+    font-size:11px;font-weight:700;color:var(--danger);background:rgba(240,93,94,.10);
+    border:1px solid rgba(240,93,94,.4);border-radius:9999px;padding:3px 10px;white-space:nowrap;
+  }
+  .m-sub{font-size:14px;color:var(--tx2);}
+  .m-meta{font-size:12px;color:var(--tx-dis);}
+  .m-msg{font-size:13px;color:var(--tx);line-height:1.55;}
+
+  .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:2px;}
+  .btn-primary{
+    height:40px;padding:0 20px;background:var(--tx);color:var(--base);border:none;border-radius:9999px;
+    font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;
+  }
+  .btn-secondary{
+    height:40px;padding:0 18px;background:var(--raised);color:var(--tx);border:1px solid var(--bd-strong);
+    border-radius:9999px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap;
+  }
+
+  /* settings rows */
+  .res-list{display:flex;flex-direction:column;gap:8px;}
+  .res-row{
+    display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--panel);
+    border:1px solid var(--bd);border-radius:var(--r-card);
+  }
+  .res-row .rlabel{font-size:13px;color:var(--tx2);font-weight:600;width:84px;flex:none;}
+  .res-row .rfile{flex:1;min-width:0;display:flex;align-items:center;gap:7px;font-size:13px;color:var(--tx);font-weight:600;overflow:hidden;}
+  .res-row .rfile .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .res-row .rfile.missing{color:var(--tx-dis);font-weight:500;}
+  .st{font-size:12px;flex:none;font-weight:700;}
+  .st.ok{color:var(--progress);}
+  .st.miss{color:var(--tx-dis);}
+  .st.warn{color:var(--warn);}
+  .swap{
+    flex:none;height:30px;padding:0 13px;background:var(--raised);color:var(--tx);
+    border:1px solid var(--bd-strong);border-radius:9999px;font-size:12px;font-weight:600;cursor:pointer;
+  }
+
+  /* change note */
+  .note{
+    display:flex;gap:9px;align-items:flex-start;font-size:12px;color:var(--tx2);
+    background:rgba(124,132,232,.06);border:1px solid var(--bd);border-radius:var(--r-card);padding:11px 13px;
+  }
+  .note .tag{
+    font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--accent);background:rgba(124,132,232,.12);
+    border:1px solid rgba(124,132,232,.4);border-radius:9999px;padding:2px 8px;flex:none;text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <div class="eyebrow">GraceTree Shorts Studio</div>
+  <h1>팝업 단순화 — 핵심만</h1>
+  <p>각 다이얼로그를 어둡게 처리된 배경 위에 올려, 핵심 정보만 남기고 무엇을 잘라냈는지 표기.</p>
+</div>
+
+<div class="grid">
+
+  <!-- 1. 생성 완료 -->
+  <div class="cell">
+    <div class="celltitle">생성 완료 (Result)</div>
+    <div class="backdrop">
+      <div class="modal">
+        <div class="m-title"><span class="ok">✓</span>영상이 완성되었습니다</div>
+        <div class="m-sub">오늘 우리에게 주신 말씀</div>
+        <div class="m-meta">게시 2026-06-27 · Fri</div>
+        <div class="actions">
+          <button class="btn-secondary">📁 폴더 열기</button>
+          <button class="btn-primary">확인</button>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="tag">변경</span>
+      <span>결과 경로(긴 문자열)·실제 생성일·이중 제목 제거 → 폴더 열기 버튼으로.</span>
+    </div>
+  </div>
+
+  <!-- 2. 생성 실패 -->
+  <div class="cell">
+    <div class="celltitle">생성 실패 (Failed)</div>
+    <div class="backdrop">
+      <div class="modal">
+        <div class="m-title row">영상 생성에 실패했습니다<span class="stage-tag">자막 단계</span></div>
+        <div class="m-msg">자막 폰트를 읽지 못했습니다 — 설정에서 폰트를 교체한 뒤 다시 시도하세요.</div>
+        <div class="actions">
+          <button class="btn-secondary">🗂 로그 폴더</button>
+          <button class="btn-primary">입력 수정</button>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="tag">변경</span>
+      <span>기술 details 숨김(로그 버튼 뒤로)·이중 제목 정리·버튼 3→2.</span>
+    </div>
+  </div>
+
+  <!-- 3. 공통 리소스 설정 -->
+  <div class="cell">
+    <div class="celltitle">공통 리소스 설정 (Settings)</div>
+    <div class="backdrop">
+      <div class="modal" style="max-width:420px;">
+        <div class="modal-x">×</div>
+        <div class="m-title">공통 리소스 설정</div>
+        <div class="res-list">
+          <div class="res-row">
+            <span class="rlabel">제목·말씀 영상</span>
+            <span class="rfile"><span class="fn">title_scripture.mp4</span><span class="st ok">✓</span></span>
+            <button class="swap">교체</button>
+          </div>
+          <div class="res-row">
+            <span class="rlabel">기도 영상</span>
+            <span class="rfile"><span class="fn">prayer_loop.mp4</span><span class="st ok">✓</span></span>
+            <button class="swap">교체</button>
+          </div>
+          <div class="res-row">
+            <span class="rlabel">기본 BGM</span>
+            <span class="rfile missing"><span class="fn">미등록</span><span class="st miss">✗</span></span>
+            <button class="swap">교체</button>
+          </div>
+          <div class="res-row">
+            <span class="rlabel">자막 폰트</span>
+            <span class="rfile"><span class="fn">noto.ttf</span><span class="st ok">✓</span></span>
+            <button class="swap">교체</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <span class="tag">변경</span>
+      <span>행마다 반복되던 포맷(MP4,MOV…) 상시노출 제거 → 라벨·현재파일·상태·교체만.</span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

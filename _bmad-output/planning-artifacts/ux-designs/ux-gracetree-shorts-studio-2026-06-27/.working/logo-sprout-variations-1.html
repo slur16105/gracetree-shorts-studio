@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GraceTree — 새싹 로고 변주</title>
+<style>
+  :root{
+    --bg:#141414; --panel:#0F0F10; --border:#2A2A2D;
+    --rail:#0C0C0D; --raised:#18181A; --near-black:#0A0A0B;
+    --txt:#F3F3F4; --txt2:#9C9CA1; --accent:#7C84E8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:var(--bg); color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+    padding:40px 32px 64px;
+  }
+  header{max-width:1320px;margin:0 auto 36px;}
+  h1{font-size:24px;font-weight:650;letter-spacing:-0.01em;margin:0 0 10px;}
+  header p{margin:0;color:var(--txt2);font-size:14px;max-width:780px;}
+  .grid{
+    max-width:1320px;margin:0 auto;
+    display:grid;gap:20px;
+    grid-template-columns:repeat(auto-fill,minmax(360px,1fr));
+  }
+  .card{
+    background:var(--panel);border:1px solid var(--border);
+    border-radius:16px;padding:22px 22px 24px;
+    display:flex;flex-direction:column;gap:18px;
+  }
+  .cname{font-size:15px;font-weight:620;letter-spacing:-0.01em;margin:0;}
+  .crat{font-size:12.5px;color:var(--txt2);margin:4px 0 0;line-height:1.45;}
+
+  .ctx-label{font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:#6A6A70;margin:0 0 9px;}
+  .ctx-block{display:flex;flex-direction:column;}
+  .ctx-row{display:flex;align-items:center;gap:20px;}
+
+  .rail{
+    width:56px;background:var(--rail);border:1px solid var(--border);
+    border-radius:16px;padding:8px;display:flex;flex-direction:column;
+    align-items:center;gap:10px;
+  }
+  .brand44{
+    width:44px;height:44px;background:var(--raised);border:1px solid var(--border);
+    border-radius:12px;display:flex;align-items:center;justify-content:center;
+    color:var(--txt);
+  }
+  .ph{width:30px;height:30px;border-radius:9px;background:#161618;
+    display:flex;align-items:center;justify-content:center;}
+  .ph span{width:15px;height:2px;border-radius:2px;background:#37373b;box-shadow:0 5px 0 #37373b,0 -5px 0 #37373b;}
+  .rail-note{font-size:11px;color:var(--txt2);}
+
+  .icons{display:flex;align-items:center;gap:16px;}
+  .ic-wrap{display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .icon96{
+    width:96px;height:96px;border-radius:22px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .icon96.mono{background:var(--raised);border:1px solid var(--border);color:var(--txt);}
+  .icon96.accent{background:var(--near-black);border:1px solid #1d1d22;color:var(--accent);}
+  .ic-cap{font-size:10.5px;color:#6A6A70;}
+
+  .tiny{display:flex;align-items:center;gap:12px;}
+  .tiny24{width:24px;height:24px;color:var(--txt);}
+  .tiny-cap{font-size:11px;color:var(--txt2);}
+
+  .pick{
+    display:inline-block;margin-top:2px;font-size:11.5px;color:var(--accent);
+    background:rgba(124,132,232,0.10);border:1px solid rgba(124,132,232,0.30);
+    border-radius:7px;padding:5px 9px;line-height:1.4;
+  }
+  .sep{height:1px;background:var(--border);border:0;margin:2px 0;width:100%;}
+  svg{display:block;}
+</style>
+</head>
+<body>
+
+<!-- ============ SHARED SYMBOL DEFINITIONS (32-unit grid, ~2px stroke) ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- 1 두 잎 새싹 (클래식, 모노라인) -->
+    <symbol id="s1" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 27 V13.5"/>
+        <path d="M16 19 C11 19 8.6 15 9.6 9.8 C14.6 10.8 16 15 16 19 Z"/>
+        <path d="M16 15.5 C21 15.5 23.4 11.6 22.4 6.6 C17.4 7.6 16 11.6 16 15.5 Z"/>
+      </g>
+    </symbol>
+
+    <!-- 2 두 잎 새싹 (채움) -->
+    <symbol id="s2" viewBox="0 0 32 32">
+      <path d="M16 27 V13.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M16 19.2 C10.6 19.2 8.2 14.9 9.4 9.4 C14.8 10.4 16 15 16 19.2 Z" fill="currentColor"/>
+      <path d="M16 15.7 C21.4 15.7 23.8 11.5 22.6 6 C17.2 7 16 11.4 16 15.7 Z" fill="currentColor"/>
+    </symbol>
+
+    <!-- 3 한 잎 (center vein) -->
+    <symbol id="s3" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 4 C24 10 24 20 16 28 C8 20 8 10 16 4 Z"/>
+        <path d="M16 8 V24"/>
+      </g>
+    </symbol>
+
+    <!-- 4 세 잎 -->
+    <symbol id="s4" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 28 V15"/>
+        <path d="M16 15 C16 9.5 16 6.5 16 5 C18.8 8 18.8 12 16 15 Z"/>
+        <path d="M16 18 C11 18.5 8.4 15 9 10.2 C13.8 10.8 16 14 16 18 Z"/>
+        <path d="M16 18 C21 18.5 23.6 15 23 10.2 C18.2 10.8 16 14 16 18 Z"/>
+      </g>
+    </symbol>
+
+    <!-- 5 새싹 + 재생(▶) : play nested in negative space between leaves -->
+    <symbol id="s5" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 28 V20"/>
+        <path d="M16 20 C10.6 20 8.2 15.7 9.4 10.2 C14.8 11.2 16 15.8 16 20 Z"/>
+        <path d="M16 17 C21.4 17 23.8 12.8 22.6 7.3 C17.2 8.3 16 12.7 16 17 Z"/>
+      </g>
+      <path d="M14 16.4 L19 19.3 L14 22.2 Z" fill="currentColor" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+    </symbol>
+
+    <!-- 6 땅에서 돋는 새싹 (germination from ground arc) -->
+    <symbol id="s6" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 24 V12.5"/>
+        <path d="M16 18 C11.4 18 9.2 14.4 10.2 9.6 C14.8 10.5 16 14.4 16 18 Z"/>
+        <path d="M16 14.8 C20.6 14.8 22.8 11.2 21.8 6.4 C17.2 7.3 16 11.2 16 14.8 Z"/>
+        <path d="M7 24 Q16 20.5 25 24"/>
+      </g>
+    </symbol>
+
+    <!-- 7 물방울/빛 잎 하이브리드 (leaf = droplet / soft flame) -->
+    <symbol id="s7" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 4 C16 4 24 13 24 19.5 A8 8 0 0 1 8 19.5 C8 13 16 4 16 4 Z"/>
+        <path d="M13.4 19.8 A3 3 0 0 0 16 24.4"/>
+      </g>
+    </symbol>
+
+    <!-- 8 9:16 프레임 속 새싹 -->
+    <symbol id="s8" viewBox="0 0 32 32">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="4" width="14" height="24" rx="4.5"/>
+        <path d="M16 24 V16.5"/>
+        <path d="M16 20.4 C12.8 20.4 11.2 18 11.9 14.7 C15.1 15.4 16 18 16 20.4 Z"/>
+        <path d="M16 18.2 C19.2 18.2 20.8 15.8 20.1 12.5 C16.9 13.2 16 15.8 16 18.2 Z"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <h1>GraceTree — 새싹 로고 변주</h1>
+  <p>새싹 컨셉의 여러 타입입니다. 잎 수·줄기·재생(▶) 결합·프레임 유무가 다릅니다. 형태를 먼저 고르세요(색은 임시).</p>
+</header>
+
+<main class="grid">
+
+  <!-- 1 -->
+  <section class="card">
+    <div>
+      <p class="cname">1 — 두 잎 새싹 (클래식, 모노라인)</p>
+      <p class="crat">중심 줄기에 좌우 대칭 두 잎 — 깔끔한 아웃라인의 기준형.</p>
+      <span class="pick">24px 검토: 아웃라인은 우아하나 잎 내부가 비어 작게 가면 약함 — #2 채움형이 더 또렷.</span>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s1"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s1"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s1"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s1"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 2 -->
+  <section class="card">
+    <div>
+      <p class="cname">2 — 두 잎 새싹 (채움)</p>
+      <p class="crat">동일 실루엣을 솔리드로 채움 — 24px에서 가장 강하고 선명하게 읽힘.</p>
+      <span class="pick">24px 검토: 채움형이 사이드바·파비콘에서 가장 안정적 — 소형 우선이면 권장.</span>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s2"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s2"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s2"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s2"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="card">
+    <div>
+      <p class="cname">3 — 한 잎</p>
+      <p class="crat">중심 잎맥을 가진 단일 잎 — 가장 절제되고 확신에 찬 한 형태.</p>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s3"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s3"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s3"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s3"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 4 -->
+  <section class="card">
+    <div>
+      <p class="cname">4 — 세 잎</p>
+      <p class="crat">곧은 잎 하나 + 좌우 두 잎 — 더 풍성한 수관의 인상.</p>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s4"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s4"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s4"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s4"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="card">
+    <div>
+      <p class="cname">5 — 새싹 + 재생(▶)</p>
+      <p class="crat">잎 사이 여백에 재생 삼각형을 끼워 넣어 쇼츠와 자연스럽게 결합.</p>
+      <span class="pick">24px 검토: 채움 ▶ 덕분에 소형에서 핵심 의미가 가장 먼저 읽힘 — 채움 추천.</span>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s5"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s5"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s5"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s5"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 6 -->
+  <section class="card">
+    <div>
+      <p class="cname">6 — 땅에서 돋는 새싹</p>
+      <p class="crat">짧은 지면 아치에서 돋아나는 새싹 — 발아·뿌리내림의 안정된 구도.</p>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s6"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s6"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s6"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s6"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 7 -->
+  <section class="card">
+    <div>
+      <p class="cname">7 — 물방울/빛 잎 하이브리드</p>
+      <p class="crat">잎이 물방울·부드러운 불꽃으로도 읽히는 단일 형태 — 은혜·빛의 은유.</p>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s7"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s7"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s7"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s7"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+  <!-- 8 -->
+  <section class="card">
+    <div>
+      <p class="cname">8 — 9:16 프레임 속 새싹</p>
+      <p class="crat">세로 9:16 쇼츠 프레임 중앙의 미니멀 새싹 — ‘말씀 쇼츠’가 가장 명확.</p>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context A · Sidebar 44px</p>
+      <div class="ctx-row"><div class="rail"><div class="brand44"><svg width="26" height="26"><use href="#s8"/></svg></div><div class="ph"><span></span></div><div class="ph"><span></span></div></div><span class="rail-note">실제 사이드바 크기</span></div>
+    </div>
+    <div class="ctx-block"><p class="ctx-label">Context B · App icon 96px</p>
+      <div class="icons">
+        <div class="ic-wrap"><div class="icon96 mono"><svg width="58" height="58"><use href="#s8"/></svg></div><span class="ic-cap">mono</span></div>
+        <div class="ic-wrap"><div class="icon96 accent"><svg width="58" height="58"><use href="#s8"/></svg></div><span class="ic-cap">indigo</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="tiny"><svg class="tiny24" width="24" height="24"><use href="#s8"/></svg><span class="tiny-cap">24px 최소 가독성</span></div>
+  </section>
+
+</main>
+</body>
+</html>

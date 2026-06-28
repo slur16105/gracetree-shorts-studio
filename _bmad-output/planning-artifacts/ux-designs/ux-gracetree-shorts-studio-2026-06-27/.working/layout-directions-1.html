@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GraceTree Shorts Studio — Layout Directions</title>
+<style>
+  :root{
+    /* surfaces */
+    --base:#0a0a0b; --nav:#0c0c0d; --panel:#0f0f10; --raised:#18181a;
+    --hover:#202023; --selected:#262629;
+    /* text */
+    --tx:#f3f3f4; --tx2:#9c9ca1; --tx-dis:#66666b;
+    /* borders */
+    --bd:#2a2a2d; --bd-strong:#5c5c61;
+    /* accent + states */
+    --accent:#7c84e8; --progress:#9aa0f2; --warn:#f2b84b; --danger:#f05d5e;
+    /* radii */
+    --r-card:12px; --r-soft:18px;
+    font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:#161618;color:var(--tx);font-size:14px;line-height:1.45;
+    padding:40px 32px 80px;display:flex;flex-direction:column;align-items:center;gap:8px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .pagehead{width:100%;max-width:1180px;margin-bottom:8px;}
+  .pagehead .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .pagehead h1{font-size:28px;font-weight:700;margin-top:4px;}
+  .pagehead p{color:var(--tx2);font-size:13px;margin-top:6px;}
+
+  .direction{width:100%;max-width:1180px;display:flex;flex-direction:column;gap:16px;margin-top:24px;}
+  .dir-label{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  .dir-label .badge{
+    display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
+    border-radius:9999px;background:var(--raised);border:1px solid var(--bd-strong);
+    color:var(--accent);font-weight:700;font-size:15px;flex:none;
+  }
+  .dir-label h2{font-size:19px;font-weight:700;}
+  .dir-label .rationale{color:var(--tx2);font-size:13px;flex-basis:100%;padding-left:46px;}
+
+  .dir-body{display:flex;gap:20px;align-items:flex-start;}
+
+  /* ----- window frame ----- */
+  .window{
+    flex:1;min-width:0;background:var(--base);border:1px solid var(--bd);
+    border-radius:var(--r-soft);overflow:hidden;
+    box-shadow:0 24px 60px -20px rgba(0,0,0,.7);
+    display:flex;flex-direction:column;height:720px;
+  }
+  .shell{flex:1;display:flex;min-height:0;}
+
+  /* ----- rail ----- */
+  .rail{
+    width:78px;flex:none;background:var(--nav);border-right:1px solid var(--bd);
+    display:flex;flex-direction:column;align-items:center;padding:14px 0 16px;gap:18px;position:relative;
+  }
+  .traffic{position:absolute;top:10px;left:10px;display:flex;gap:6px;opacity:.35;}
+  .traffic i{width:8px;height:8px;border-radius:50%;display:block;}
+  .traffic i:nth-child(1){background:#f05d5e;}
+  .traffic i:nth-child(2){background:#f2b84b;}
+  .traffic i:nth-child(3){background:#3fb950;}
+  .brand{
+    width:44px;height:44px;border-radius:12px;background:var(--raised);border:1px solid var(--bd);
+    display:flex;align-items:center;justify-content:center;margin-top:18px;
+  }
+  .railbtns{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:6px;}
+  .railbtn{
+    width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx2);font-size:19px;border:1px solid transparent;
+  }
+  .railbtn.active{background:var(--selected);color:var(--tx);border-color:var(--bd);}
+  .railspace{flex:1;}
+
+  /* ----- main ----- */
+  .main{flex:1;min-width:0;background:var(--base);display:flex;flex-direction:column;}
+  .statusbar{
+    height:70px;flex:none;border-top:1px solid var(--bd);background:var(--panel);
+    display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+  }
+  .statusbar .left{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--tx);}
+  .statusbar .dot{width:8px;height:8px;border-radius:50%;background:var(--progress);box-shadow:0 0 0 3px rgba(154,160,242,.18);}
+  .statusbar .right{font-size:12px;color:var(--tx-dis);}
+
+  /* ----- shared content atoms ----- */
+  .eyebrow{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .h-title{font-size:24px;font-weight:700;letter-spacing:-.01em;}
+  .label{font-size:13px;color:var(--tx2);font-weight:600;}
+  .meta{font-size:12px;color:var(--tx2);}
+  .meta-dis{font-size:12px;color:var(--tx-dis);}
+
+  .datefield{
+    display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 14px;
+    background:var(--raised);border:1px solid var(--bd-strong);border-radius:var(--r-card);
+    font-size:14px;color:var(--tx);white-space:nowrap;
+  }
+  .datefield .cal{color:var(--accent);font-size:15px;}
+  .datefield .sub{color:var(--tx2);font-size:12px;}
+
+  .btn-primary{
+    display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 22px;
+    background:var(--tx);color:var(--base);border-radius:9999px;border:none;
+    font-size:14px;font-weight:700;white-space:nowrap;
+  }
+  .btn-secondary{
+    display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;
+    background:var(--raised);color:var(--tx);border:1px solid var(--bd-strong);border-radius:9999px;
+    font-size:13px;font-weight:600;white-space:nowrap;
+  }
+
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+
+  /* dropzone */
+  .dropzone{
+    border:1.5px dashed var(--bd-strong);border-radius:var(--r-soft);
+    background:linear-gradient(180deg,rgba(124,132,232,.04),rgba(124,132,232,0));
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+    text-align:center;color:var(--tx2);padding:22px 16px;
+  }
+  .dropzone .ic{width:38px;height:38px;border-radius:10px;background:var(--raised);border:1px solid var(--bd);
+    display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:18px;}
+  .dropzone .big{color:var(--tx);font-size:14px;font-weight:600;}
+
+  /* file slot rows */
+  .slots{display:flex;flex-direction:column;gap:8px;}
+  .slot{
+    display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;
+    background:var(--raised);border:1px solid var(--bd);border-radius:var(--r-card);
+  }
+  .slot .sdot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--progress);}
+  .slot.warn .sdot{background:var(--warn);}
+  .slot .stype{font-size:12px;color:var(--tx2);width:64px;flex:none;}
+  .slot .sname{font-size:13px;color:var(--tx);font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .slot .sstate{font-size:11px;color:var(--progress);font-weight:600;}
+  .slot.warn .sstate{color:var(--warn);}
+
+  /* readiness */
+  .progress-track{height:8px;border-radius:9999px;background:var(--raised);overflow:hidden;border:1px solid var(--bd);}
+  .progress-fill{height:100%;background:var(--progress);border-radius:9999px;}
+  .ready-row{display:flex;align-items:baseline;justify-content:space-between;margin-top:12px;}
+  .ready-pct{font-size:20px;font-weight:700;color:var(--tx);}
+  .chips{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap;}
+  .chip{font-size:11px;color:var(--tx2);background:var(--raised);border:1px solid var(--bd);
+    border-radius:9999px;padding:4px 10px;display:inline-flex;align-items:center;gap:6px;}
+  .chip i{width:6px;height:6px;border-radius:50%;background:var(--progress);display:block;}
+  .chip.warn i{background:var(--warn);}
+
+  /* job summary */
+  .summary{background:var(--raised);border:1px solid var(--bd);border-radius:var(--r-card);padding:14px 16px;}
+  .summary .stitle{font-size:14px;font-weight:700;color:var(--tx);}
+  .summary .sok{font-size:12px;color:var(--progress);margin-top:6px;display:flex;align-items:center;gap:6px;}
+
+  /* completion list */
+  .complist{display:flex;flex-direction:column;gap:10px;}
+  .crow{
+    display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--r-card);
+    background:var(--panel);border:1px solid var(--bd);
+  }
+  .crow.sel{border-color:var(--accent);background:var(--selected);}
+  .crow .glyph{width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;
+    background:var(--raised);border:1px solid var(--bd);color:var(--progress);font-size:15px;}
+  .crow.warn .glyph{color:var(--warn);}
+  .crow .cinfo{flex:1;min-width:0;}
+  .crow .cdate{font-size:13px;font-weight:700;color:var(--tx);}
+  .crow .cmeta{font-size:12px;color:var(--tx2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .crow.warn .cmeta{color:var(--warn);}
+  .crow .cbtn{font-size:12px;font-weight:600;color:var(--tx);background:var(--raised);border:1px solid var(--bd-strong);
+    border-radius:9999px;padding:6px 12px;white-space:nowrap;flex:none;}
+  .crow.warn .cbtn{color:var(--tx-dis);border-color:var(--bd);}
+
+  .section-h{font-size:13px;font-weight:700;color:var(--tx2);letter-spacing:.04em;text-transform:uppercase;}
+
+  /* notes panel */
+  .notes{width:248px;flex:none;background:var(--panel);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;align-self:stretch;}
+  .notes h3{font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;font-weight:700;}
+  .notes ul{list-style:none;display:flex;flex-direction:column;gap:12px;}
+  .notes li{font-size:13px;color:var(--tx2);line-height:1.5;padding-left:18px;position:relative;}
+  .notes li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:2px;background:var(--accent);}
+  .notes li b{color:var(--tx);font-weight:600;}
+
+  /* layout helpers per direction */
+  .pad{padding:24px;}
+  .scrollcol{overflow:hidden;}
+  .flex-col{display:flex;flex-direction:column;}
+  .gap12{gap:12px;}.gap16{gap:16px;}.gap20{gap:20px;}
+
+  /* A — header bar */
+  .appheader{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:18px 24px;border-bottom:1px solid var(--bd);background:var(--panel);
+  }
+  .appheader .ht .eyebrow{margin-bottom:2px;}
+  .appheader .hactions{display:flex;align-items:center;gap:12px;}
+
+  /* B — three pane */
+  .threepane{flex:1;display:flex;min-height:0;}
+  .pane{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--bd);padding:20px;gap:14px;overflow:hidden;}
+  .pane:last-child{border-right:none;}
+  .pane-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.05em;}
+  .pane-h .num{width:20px;height:20px;border-radius:9999px;background:var(--raised);border:1px solid var(--bd-strong);
+    color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;flex:none;}
+
+  /* C — center flow + rail */
+  .cwrap{flex:1;display:flex;min-height:0;}
+  .cflow{flex:1;min-width:0;overflow:hidden;display:flex;justify-content:center;padding:24px;}
+  .cflow-inner{width:100%;max-width:560px;display:flex;flex-direction:column;gap:16px;}
+  .crail{width:300px;flex:none;border-left:1px solid var(--bd);background:var(--panel);display:flex;flex-direction:column;padding:18px;gap:12px;overflow:hidden;}
+  .daterow{display:flex;align-items:center;justify-content:space-between;}
+
+  .strip{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--bd);background:var(--panel);}
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <div class="eyebrow">GraceTree Shorts Studio</div>
+  <h1>레이아웃 리디자인 — 3가지 방향</h1>
+  <p>같은 시각 언어("GraceTree Mono Focus")로 입력 → 준비 확인 → 영상 생성 → 결과 확인 흐름의 배치(IA)만 비교합니다. 각 창은 약 1180×720, 레일 + 메인 + 하단 상태바 포함.</p>
+</div>
+
+<!-- ============ DIRECTION A ============ -->
+<section class="direction">
+  <div class="dir-label">
+    <span class="badge">A</span>
+    <h2>헤더 통합 + 균형 2-pane</h2>
+    <span class="rationale">CTA와 게시일을 상단 헤더로 끌어올리고, 준비 카드를 긴 스택에서 분리해 오른쪽 컬럼이 제 역할을 하도록 균형을 맞춥니다.</span>
+  </div>
+  <div class="dir-body">
+    <div class="window">
+      <div class="shell">
+        <!-- rail -->
+        <aside class="rail">
+          <div class="traffic"><i></i><i></i><i></i></div>
+          <div class="brand">
+            <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#7c84e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 24 V12.5"/>
+              <path d="M16 18 C11.4 18 9.2 14.4 10.2 9.6 C14.8 10.5 16 14.4 16 18 Z"/>
+              <path d="M16 14.8 C20.6 14.8 22.8 11.2 21.8 6.4 C17.2 7.3 16 11.2 16 14.8 Z"/>
+              <path d="M7 24 Q16 20.5 25 24"/>
+            </svg>
+          </div>
+          <div class="railbtns">
+            <div class="railbtn active">⌂</div>
+            <div class="railbtn">?</div>
+          </div>
+          <div class="railspace"></div>
+          <div class="railbtn">⚙</div>
+        </aside>
+        <!-- main -->
+        <div class="main">
+          <!-- app header bar -->
+          <div class="appheader">
+            <div class="ht">
+              <div class="eyebrow">GraceTree Shorts Studio</div>
+              <div class="h-title">영상 작업</div>
+            </div>
+            <div class="hactions">
+              <div class="datefield"><span class="cal">📅</span><span>2026-06-28</span><span class="sub">· Sun</span></div>
+              <button class="btn-primary">▶ 영상 생성</button>
+            </div>
+          </div>
+          <!-- two-pane body -->
+          <div style="flex:1;display:flex;min-height:0;">
+            <!-- left workspace ~60% -->
+            <div style="flex:1.5;min-width:0;border-right:1px solid var(--bd);padding:20px;display:flex;flex-direction:column;gap:14px;overflow:hidden;">
+              <div class="section-h">입력 워크스페이스</div>
+              <div class="dropzone">
+                <div class="ic">⬆</div>
+                <div class="big">여기에 파일을 끌어다 놓거나 선택하세요</div>
+                <div class="meta">자막 · 말씀 영상 · 기도 영상 · 배경음악</div>
+              </div>
+              <div class="slots">
+                <div class="slot"><span class="sdot"></span><span class="stype">자막</span><span class="sname">script.txt</span><span class="sstate">준비됨</span></div>
+                <div class="slot"><span class="sdot"></span><span class="stype">말씀 영상</span><span class="sname">word_2026-06-28.mp4</span><span class="sstate">준비됨</span></div>
+                <div class="slot"><span class="sdot"></span><span class="stype">기도 영상</span><span class="sname">prayer_2026-06-28.mp4</span><span class="sstate">준비됨</span></div>
+                <div class="slot warn"><span class="sdot"></span><span class="stype">배경음악</span><span class="sname">bgm.mp3</span><span class="sstate">확인 필요</span></div>
+              </div>
+              <div class="summary">
+                <div class="stitle">[제목] 오늘 우리에게 주신 말씀</div>
+                <div class="sok">✓ 자막 파싱 완료 · 블록 12개 인식</div>
+              </div>
+              <div style="margin-top:auto;"><button class="btn-secondary">↻ 파일 다시 선택</button></div>
+            </div>
+            <!-- right stacked ~40% -->
+            <div style="flex:1;min-width:0;padding:20px;display:flex;flex-direction:column;gap:16px;overflow:hidden;">
+              <div class="card">
+                <div class="card-title">입력 준비</div>
+                <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+                <div class="ready-row"><span class="ready-pct">100%</span><span class="meta">필수 입력 4/4</span></div>
+                <div class="chips">
+                  <span class="chip"><i></i>자막</span><span class="chip"><i></i>말씀</span>
+                  <span class="chip"><i></i>기도</span><span class="chip warn"><i></i>배경음악</span>
+                </div>
+              </div>
+              <div class="section-h">완료 목록</div>
+              <div class="complist" style="overflow:hidden;">
+                <div class="crow sel"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-27 · Fri</div><div class="cmeta">실제 생성 2026-06-27 · 결과 폴더 있음</div></div><button class="cbtn">폴더 열기</button></div>
+                <div class="crow"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-26 · Thu</div><div class="cmeta">실제 생성 2026-06-26 · 결과 폴더 있음</div></div><button class="cbtn">폴더 열기</button></div>
+                <div class="crow warn"><div class="glyph">!</div><div class="cinfo"><div class="cdate">2026-06-25 · Wed</div><div class="cmeta">결과 폴더 없음</div></div><button class="cbtn">폴더 열기</button></div>
+              </div>
+            </div>
+          </div>
+          <!-- status bar -->
+          <div class="statusbar">
+            <div class="left"><span class="dot"></span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</div>
+            <div class="right">모든 기능은 로컬에서 실행됩니다</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- notes -->
+    <div class="notes">
+      <h3>UX 포인트</h3>
+      <ul>
+        <li><b>CTA 상시 노출.</b> "영상 생성" 버튼이 헤더로 올라와 더 이상 스크롤 하단에 묻히지 않습니다.</li>
+        <li><b>게시일 승격.</b> 작업의 핵심 입력인 게시일을 제목 옆 헤더에 배치.</li>
+        <li><b>준비 카드 분리.</b> Readiness를 긴 좌측 스택에서 떼어내 우측 상단으로 이동.</li>
+        <li><b>우측 컬럼 활용.</b> 준비 + 완료 목록을 함께 담아 여백 낭비를 해소.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DIRECTION B ============ -->
+<section class="direction">
+  <div class="dir-label">
+    <span class="badge">B</span>
+    <h2>3-pane 작업대 (좌→우 흐름)</h2>
+    <span class="rationale">입력 → 준비·생성 → 완료를 세 컬럼으로 펼쳐 흐름을 그대로 좌우로 읽게 하고, 가운데에서 생성 행위를 시각적으로 중심에 둡니다.</span>
+  </div>
+  <div class="dir-body">
+    <div class="window">
+      <div class="shell">
+        <aside class="rail">
+          <div class="traffic"><i></i><i></i><i></i></div>
+          <div class="brand">
+            <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#7c84e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 24 V12.5"/>
+              <path d="M16 18 C11.4 18 9.2 14.4 10.2 9.6 C14.8 10.5 16 14.4 16 18 Z"/>
+              <path d="M16 14.8 C20.6 14.8 22.8 11.2 21.8 6.4 C17.2 7.3 16 11.2 16 14.8 Z"/>
+              <path d="M7 24 Q16 20.5 25 24"/>
+            </svg>
+          </div>
+          <div class="railbtns">
+            <div class="railbtn active">⌂</div>
+            <div class="railbtn">?</div>
+          </div>
+          <div class="railspace"></div>
+          <div class="railbtn">⚙</div>
+        </aside>
+        <div class="main">
+          <!-- slim strip -->
+          <div class="strip">
+            <div><span class="eyebrow">GraceTree Shorts Studio</span> &nbsp; <span style="font-size:18px;font-weight:700;vertical-align:middle;">영상 작업</span></div>
+            <div class="datefield"><span class="cal">📅</span><span>2026-06-28</span><span class="sub">· Sun</span></div>
+          </div>
+          <!-- three pane -->
+          <div class="threepane">
+            <!-- ① 입력 -->
+            <div class="pane">
+              <div class="pane-h"><span class="num">1</span>입력</div>
+              <div class="dropzone">
+                <div class="ic">⬆</div>
+                <div class="big">파일을 끌어다 놓거나 선택</div>
+                <div class="meta">4개 파일</div>
+              </div>
+              <div class="slots">
+                <div class="slot"><span class="sdot"></span><span class="stype">자막</span><span class="sname">script.txt</span><span class="sstate">준비</span></div>
+                <div class="slot"><span class="sdot"></span><span class="stype">말씀</span><span class="sname">word.mp4</span><span class="sstate">준비</span></div>
+                <div class="slot"><span class="sdot"></span><span class="stype">기도</span><span class="sname">prayer.mp4</span><span class="sstate">준비</span></div>
+                <div class="slot warn"><span class="sdot"></span><span class="stype">배경음악</span><span class="sname">bgm.mp3</span><span class="sstate">확인</span></div>
+              </div>
+              <div style="margin-top:auto;"><button class="btn-secondary">↻ 파일 다시 선택</button></div>
+            </div>
+            <!-- ② 준비 & 생성 -->
+            <div class="pane" style="background:linear-gradient(180deg,rgba(124,132,232,.05),rgba(124,132,232,0));">
+              <div class="pane-h"><span class="num">2</span>준비 &amp; 생성</div>
+              <div class="card">
+                <div class="card-title">입력 준비</div>
+                <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+                <div class="ready-row"><span class="ready-pct">100%</span><span class="meta">필수 4/4</span></div>
+                <div class="chips">
+                  <span class="chip"><i></i>자막</span><span class="chip"><i></i>말씀</span>
+                  <span class="chip"><i></i>기도</span><span class="chip warn"><i></i>음악</span>
+                </div>
+              </div>
+              <div class="summary">
+                <div class="stitle">[제목] 오늘 우리에게 주신 말씀</div>
+                <div class="sok">✓ 자막 파싱 완료</div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+                <button class="btn-primary" style="height:52px;padding:0 36px;font-size:16px;">▶ 영상 생성</button>
+                <div class="meta-dis">게시일 2026-06-28 기준 생성</div>
+              </div>
+            </div>
+            <!-- ③ 완료 -->
+            <div class="pane">
+              <div class="pane-h"><span class="num">3</span>완료</div>
+              <div class="complist">
+                <div class="crow sel"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-27 · Fri</div><div class="cmeta">생성 2026-06-27 · 폴더 있음</div></div><button class="cbtn">열기</button></div>
+                <div class="crow"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-26 · Thu</div><div class="cmeta">생성 2026-06-26 · 폴더 있음</div></div><button class="cbtn">열기</button></div>
+                <div class="crow"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-25 · Wed</div><div class="cmeta">생성 2026-06-25 · 폴더 있음</div></div><button class="cbtn">열기</button></div>
+                <div class="crow warn"><div class="glyph">!</div><div class="cinfo"><div class="cdate">2026-06-24 · Tue</div><div class="cmeta">결과 폴더 없음</div></div><button class="cbtn">열기</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="statusbar">
+            <div class="left"><span class="dot"></span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</div>
+            <div class="right">모든 기능은 로컬에서 실행됩니다</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>UX 포인트</h3>
+      <ul>
+        <li><b>흐름의 직역.</b> 입력→준비/생성→결과가 좌에서 우로 그대로 읽힙니다.</li>
+        <li><b>생성이 중심.</b> 가운데 컬럼이 "영상 생성" 행위를 시각적으로 가운데 고정.</li>
+        <li><b>독립 스크롤.</b> 각 컬럼이 헤딩과 자체 스크롤을 가져 길이 차이에 흔들리지 않음.</li>
+        <li><b>풀 와이드 활용.</b> 넓은 화면의 가로 공간을 세 영역이 고르게 사용.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DIRECTION C ============ -->
+<section class="direction">
+  <div class="dir-label">
+    <span class="badge">C</span>
+    <h2>집중 흐름 + 완료 레일</h2>
+    <span class="rationale">중앙 단일 컬럼에 생성 흐름을 히어로로 두어 매일 반복 작업의 분산을 최소화하고, 우측 완료 레일로 이력은 한눈에 유지합니다.</span>
+  </div>
+  <div class="dir-body">
+    <div class="window">
+      <div class="shell">
+        <aside class="rail">
+          <div class="traffic"><i></i><i></i><i></i></div>
+          <div class="brand">
+            <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#7c84e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 24 V12.5"/>
+              <path d="M16 18 C11.4 18 9.2 14.4 10.2 9.6 C14.8 10.5 16 14.4 16 18 Z"/>
+              <path d="M16 14.8 C20.6 14.8 22.8 11.2 21.8 6.4 C17.2 7.3 16 11.2 16 14.8 Z"/>
+              <path d="M7 24 Q16 20.5 25 24"/>
+            </svg>
+          </div>
+          <div class="railbtns">
+            <div class="railbtn active">⌂</div>
+            <div class="railbtn">?</div>
+          </div>
+          <div class="railspace"></div>
+          <div class="railbtn">⚙</div>
+        </aside>
+        <div class="main">
+          <div class="cwrap">
+            <!-- center flow -->
+            <div class="cflow">
+              <div class="cflow-inner">
+                <div class="daterow">
+                  <div><div class="eyebrow">GraceTree Shorts Studio</div><div class="h-title" style="margin-top:2px;">영상 작업</div></div>
+                  <div class="datefield"><span class="cal">📅</span><span>2026-06-28</span><span class="sub">· Sun</span></div>
+                </div>
+                <div class="dropzone" style="padding:34px 16px;">
+                  <div class="ic" style="width:46px;height:46px;font-size:22px;">⬆</div>
+                  <div class="big" style="font-size:15px;">여기에 파일을 끌어다 놓거나 선택하세요</div>
+                  <div class="meta">자막 · 말씀 영상 · 기도 영상 · 배경음악</div>
+                </div>
+                <div class="slots">
+                  <div class="slot"><span class="sdot"></span><span class="stype">자막</span><span class="sname">script.txt</span><span class="sstate">준비됨</span></div>
+                  <div class="slot"><span class="sdot"></span><span class="stype">말씀 영상</span><span class="sname">word_2026-06-28.mp4</span><span class="sstate">준비됨</span></div>
+                  <div class="slot"><span class="sdot"></span><span class="stype">기도 영상</span><span class="sname">prayer_2026-06-28.mp4</span><span class="sstate">준비됨</span></div>
+                  <div class="slot warn"><span class="sdot"></span><span class="stype">배경음악</span><span class="sname">bgm.mp3</span><span class="sstate">확인 필요</span></div>
+                </div>
+                <div class="card" style="padding:16px;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div class="card-title" style="margin:0;">입력 준비</div>
+                    <span class="meta">100% · 필수 입력 4/4</span>
+                  </div>
+                  <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+                  <div class="chips">
+                    <span class="chip"><i></i>자막</span><span class="chip"><i></i>말씀</span>
+                    <span class="chip"><i></i>기도</span><span class="chip warn"><i></i>배경음악</span>
+                  </div>
+                </div>
+                <div class="summary"><div class="stitle">[제목] 오늘 우리에게 주신 말씀</div><div class="sok">✓ 자막 파싱 완료 · 블록 12개</div></div>
+                <div style="display:flex;align-items:center;gap:12px;margin-top:4px;">
+                  <button class="btn-primary" style="height:50px;padding:0 32px;font-size:16px;flex:1;justify-content:center;">▶ 영상 생성</button>
+                  <button class="btn-secondary" style="height:50px;">↻ 다시 선택</button>
+                </div>
+              </div>
+            </div>
+            <!-- persistent completion rail -->
+            <aside class="crail">
+              <div class="section-h">완료 목록</div>
+              <div class="complist" style="overflow:hidden;">
+                <div class="crow sel"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-27 · Fri</div><div class="cmeta">생성 06-27 · 폴더 있음</div></div><button class="cbtn">열기</button></div>
+                <div class="crow"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-26 · Thu</div><div class="cmeta">생성 06-26 · 폴더 있음</div></div><button class="cbtn">열기</button></div>
+                <div class="crow"><div class="glyph">✓</div><div class="cinfo"><div class="cdate">2026-06-25 · Wed</div><div class="cmeta">생성 06-25 · 폴더 있음</div></div><button class="cbtn">열기</button></div>
+                <div class="crow warn"><div class="glyph">!</div><div class="cinfo"><div class="cdate">2026-06-24 · Tue</div><div class="cmeta">결과 폴더 없음</div></div><button class="cbtn">열기</button></div>
+              </div>
+            </aside>
+          </div>
+          <div class="statusbar">
+            <div class="left"><span class="dot"></span>최근: 오늘의 말씀기도 쇼츠 · 생성 완료</div>
+            <div class="right">모든 기능은 로컬에서 실행됩니다</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <h3>UX 포인트</h3>
+      <ul>
+        <li><b>작업이 히어로.</b> 중앙 단일 컬럼이 오늘의 생성 작업에 집중을 모읍니다.</li>
+        <li><b>분산 최소화.</b> 매일 반복하는 흐름을 좌우로 쪼개지 않아 시선 이동이 적음.</li>
+        <li><b>넉넉한 드롭존.</b> 넓은 max-width로 드롭 영역이 실제 너비를 확보.</li>
+        <li><b>이력은 상시.</b> 우측 300px 레일로 완료 목록을 한눈에 유지.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

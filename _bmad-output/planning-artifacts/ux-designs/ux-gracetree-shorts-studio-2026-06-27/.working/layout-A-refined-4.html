@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>레이아웃 A — 정밀 시안 v4</title>
+<style>
+  :root{
+    --base:#0a0a0b; --nav:#0c0c0d; --panel:#0f0f10; --raised:#18181a;
+    --hover:#202023; --selected:#262629;
+    --tx:#f3f3f4; --tx2:#9c9ca1; --tx-dis:#66666b;
+    --bd:#2a2a2d; --bd-strong:#5c5c61;
+    --accent:#7c84e8; --progress:#9aa0f2; --warn:#f2b84b; --danger:#f05d5e;
+    --r-card:12px; --r-soft:18px;
+    font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:#161618;color:var(--tx);font-size:14px;line-height:1.45;
+    padding:40px 32px 64px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .pagehead{width:100%;max-width:1180px;margin-bottom:14px;}
+  .pagehead .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .pagehead h1{font-size:28px;font-weight:700;margin-top:4px;}
+  .pagehead p{color:var(--tx2);font-size:13px;margin-top:6px;}
+
+  .window{
+    width:100%;max-width:1180px;background:var(--base);border:1px solid var(--bd);
+    border-radius:var(--r-soft);overflow:hidden;
+    box-shadow:0 28px 70px -22px rgba(0,0,0,.75);
+    display:flex;flex-direction:column;height:760px;
+  }
+  .shell{flex:1;display:flex;min-height:0;}
+
+  /* rail */
+  .rail{
+    width:78px;flex:none;background:var(--nav);border-right:1px solid var(--bd);
+    display:flex;flex-direction:column;align-items:center;padding:14px 0 16px;position:relative;
+  }
+  .traffic{position:absolute;top:11px;left:11px;display:flex;gap:6px;opacity:.32;}
+  .traffic i{width:8px;height:8px;border-radius:50%;display:block;}
+  .traffic i:nth-child(1){background:#f05d5e;}
+  .traffic i:nth-child(2){background:#f2b84b;}
+  .traffic i:nth-child(3){background:#3fb950;}
+  .brand{
+    width:44px;height:44px;border-radius:12px;background:var(--raised);border:1px solid var(--bd);
+    display:flex;align-items:center;justify-content:center;margin-top:22px;
+  }
+  .railbtns{display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:18px;}
+  .railbtn{
+    width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    color:var(--tx2);font-size:19px;border:1px solid transparent;
+  }
+  .railbtn.active{background:var(--selected);color:var(--tx);border-color:var(--bd);}
+  .railspace{flex:1;}
+
+  /* main */
+  .main{flex:1;min-width:0;background:var(--base);display:flex;flex-direction:column;}
+
+  /* header : title only */
+  .appheader{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:18px 28px;border-bottom:1px solid var(--bd);background:var(--panel);
+  }
+  .appheader .eyebrow{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:3px;}
+  .appheader .h-title{font-size:24px;font-weight:700;letter-spacing:-.01em;}
+
+  /* body two-pane */
+  .body2{flex:1;display:flex;min-height:0;}
+  .pane-left{flex:1.55;min-width:0;border-right:1px solid var(--bd);padding:22px 24px;display:flex;flex-direction:column;gap:16px;overflow:hidden;}
+  .pane-right{flex:1;min-width:0;padding:22px 24px;display:flex;flex-direction:column;gap:16px;overflow:hidden;}
+
+  /* top row : 게시일 (left) + 영상 생성 (right) */
+  .toprow{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .date-group{display:flex;align-items:center;gap:12px;}
+  .date-group .dlabel{font-size:12px;color:var(--tx2);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+  .datefield{
+    display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 16px;
+    background:var(--raised);border:1px solid var(--bd-strong);border-radius:var(--r-card);
+    font-size:14px;color:var(--tx);white-space:nowrap;
+  }
+  .datefield .cal{color:var(--accent);font-size:15px;}
+  .datefield .sub{color:var(--tx2);font-size:12px;}
+  .btn-generate{
+    height:44px;padding:0 26px;background:var(--tx);color:var(--base);border:none;border-radius:9999px;
+    font-size:15px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;
+    box-shadow:0 8px 22px -12px rgba(243,243,244,.45);white-space:nowrap;flex:none;
+  }
+
+  /* dropzone */
+  .dropzone{
+    border:1.5px dashed var(--bd-strong);border-radius:var(--r-soft);
+    background:linear-gradient(180deg,rgba(124,132,232,.05),rgba(124,132,232,0));
+    padding:20px;display:flex;flex-direction:column;gap:14px;
+  }
+  .dz-head{display:flex;align-items:center;gap:12px;}
+  .dz-ic{width:38px;height:38px;border-radius:11px;background:var(--raised);border:1px solid var(--bd);
+    display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:18px;flex:none;}
+  .dz-head .t{font-size:14px;font-weight:700;color:var(--tx);}
+  .dz-head .s{font-size:12px;color:var(--tx2);margin-top:2px;}
+
+  /* file slots */
+  .slots{display:flex;flex-direction:column;gap:10px;}
+  .slot{
+    display:flex;align-items:center;gap:12px;min-height:56px;padding:0 16px;
+    background:var(--raised);border:1px solid var(--bd);border-radius:var(--r-card);
+  }
+  .slot.hovered{background:var(--hover);border-color:var(--bd-strong);}
+  .slot .sdot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--progress);box-shadow:0 0 0 3px rgba(154,160,242,.16);}
+  .slot .sbody{min-width:0;}
+  .slot .srole{font-size:12px;color:var(--tx2);}
+  .slot .sname{font-size:14px;color:var(--tx);font-weight:600;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .del-x{
+    flex:none;font-size:14px;line-height:1;color:var(--tx-dis);width:22px;height:22px;
+    display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;
+  }
+  .slot.hovered .del-x{color:var(--danger);}
+  .slot .spacer{flex:1;}
+  .slot .sstate{font-size:13px;color:var(--progress);font-weight:600;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex:none;}
+  .pill-act{
+    display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 14px;border-radius:9999px;
+    font-size:12px;font-weight:600;background:var(--raised);border:1px solid var(--bd-strong);color:var(--tx);flex:none;
+  }
+
+  /* card */
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:var(--r-card);padding:18px;}
+  .card-title{font-size:14px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;}
+  .progress-track{height:8px;border-radius:9999px;background:var(--raised);overflow:hidden;border:1px solid var(--bd);}
+  .progress-fill{height:100%;background:var(--progress);border-radius:9999px;}
+  .ready-row{display:flex;align-items:baseline;justify-content:space-between;margin-top:14px;}
+  .ready-pct{font-size:22px;font-weight:700;color:var(--tx);}
+  .ready-row .meta{font-size:12px;color:var(--tx2);}
+  .chips{display:flex;gap:7px;margin-top:16px;flex-wrap:wrap;}
+  .chip{font-size:11px;color:var(--tx2);background:var(--raised);border:1px solid var(--bd);
+    border-radius:9999px;padding:5px 11px;display:inline-flex;align-items:center;gap:6px;}
+  .chip i{width:6px;height:6px;border-radius:50%;background:var(--progress);display:block;}
+
+  /* completion — dense, iconless */
+  .section-h{font-size:13px;font-weight:700;color:var(--tx2);letter-spacing:.04em;text-transform:uppercase;}
+  .complist{display:flex;flex-direction:column;gap:6px;overflow:hidden;}
+  .crow{
+    display:flex;align-items:center;gap:12px;padding:9px 13px;border-radius:10px;
+    background:var(--panel);border:1px solid var(--bd);border-left:3px solid transparent;
+  }
+  .crow.sel{border-color:var(--accent);border-left-color:var(--accent);background:var(--selected);}
+  .crow .cinfo{flex:1;min-width:0;}
+  .crow .ctop{display:flex;align-items:baseline;gap:8px;min-width:0;}
+  .crow .cdate{font-size:13px;font-weight:700;color:var(--tx);flex:none;}
+  .crow .ctitle{font-size:13px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .crow .cmeta{font-size:11px;color:var(--tx-dis);margin-top:1px;}
+  .crow .cmeta.warn{color:var(--warn);font-weight:600;}
+  .crow .cbtn{font-size:12px;font-weight:600;color:var(--tx);background:var(--raised);border:1px solid var(--bd-strong);
+    border-radius:9999px;padding:5px 12px;white-space:nowrap;flex:none;}
+  .crow.warn .cbtn{color:var(--tx-dis);border-color:var(--bd);}
+
+  /* status bar : title (left) + generation progress bar (right) */
+  .statusbar{
+    height:70px;flex:none;border-top:1px solid var(--bd);background:var(--panel);
+    display:flex;align-items:center;justify-content:space-between;padding:0 28px;
+  }
+  .statusbar .left{display:flex;align-items:center;gap:11px;font-size:14px;color:var(--tx);font-weight:600;}
+  .statusbar .dot{width:9px;height:9px;border-radius:50%;background:var(--progress);box-shadow:0 0 0 3px rgba(154,160,242,.18);}
+  .gen-progress{display:flex;align-items:center;gap:12px;}
+  .gen-track{width:200px;height:8px;border-radius:9999px;background:var(--raised);overflow:hidden;border:1px solid var(--bd);}
+  .gen-fill{height:100%;width:45%;background:var(--progress);border-radius:9999px;}
+  .gen-pct{font-size:13px;color:var(--progress);font-weight:700;min-width:34px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <div class="eyebrow">GraceTree Shorts Studio</div>
+  <h1>레이아웃 A — 정밀 시안 v4</h1>
+  <p>좌측 상단 한 줄에 게시일 + 영상 생성, 푸터는 현재 작업 + 생성 진행률만.</p>
+</div>
+
+<div class="window">
+  <div class="shell">
+    <!-- rail -->
+    <aside class="rail">
+      <div class="traffic"><i></i><i></i><i></i></div>
+      <div class="brand">
+        <svg viewBox="0 0 32 32" width="26" height="26" fill="none" stroke="#7c84e8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 24 V12.5"/>
+          <path d="M16 18 C11.4 18 9.2 14.4 10.2 9.6 C14.8 10.5 16 14.4 16 18 Z"/>
+          <path d="M16 14.8 C20.6 14.8 22.8 11.2 21.8 6.4 C17.2 7.3 16 11.2 16 14.8 Z"/>
+          <path d="M7 24 Q16 20.5 25 24"/>
+        </svg>
+      </div>
+      <div class="railbtns">
+        <div class="railbtn active">⌂</div>
+        <div class="railbtn">?</div>
+      </div>
+      <div class="railspace"></div>
+      <div class="railbtn">⚙</div>
+    </aside>
+
+    <!-- main -->
+    <div class="main">
+      <!-- header : title only -->
+      <div class="appheader">
+        <div class="ht">
+          <div class="eyebrow">GraceTree Shorts Studio</div>
+          <div class="h-title">영상 작업</div>
+        </div>
+      </div>
+
+      <!-- two-pane body -->
+      <div class="body2">
+        <!-- LEFT : top row (date + CTA) → dropzone + slots -->
+        <div class="pane-left">
+          <div class="toprow">
+            <div class="date-group">
+              <span class="dlabel">게시일</span>
+              <div class="datefield"><span class="cal">📅</span><span>2026-06-28</span><span class="sub">· Sun</span></div>
+            </div>
+            <button class="btn-generate">▶ 영상 생성</button>
+          </div>
+
+          <div class="dropzone">
+            <div class="dz-head">
+              <div class="dz-ic">✓</div>
+              <div>
+                <div class="t">파일 4개 준비됨</div>
+                <div class="s">여기에 파일을 끌어다 놓아 교체할 수 있어요</div>
+              </div>
+            </div>
+            <div class="slots">
+              <div class="slot">
+                <span class="sdot"></span>
+                <div class="sbody"><div class="srole">자막</div><div class="sname">script.txt</div></div>
+                <span class="del-x" title="삭제">✕</span>
+                <span class="spacer"></span>
+                <span class="sstate">✓ 준비됨</span>
+              </div>
+
+              <div class="slot hovered">
+                <span class="sdot"></span>
+                <div class="sbody"><div class="srole">말씀 영상</div><div class="sname">word.mp4</div></div>
+                <span class="del-x" title="삭제">✕</span>
+                <span class="spacer"></span>
+                <span class="pill-act">↻ 다시 선택</span>
+              </div>
+
+              <div class="slot">
+                <span class="sdot"></span>
+                <div class="sbody"><div class="srole">기도 영상</div><div class="sname">prayer.mp4</div></div>
+                <span class="del-x" title="삭제">✕</span>
+                <span class="spacer"></span>
+                <span class="sstate">✓ 준비됨</span>
+              </div>
+              <div class="slot">
+                <span class="sdot"></span>
+                <div class="sbody"><div class="srole">배경음악</div><div class="sname">bgm.mp3</div></div>
+                <span class="del-x" title="삭제">✕</span>
+                <span class="spacer"></span>
+                <span class="sstate">✓ 준비됨</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT : readiness + dense completion -->
+        <div class="pane-right">
+          <div class="card">
+            <div class="card-title">입력 준비</div>
+            <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+            <div class="ready-row"><span class="ready-pct">100%</span><span class="meta">필수 입력 4/4</span></div>
+            <div class="chips">
+              <span class="chip"><i></i>자막</span>
+              <span class="chip"><i></i>말씀</span>
+              <span class="chip"><i></i>기도</span>
+              <span class="chip"><i></i>배경음악</span>
+            </div>
+          </div>
+
+          <div class="section-h">완료 목록</div>
+          <div class="complist">
+            <div class="crow sel">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-27 · Fri</span><span class="ctitle">오늘 우리에게 주신 말씀</span></div>
+                <div class="cmeta">결과 폴더 있음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+            <div class="crow">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-26 · Thu</span><span class="ctitle">주를 향한 노래</span></div>
+                <div class="cmeta">결과 폴더 있음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+            <div class="crow warn">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-25 · Wed</span><span class="ctitle">낮은 곳으로 임하소서</span></div>
+                <div class="cmeta warn">결과 폴더 없음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+            <div class="crow">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-24 · Tue</span><span class="ctitle">은혜 아니면</span></div>
+                <div class="cmeta">결과 폴더 있음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+            <div class="crow">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-23 · Mon</span><span class="ctitle">주 안에 있는 나에게</span></div>
+                <div class="cmeta">결과 폴더 있음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+            <div class="crow">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-22 · Sun</span><span class="ctitle">샘솟는 기쁨</span></div>
+                <div class="cmeta">결과 폴더 있음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+            <div class="crow">
+              <div class="cinfo">
+                <div class="ctop"><span class="cdate">2026-06-21 · Sat</span><span class="ctitle">예수 나의 친구</span></div>
+                <div class="cmeta">결과 폴더 있음</div>
+              </div>
+              <button class="cbtn">폴더 열기</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- status bar : title + generation progress only -->
+      <div class="statusbar">
+        <div class="left"><span class="dot"></span>현재 작업: 오늘 우리에게 주신 말씀</div>
+        <div class="gen-progress">
+          <div class="gen-track"><div class="gen-fill"></div></div>
+          <span class="gen-pct">45%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
