@@ -2,6 +2,7 @@
   "name": "gracetree-shorts-studio",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
   "packageManager": "pnpm@11.8.0",
   "scripts": {
     "dev": "pnpm --filter gracetree-desktop dev",

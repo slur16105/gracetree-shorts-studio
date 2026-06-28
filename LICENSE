@@ -1,0 +1,27 @@
+Copyright © 2026 Hoseong Lee. All rights reserved.
+
+This software and its source code (the "Software") are made publicly available
+for viewing and evaluation purposes only — for example, as a portfolio
+reference.
+
+No license or right is granted to any person to use, run, copy, modify, merge,
+publish, distribute, sublicense, or sell copies of the Software, in whole or in
+part, for any purpose (including commercial use), without the prior written
+permission of the copyright holder.
+
+THIRD-PARTY COMPONENTS
+-----------------------
+This repository bundles third-party assets that are licensed separately and are
+NOT covered by this license. Their own licenses govern their use — see the
+`resources/licenses/` directory (for example, the SIL Open Font License for the
+bundled Korean fonts "Black Han Sans" and "Nanum Gothic"). Build-time and runtime
+dependencies retain their respective upstream licenses.
+
+NO WARRANTY
+-----------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN
+AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
