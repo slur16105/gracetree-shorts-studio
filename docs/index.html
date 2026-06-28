@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GraceTree Shorts Studio — 오프라인 말씀기도 쇼츠 제작 데스크톱 앱</title>
+<meta name="description" content="음성과 스크립트만 넣으면 자막·배경·BGM이 합성된 완성 쇼츠를 만들어주는, 완전 오프라인 데스크톱 앱." />
+<meta property="og:title" content="GraceTree Shorts Studio" />
+<meta property="og:description" content="오프라인으로, 반복 가능하게 — 말씀기도 쇼츠 자동 제작 데스크톱 앱." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  :root {
+    --base: #0A0A0B; --nav: #0C0C0D; --panel: #0F0F10; --raised: #18181A;
+    --hover: #202023; --selected: #262629;
+    --text: #F3F3F4; --text-2: #9C9CA1; --text-3: #66666B;
+    --border: #2A2A2D; --border-strong: #5C5C61;
+    --accent: #7C84E8; --progress: #9AA0F2; --warning: #F2B84B; --danger: #F05D5E;
+    --radius: 18px; --radius-sm: 12px; --maxw: 1120px;
+    --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--base); color: var(--text);
+    font-family: var(--font); line-height: 1.6; -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+  .accent { color: var(--accent); }
+  .muted { color: var(--text-2); }
+
+  /* nav */
+  header {
+    position: sticky; top: 0; z-index: 10; background: rgba(10,10,11,.72);
+    backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+  }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+  .brand .mark {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    background: var(--raised); border: 1px solid var(--border); border-radius: 10px; font-size: 18px;
+  }
+  .nav-links { display: flex; gap: 26px; align-items: center; }
+  .nav-links a { color: var(--text-2); font-size: 14px; font-weight: 500; }
+  .nav-links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px;
+    padding: 10px 18px; border-radius: 999px; border: 1px solid transparent; cursor: pointer;
+    transition: transform .12s ease, background .15s ease, border-color .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-primary { background: var(--text); color: var(--base); }
+  .btn-primary:hover { background: #fff; }
+  .btn-ghost { background: var(--raised); color: var(--text); border-color: var(--border-strong); }
+  .btn-ghost:hover { background: var(--hover); }
+
+  /* hero */
+  .hero { position: relative; padding: 96px 0 64px; text-align: center; }
+  .hero::before {
+    content: ""; position: absolute; inset: -20% 0 auto 0; height: 540px; z-index: -1;
+    background: radial-gradient(60% 60% at 50% 0%, rgba(124,132,232,.20), transparent 70%);
+    pointer-events: none;
+  }
+  .eyebrow {
+    display: inline-block; font-size: 12px; letter-spacing: .12em; font-weight: 600;
+    color: var(--text-2); text-transform: uppercase; padding: 6px 14px;
+    border: 1px solid var(--border); border-radius: 999px; background: var(--panel); margin-bottom: 22px;
+  }
+  h1 {
+    font-size: clamp(34px, 6vw, 62px); line-height: 1.1; letter-spacing: -.03em;
+    margin: 0 0 20px; font-weight: 800;
+  }
+  h1 .grad {
+    background: linear-gradient(120deg, var(--accent), var(--progress) 60%, #c8cdff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lead { font-size: clamp(16px, 2.2vw, 20px); color: var(--text-2); max-width: 660px; margin: 0 auto 14px; }
+  .lead-en { font-size: 14px; color: var(--text-3); max-width: 620px; margin: 0 auto 34px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
+  .cta .btn { padding: 13px 24px; font-size: 15px; }
+  .badges { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .badge {
+    font-size: 12px; color: var(--text-2); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+  }
+  .badge b { color: var(--progress); font-weight: 700; }
+
+  /* hero visual */
+  .shot { margin: 56px auto 0; max-width: 920px; }
+  .frame {
+    border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+    background: var(--panel); box-shadow: 0 30px 80px -30px rgba(0,0,0,.8);
+  }
+  .frame-bar { display: flex; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--nav); }
+  .frame-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--border-strong); display: block; }
+  .frame img { width: 100%; display: block; }
+  .frame-ph {
+    display: none; aspect-ratio: 16/10; align-items: center; justify-content: center; flex-direction: column;
+    gap: 8px; color: var(--text-3); background:
+      repeating-linear-gradient(45deg, #131315 0 12px, #0f0f10 12px 24px);
+    font-size: 14px;
+  }
+  .frame-ph b { color: var(--text-2); font-weight: 600; }
+
+  /* sections */
+  section { padding: 80px 0; }
+  .sec-head { text-align: center; max-width: 640px; margin: 0 auto 48px; }
+  .sec-head h2 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -.02em; margin: 0 0 12px; font-weight: 800; }
+  .sec-head p { color: var(--text-2); margin: 0; font-size: 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .card {
+    background: var(--raised); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 26px; transition: border-color .2s ease, transform .2s ease;
+  }
+  .card:hover { border-color: var(--border-strong); transform: translateY(-3px); }
+  .card .ic { font-size: 24px; margin-bottom: 14px; }
+  .card h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; }
+  .card p { margin: 0; color: var(--text-2); font-size: 14.5px; }
+
+  /* pipeline */
+  .pipe { display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; justify-content: center; }
+  .step {
+    flex: 1 1 120px; min-width: 120px; text-align: center; padding: 18px 10px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel);
+    position: relative; font-size: 13.5px;
+  }
+  .step .n { display: block; font-size: 12px; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
+  .pipe .arrow { display: grid; place-items: center; color: var(--text-3); padding: 0 6px; font-size: 18px; }
+
+  /* tech chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 760px; margin: 0 auto; }
+  .chip {
+    font-size: 13.5px; color: var(--text); background: var(--raised);
+    border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px;
+  }
+  .chip span { color: var(--text-3); }
+
+  /* download */
+  .dl { text-align: center; background:
+      radial-gradient(70% 120% at 50% 0%, rgba(124,132,232,.12), transparent 70%); }
+  .dl-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .dl-card {
+    display: flex; align-items: center; gap: 14px; text-align: left; padding: 16px 22px;
+    background: var(--raised); border: 1px solid var(--border-strong); border-radius: var(--radius);
+    min-width: 230px; transition: transform .12s ease, border-color .15s ease;
+  }
+  .dl-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .dl-card .os { font-size: 26px; }
+  .dl-card .t { font-weight: 700; font-size: 15px; }
+  .dl-card .s { font-size: 12.5px; color: var(--text-2); }
+  .note { margin-top: 22px; font-size: 13px; color: var(--text-3); }
+
+  /* footer */
+  footer { border-top: 1px solid var(--border); padding: 44px 0; color: var(--text-3); font-size: 13.5px; }
+  .foot { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .foot a { color: var(--text-2); }
+  .foot a:hover { color: var(--text); }
+
+  @media (max-width: 820px) {
+    .grid { grid-template-columns: 1fr; }
+    .nav-links a:not(.btn) { display: none; }
+    .pipe .arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ✏️ 배포 전 USERNAME을 본인 GitHub 사용자명으로 바꾸세요 -->
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top"><span class="mark">🌱</span> GraceTree Shorts Studio</a>
+    <nav class="nav-links">
+      <a href="#features">기능</a>
+      <a href="#how">동작 방식</a>
+      <a href="#tech">기술</a>
+      <a class="btn btn-ghost" href="https://github.com/USERNAME/gracetree-shorts-studio" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow">100% 오프라인 · 로컬 제작 도구</span>
+      <h1>말씀기도 쇼츠를<br/><span class="grad">한 번에 자동 제작</span></h1>
+      <p class="lead">음성 녹음과 스크립트만 넣으면 — 자막·배경·BGM이 합성된 1080×1920 세로 영상이 나옵니다. 인터넷 없이, 기기 안에서.</p>
+      <p class="lead-en">A fully-offline desktop studio that turns a voice recording + script into a finished vertical short — local speech alignment, styled subtitle burn-in, and an atomic, recoverable render pipeline.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#download">↓ 다운로드</a>
+        <a class="btn btn-ghost" href="https://github.com/USERNAME/gracetree-shorts-studio" target="_blank" rel="noopener">GitHub에서 보기</a>
+      </div>
+      <div class="badges">
+        <span class="badge">⚡ 완전 오프라인</span>
+        <span class="badge"><b>661</b> 자동 테스트</span>
+        <span class="badge">🪟 Windows · 🍎 macOS</span>
+        <span class="badge">Electron + Python</span>
+      </div>
+
+      <div class="shot">
+        <div class="frame">
+          <div class="frame-bar"><i></i><i></i><i></i></div>
+          <img src="screenshots/home.png" alt="GraceTree Shorts Studio 홈 작업 화면"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+          <div class="frame-ph">
+            <b>스크린샷 자리</b>
+            <span>docs/screenshots/home.png 를 추가하세요</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>반복 제작을 끝내는 데 필요한 전부</h2>
+        <p>영상 편집기가 아니라, "지금 생성 가능한가 · 결과가 어디 있는가"를 빠르게 끝내는 도구.</p>
+      </div>
+      <div class="grid">
+        <div class="card"><div class="ic">🔒</div><h3>완전 오프라인</h3><p>음성 인식(STT)까지 로컬 모델로 처리. 네트워크 호출이 없어 원고·음성이 기기를 떠나지 않습니다.</p></div>
+        <div class="card"><div class="ic">🎙️</div><h3>로컬 음성 정렬</h3><p>Whisper 단어 단위 타임스탬프로 자막을 실제 발화 구간에 정확히 맞춥니다.</p></div>
+        <div class="card"><div class="ic">💬</div><h3>스타일드 자막 번인</h3><p>libass로 한글 폰트를 번들 번인. 제목·말씀·기도 레이아웃과 페이드, "아멘" 홀드까지.</p></div>
+        <div class="card"><div class="ic">🧩</div><h3>멀티프로세스 설계</h3><p>Electron(TS) UI ↔ Python 엔진을 JSON Lines + 공유 스키마 계약으로 안전하게 연결.</p></div>
+        <div class="card"><div class="ic">🛡️</div><h3>프로덕션급 안전성</h3><p>허용목록 서브프로세스, 경로 경계 검사, 원자적 커밋, 취소·실패 복구를 1차 안전선으로.</p></div>
+        <div class="card"><div class="ic">📦</div><h3>크로스플랫폼 배포</h3><p>Windows·macOS 설치 패키지, 엔진 번들, 서명 게이트, 오프라인 설치 스모크 테스트.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how" style="background:var(--nav); border-block:1px solid var(--border);">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>생성 파이프라인</h2>
+        <p>각 단계는 시작 전 취소 체크포인트를 두고, 검증을 통과한 산출물만 원자적으로 커밋합니다.</p>
+      </div>
+      <div class="pipe">
+        <div class="step"><span class="n">01</span>스크립트 파싱</div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">02</span>로컬 음성 정렬</div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">03</span>ASS 자막 생성</div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">04</span>배경·오디오 합성</div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">05</span>libass 번인</div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">06</span>검증 + 원자적 커밋</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH -->
+  <section id="tech">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>기술 스택</h2>
+        <p>멀티프로세스 · 미디어 · 안전성 문제를 다루는 풀스택 데스크톱 프로젝트.</p>
+      </div>
+      <div class="chips">
+        <span class="chip">Electron 39</span>
+        <span class="chip">React 19</span>
+        <span class="chip">TypeScript 5.9</span>
+        <span class="chip">Python <span>3.11+</span></span>
+        <span class="chip">faster-whisper</span>
+        <span class="chip">ffmpeg <span>/ libass</span></span>
+        <span class="chip">SQLite</span>
+        <span class="chip">JSON Schema <span>계약</span></span>
+        <span class="chip">Vitest · pytest · Playwright</span>
+        <span class="chip">electron-builder · PyInstaller</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD -->
+  <section id="download" class="dl">
+    <div class="wrap">
+      <div class="sec-head">
+        <h2>다운로드</h2>
+        <p>Windows·macOS 설치 패키지. 최신 버전은 GitHub Releases에서 받습니다.</p>
+      </div>
+      <div class="dl-btns">
+        <a class="dl-card" href="https://github.com/USERNAME/gracetree-shorts-studio/releases" target="_blank" rel="noopener">
+          <span class="os">🪟</span><span><span class="t">Windows</span><br/><span class="s">.exe 설치 패키지 (x64)</span></span>
+        </a>
+        <a class="dl-card" href="https://github.com/USERNAME/gracetree-shorts-studio/releases" target="_blank" rel="noopener">
+          <span class="os">🍎</span><span><span class="t">macOS</span><br/><span class="s">.dmg (Apple Silicon)</span></span>
+        </a>
+      </div>
+      <p class="note">⏳ 정식 릴리스 준비 중입니다. 그동안 소스와 빌드 방법은 GitHub 저장소에서 확인하세요.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>© 2026 Hoseong Lee · GraceTree Shorts Studio</div>
+    <div>
+      <a href="https://github.com/USERNAME/gracetree-shorts-studio" target="_blank" rel="noopener">GitHub</a> ·
+      <a href="https://github.com/USERNAME/gracetree-shorts-studio/blob/main/LICENSE" target="_blank" rel="noopener">License</a> ·
+      <span>Fonts: Black Han Sans · Nanum Gothic (OFL)</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
