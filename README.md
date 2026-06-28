@@ -137,7 +137,7 @@ flowchart LR
 
 ```bash
 # 사전 준비: Node.js, pnpm 11.8, Python 3.11+, ffmpeg/ffprobe
-git clone <repo-url> && cd gracetree-shorts-studio
+git clone https://github.com/slur16105/gracetree-shorts-studio.git && cd gracetree-shorts-studio
 pnpm install --frozen-lockfile
 ( cd engine && pip install -e ".[dev]" )
 
