@@ -29,6 +29,14 @@ class AttemptRepository:
         """
         snapshot_json = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=False)
         now = _utc_now()
+        # 스크립트 [제목] 섹션을 한 줄로 정규화해 job 제목으로 보존한다(파서 oneLiner와 동일).
+        # 제목이 없으면 None으로 두고 COALESCE로 기존 제목을 덮어쓰지 않는다.
+        script_title: str | None = None
+        script_ast = snapshot.get("scriptAst")
+        if isinstance(script_ast, dict):
+            raw_title = script_ast.get("title")
+            if raw_title:
+                script_title = " ".join(str(raw_title).split()) or None
         with connect_database(self._database_path) as conn:
             conn.execute("BEGIN IMMEDIATE")
             existing = conn.execute(
@@ -61,8 +69,9 @@ class AttemptRepository:
                 (attempt_id, job_id, snapshot_json, now, 1 if is_regeneration else 0),
             )
             conn.execute(
-                "UPDATE jobs SET running_attempt_id = ?, status = 'running', updated_at = ? WHERE id = ?",
-                (attempt_id, now, job_id),
+                "UPDATE jobs SET running_attempt_id = ?, status = 'running', "
+                "title = COALESCE(?, title), updated_at = ? WHERE id = ?",
+                (attempt_id, script_title, now, job_id),
             )
         return {
             "attemptId": attempt_id,

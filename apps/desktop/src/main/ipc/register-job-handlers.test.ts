@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createGetOrCreateJobHandler,
   createListCompletedJobsHandler,
-  createOpenResultFolderHandler,
+  createOpenDownloadsFolderHandler,
   isCanonicalResultPath
 } from './register-job-handlers'
 
@@ -218,137 +218,22 @@ describe('listCompletedJobs handler', () => {
   })
 })
 
-describe('openResultFolder handler', () => {
-  const managedRoot = '/Users/test/AppData/GraceTreeData'
+describe('openDownloadsFolder handler', () => {
+  const downloadsPath = '/Users/test/Downloads'
 
-  function makeRequestEngine(jobs: CompletedJobDto[] = [completedJob]): MockRequestEngine {
-    return vi.fn(async (command: EngineCommand): Promise<EngineEvent> => ({
-      protocolVersion: 1,
-      type: 'completed_jobs_listed',
-      jobId: command.jobId,
-      timestamp: '2026-06-26T00:00:00.000Z',
-      payload: { jobs }
-    }))
-  }
-
-  it('resolves job path from DB and calls shell.openPath', async () => {
-    const fsExistsSync = vi.fn(() => true)
+  it('opens the downloads folder via shell.openPath', async () => {
     const shellOpenPath = vi.fn(async () => '')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine(),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
+    const handler = createOpenDownloadsFolderHandler(downloadsPath, shellOpenPath)
 
-    await handler(completedJob.id)
+    await handler()
 
-    expect(fsExistsSync).toHaveBeenCalledWith(completedJob.resultPath)
-    expect(shellOpenPath).toHaveBeenCalledWith(completedJob.resultPath)
-  })
-
-  it('throws when job not found in DB', async () => {
-    const fsExistsSync = vi.fn(() => true)
-    const shellOpenPath = vi.fn(async () => '')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine([]),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
-
-    await expect(handler('nonexistent-job-id')).rejects.toThrow('not found')
-    expect(shellOpenPath).not.toHaveBeenCalled()
-  })
-
-  it('throws when result path is outside managed root', async () => {
-    const escapingJob: CompletedJobDto = {
-      ...completedJob,
-      resultPath: '/other/location/output'
-    }
-    const fsExistsSync = vi.fn(() => true)
-    const shellOpenPath = vi.fn(async () => '')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine([escapingJob]),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
-
-    await expect(handler(escapingJob.id)).rejects.toThrow('managed root')
-    expect(shellOpenPath).not.toHaveBeenCalled()
-  })
-
-  it('rejects path that only shares a prefix with managedRoot (no sep suffix)', async () => {
-    const escapingJob: CompletedJobDto = {
-      ...completedJob,
-      resultPath: '/Users/test/AppData/GraceTreeDataExtra/output'
-    }
-    const fsExistsSync = vi.fn(() => true)
-    const shellOpenPath = vi.fn(async () => '')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine([escapingJob]),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
-
-    await expect(handler(escapingJob.id)).rejects.toThrow('managed root')
-    expect(shellOpenPath).not.toHaveBeenCalled()
-  })
-
-  it('throws when result folder does not exist', async () => {
-    const fsExistsSync = vi.fn(() => false)
-    const shellOpenPath = vi.fn(async () => '')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine(),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
-
-    await expect(handler(completedJob.id)).rejects.toThrow('does not exist')
-    expect(shellOpenPath).not.toHaveBeenCalled()
-  })
-
-  it('uses canonicalized path for existence check and shell.openPath', async () => {
-    const jobWithDotDot: CompletedJobDto = {
-      ...completedJob,
-      resultPath: '/Users/test/AppData/GraceTreeData/jobs/../jobs/2026-06-15/output'
-    }
-    const fsExistsSync = vi.fn(() => true)
-    const shellOpenPath = vi.fn(async () => '')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine([jobWithDotDot]),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
-
-    await handler(jobWithDotDot.id)
-
-    const canonicalPath = '/Users/test/AppData/GraceTreeData/jobs/2026-06-15/output'
-    expect(fsExistsSync).toHaveBeenCalledWith(canonicalPath)
-    expect(shellOpenPath).toHaveBeenCalledWith(canonicalPath)
+    expect(shellOpenPath).toHaveBeenCalledWith(downloadsPath)
   })
 
   it('throws when shell.openPath reports an OS error', async () => {
-    const fsExistsSync = vi.fn(() => true)
     const shellOpenPath = vi.fn(async () => 'No application is associated with the file')
-    const handler = createOpenResultFolderHandler(
-      managedRoot,
-      makeRequestEngine(),
-      () => '33333333-3333-4333-8333-333333333333',
-      fsExistsSync,
-      shellOpenPath
-    )
+    const handler = createOpenDownloadsFolderHandler(downloadsPath, shellOpenPath)
 
-    await expect(handler(completedJob.id)).rejects.toThrow('Failed to open result folder')
+    await expect(handler()).rejects.toThrow('Failed to open downloads folder')
   })
 })

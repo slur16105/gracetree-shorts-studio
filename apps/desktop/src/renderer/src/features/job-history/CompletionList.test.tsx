@@ -25,18 +25,18 @@ function makeJob(overrides: Partial<CompletedJobSummary> = {}): CompletedJobSumm
 
 describe('CompletionList', () => {
   const listCompletedJobs = vi.fn()
-  const openResultFolder = vi.fn()
+  const openDownloadsFolder = vi.fn()
 
   beforeEach(() => {
     listCompletedJobs.mockReset()
-    openResultFolder.mockReset()
-    openResultFolder.mockResolvedValue(undefined)
+    openDownloadsFolder.mockReset()
+    openDownloadsFolder.mockResolvedValue(undefined)
     vi.mocked(showToast).mockClear()
     Object.defineProperty(window, 'desktopApi', {
       configurable: true,
       value: {
         listCompletedJobs,
-        openResultFolder
+        openDownloadsFolder
       }
     })
   })
@@ -75,16 +75,16 @@ describe('CompletionList', () => {
     expect(items).toHaveLength(2)
   })
 
-  it('resultExists=false이면 "열기" 버튼이 비활성화된다', async () => {
+  it('"열기" 버튼은 결과 폴더 존재 여부와 무관하게 항상 활성화된다', async () => {
     const job = makeJob({ resultExists: false })
     listCompletedJobs.mockResolvedValue([job])
     render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
     const openButton = await screen.findByRole('button', { name: '열기' })
-    expect(openButton).toBeDisabled()
+    expect(openButton).toBeEnabled()
   })
 
-  it('"열기" 버튼 클릭 시 openResultFolder가 호출된다', async () => {
+  it('"열기" 버튼 클릭 시 openDownloadsFolder가 호출된다', async () => {
     const user = userEvent.setup()
     const job = makeJob()
     listCompletedJobs.mockResolvedValue([job])
@@ -93,8 +93,8 @@ describe('CompletionList', () => {
     const openButton = await screen.findByRole('button', { name: '열기' })
     await user.click(openButton)
 
-    expect(openResultFolder).toHaveBeenCalledOnce()
-    expect(openResultFolder).toHaveBeenCalledWith(job.id)
+    expect(openDownloadsFolder).toHaveBeenCalledOnce()
+    expect(openDownloadsFolder).toHaveBeenCalledWith()
   })
 
   it('긴 제목은 title 속성에 전체 제목이 포함된다', async () => {
@@ -158,11 +158,11 @@ describe('CompletionList', () => {
     expect(onJobsLoaded).toHaveBeenCalledWith([job])
   })
 
-  it('openResultFolder 실패 시 토스트로 오류를 안내한다', async () => {
+  it('openDownloadsFolder 실패 시 토스트로 오류를 안내한다', async () => {
     const user = userEvent.setup()
     const job = makeJob()
     listCompletedJobs.mockResolvedValue([job])
-    openResultFolder.mockRejectedValue(new Error('엔진 오류'))
+    openDownloadsFolder.mockRejectedValue(new Error('엔진 오류'))
     render(<CompletionList managedRoot={MANAGED_ROOT} />)
 
     const openButton = await screen.findByRole('button', { name: '열기' })

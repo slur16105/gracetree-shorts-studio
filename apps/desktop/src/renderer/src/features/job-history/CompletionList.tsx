@@ -47,9 +47,9 @@ export function CompletionList({
     void load()
   }, [load, managedRoot, refreshKey])
 
-  function handleOpenClick(event: React.MouseEvent, job: CompletedJobSummary): void {
+  function handleOpenClick(event: React.MouseEvent): void {
     event.stopPropagation()
-    window.desktopApi.openResultFolder(job.id).catch((err: unknown) => {
+    window.desktopApi.openDownloadsFolder().catch((err: unknown) => {
       const message = err instanceof Error ? err.message : '폴더를 열 수 없습니다.'
       showToast(message, 'danger')
     })
@@ -115,19 +115,17 @@ export function CompletionList({
                       </span>
                     ) : null}
                   </div>
-                  <div className={styles.rowMeta}>
-                    <span>생성 {formatDate(job.completedAt)}</span>
-                    {!job.resultExists ? (
+                  {!job.resultExists ? (
+                    <div className={styles.rowMeta}>
                       <span className={styles.missing}>결과 폴더 없음</span>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 <button
                   className={styles.openButton}
-                  disabled={!job.resultExists}
-                  onClick={(e) => handleOpenClick(e, job)}
-                  title={job.resultExists ? '결과 폴더 열기' : '결과 폴더를 찾을 수 없습니다'}
+                  onClick={handleOpenClick}
+                  title="다운로드 폴더 열기"
                   type="button"
                 >
                   열기
