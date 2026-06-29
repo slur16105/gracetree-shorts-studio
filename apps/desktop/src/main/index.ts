@@ -80,6 +80,9 @@ app.whenReady().then(() => {
     resolveMedia('ffmpeg', resolveFfmpegPath),
     resolveMedia('ffprobe', resolveFfprobePath)
   )
+  // Clear the previous session's job workspaces once, on the first engine start of
+  // this app launch (session-scoped data: completed list resets each launch).
+  engineClient.enableSessionSweepOnStart()
   const engineProcess = new EngineProcess(engineClient)
   const jobService = new JobService(engineProcess, (artifactPath, jobManagedRoot) => {
     // Best-effort convenience copy of the completed render into Downloads.

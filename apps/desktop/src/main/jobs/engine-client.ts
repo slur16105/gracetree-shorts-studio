@@ -34,6 +34,15 @@ export class EngineClient {
   private readonly pending = new Map<string, PendingRequest>()
   private readonly queued = new Map<string, QueuedRequest[]>()
   private readonly streamListeners = new Map<string, StreamListener>()
+  // Session cleanup must run once per app launch, not on every engine spawn.
+  // Set by main at startup and consumed by the first spawn, so a mid-session
+  // respawn (after an engine crash) does NOT wipe the current session's work.
+  private sweepSessionOnStart = false
+
+  /** Ask the engine to clear the previous session's job workspaces on its next (first) start. */
+  enableSessionSweepOnStart(): void {
+    this.sweepSessionOnStart = true
+  }
 
   constructor(
     private readonly projectRoot: string,
@@ -154,6 +163,12 @@ export class EngineClient {
     // The allowlist is still enforced on the logical name inside run_safe.
     if (this.ffmpegPath) env['GRACETREE_FFMPEG'] = this.ffmpegPath
     if (this.ffprobePath) env['GRACETREE_FFPROBE'] = this.ffprobePath
+    // Consume the one-time session-sweep request: only the first spawn of this app
+    // launch clears the previous session. Cleared here so respawns never re-sweep.
+    if (this.sweepSessionOnStart) {
+      env['GRACETREE_SWEEP_SESSION'] = '1'
+      this.sweepSessionOnStart = false
+    }
     // In dev mode (python -m gracetree_engine), provide the source tree on PYTHONPATH.
     // In packaged mode (PyInstaller bundle), PYTHONPATH must not be set to a source path
     // that does not exist on the end user's machine.

@@ -290,10 +290,17 @@ def _startup_reconciliation() -> None:
         return
     try:
         from .jobs.attempt_repository import AttemptRepository
+        from .jobs.session_cleanup import sweep_session_workspaces
         apply_migrations(database_path)
         repo = AttemptRepository(database_path)
         repo.reconcile_pending_artifacts()
         repo.interrupt_running_attempts()
+        # 세션 한정 작업 데이터 정리: 이전 세션의 jobs/ 작업 폴더와 행을 비운다.
+        # (resources/와 studio.db 파일은 보존. 완성 영상은 다운로드 폴더 사본이 남는다.)
+        # 앱 실행당 한 번만 정리하도록 main이 첫 spawn에만 이 환경변수를 설정한다.
+        # 엔진이 세션 도중 crash로 재시작돼도(respawn) 현재 작업이 지워지지 않게 한다.
+        if os.environ.get("GRACETREE_SWEEP_SESSION") == "1":
+            sweep_session_workspaces(Path(approved_root_value))
     except Exception as exc:
         print(f"STARTUP_RECONCILIATION_FAILED: {exc}", file=sys.stderr, flush=True)
 
