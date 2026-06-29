@@ -13,6 +13,7 @@ import { resolveEngineCommand, resolveFfmpegPath, resolveFfprobePath } from './f
 import { EngineProcess } from './jobs/engine-process'
 import { JobService } from './jobs/job-service'
 import { createManagedJobPaths } from './files/managed-paths'
+import { exportArtifactToDownloads } from './files/download-export'
 
 const projectRoot = resolve(__dirname, '../../../..')
 let engineClient: EngineClient | null = null
@@ -80,7 +81,16 @@ app.whenReady().then(() => {
     resolveMedia('ffprobe', resolveFfprobePath)
   )
   const engineProcess = new EngineProcess(engineClient)
-  const jobService = new JobService(engineProcess)
+  const jobService = new JobService(engineProcess, (artifactPath, jobManagedRoot) => {
+    // Best-effort convenience copy of the completed render into Downloads.
+    // The managed-root artifact stays the source of truth; copy failures are logged
+    // but must never affect job completion.
+    exportArtifactToDownloads(artifactPath, jobManagedRoot, app.getPath('downloads')).catch(
+      (error) => {
+        console.error('Failed to copy final video to Downloads:', error)
+      }
+    )
+  })
   registerJobHandlers(
     userDataPath,
     (command) => {
