@@ -12,8 +12,8 @@ import type {
   JOB_GET_OR_CREATE_CHANNEL,
   JOB_START_CHANNEL,
   JOBS_LIST_COMPLETED_CHANNEL,
+  JOBS_OPEN_DOWNLOADS_CHANNEL,
   JOBS_OPEN_LOG_CHANNEL,
-  JOBS_OPEN_RESULT_CHANNEL,
   RESOURCE_GET_CHANNEL,
   RESOURCE_SELECT_FILE_CHANNEL,
   RESOURCE_UPDATE_CHANNEL,
@@ -35,7 +35,7 @@ const resourceGetChannel: typeof RESOURCE_GET_CHANNEL = 'resources:get'
 const resourceUpdateChannel: typeof RESOURCE_UPDATE_CHANNEL = 'resources:update'
 const resourceSelectFileChannel: typeof RESOURCE_SELECT_FILE_CHANNEL = 'resources:select-file'
 const jobsListCompletedChannel: typeof JOBS_LIST_COMPLETED_CHANNEL = 'jobs:list-completed'
-const jobsOpenResultChannel: typeof JOBS_OPEN_RESULT_CHANNEL = 'jobs:open-result'
+const jobsOpenDownloadsChannel: typeof JOBS_OPEN_DOWNLOADS_CHANNEL = 'jobs:open-downloads'
 const jobsOpenLogChannel: typeof JOBS_OPEN_LOG_CHANNEL = 'jobs:open-log'
 
 function toSelectedFile(file: InputFileCandidate): { name: string; sourcePath: string } {
@@ -70,8 +70,7 @@ export const desktopApi = Object.freeze({
     ipcRenderer.invoke(resourceUpdateChannel, resourceType, sourcePath, managedRoot),
   selectResourceFile: (resourceType) => ipcRenderer.invoke(resourceSelectFileChannel, resourceType),
   listCompletedJobs: (managedRoot) => ipcRenderer.invoke(jobsListCompletedChannel, managedRoot),
-  openResultFolder: (jobId) =>
-    ipcRenderer.invoke(jobsOpenResultChannel, jobId),
+  openDownloadsFolder: () => ipcRenderer.invoke(jobsOpenDownloadsChannel),
   openLogFolder: (jobId, attemptId) =>
     ipcRenderer.invoke(jobsOpenLogChannel, jobId, attemptId),
   startJob: (jobId, managedRoot, workPath, regenerate?: boolean) =>

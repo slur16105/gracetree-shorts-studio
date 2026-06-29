@@ -137,6 +137,45 @@ describe('EngineClient', () => {
     client.stop()
   })
 
+  it('does not request a session sweep unless enabled', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+
+    const pending = client.request(command('job-1'))
+    expect(spawnMock.mock.calls[0][2].env.GRACETREE_SWEEP_SESSION).toBeUndefined()
+
+    child.stdout.write(`${JSON.stringify(event('job-1'))}\n`)
+    await expect(pending).resolves.toEqual(event('job-1'))
+    client.stop()
+  })
+
+  it('requests a session sweep only on the first spawn, never on a respawn', async () => {
+    vi.useFakeTimers()
+    const firstChild = createFakeChild()
+    const secondChild = createFakeChild()
+    spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild)
+    const client = new EngineClient('/project', '/managed/GraceTreeData')
+    client.enableSessionSweepOnStart()
+
+    // First spawn of the app launch → sweep requested.
+    const timedOut = client.request(command('job-1'))
+    const rejection = expect(timedOut).rejects.toThrow('timed out')
+    expect(firstChild.kill).toBeDefined()
+    expect(spawnMock.mock.calls[0][2].env.GRACETREE_SWEEP_SESSION).toBe('1')
+
+    await vi.advanceTimersByTimeAsync(5000)
+    await rejection
+
+    // Mid-session respawn (e.g. after an engine crash) must NOT sweep, or it would
+    // wipe the current session's in-progress work.
+    const next = client.request(command('job-2'))
+    secondChild.stdout.write(`${JSON.stringify(event('job-2'))}\n`)
+    await expect(next).resolves.toEqual(event('job-2'))
+    expect(spawnMock.mock.calls[1][2].env.GRACETREE_SWEEP_SESSION).toBeUndefined()
+    client.stop()
+  })
+
   it('terminates a timed-out engine and starts a fresh process for the next request', async () => {
     vi.useFakeTimers()
     const firstChild = createFakeChild()

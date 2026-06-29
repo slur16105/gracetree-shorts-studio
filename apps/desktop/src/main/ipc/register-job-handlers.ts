@@ -12,11 +12,11 @@ import {
   JOB_GET_OR_CREATE_CHANNEL,
   JOB_START_CHANNEL,
   JOBS_LIST_COMPLETED_CHANNEL,
+  JOBS_OPEN_DOWNLOADS_CHANNEL,
   JOBS_OPEN_LOG_CHANNEL,
-  JOBS_OPEN_RESULT_CHANNEL,
   type CompletedJobSummary
 } from '@gracetree/contracts/desktop-api'
-import { shell, ipcMain } from 'electron'
+import { app, shell, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
@@ -114,51 +114,16 @@ export function createListCompletedJobsHandler(
   }
 }
 
-export function createOpenResultFolderHandler(
-  managedRoot: string,
-  requestEngine: RequestEngine,
-  idFactory: () => string = randomUUID,
-  fsExistsSync: (path: string) => boolean = existsSync,
+export function createOpenDownloadsFolderHandler(
+  downloadsPath: string,
   shellOpenPath: (path: string) => Promise<string> = shell.openPath.bind(shell)
-): (jobId: string) => Promise<void> {
-  return async (jobId: string): Promise<void> => {
-    // 1. Authoritative path lookup from DB — renderer cannot supply arbitrary paths
-    const requestId = idFactory()
-    const command: ListCompletedJobsCommand = {
-      protocolVersion: 1,
-      type: 'list_completed_jobs',
-      jobId: requestId,
-      timestamp: new Date().toISOString(),
-      payload: { managedRoot }
-    }
-    const event = await requestEngine(command)
-    if (!isCompletedJobsListedEvent(event) || event.jobId !== requestId) {
-      throw new Error('Python engine response is invalid')
-    }
-
-    const job = event.payload.jobs.find((j: CompletedJobDto) => j.id === jobId)
-    if (!job) {
-      throw new Error(`Job not found: ${jobId}`)
-    }
-
-    // 2. Validate path is within managedRoot.
-    // resolve() normalises '..' segments but does NOT dereference symlinks.
-    // Symlink escape is a separate OS-level concern; this guard prevents path-traversal.
-    const canonicalManaged = resolve(managedRoot)
-    const canonicalResult = resolve(job.resultPath)
-    if (!canonicalResult.startsWith(canonicalManaged + sep)) {
-      throw new Error(`Result path is outside managed root: ${job.resultPath}`)
-    }
-
-    // 3. Existence check (use resolved path so normalised '..' forms are handled consistently)
-    if (!fsExistsSync(canonicalResult)) {
-      throw new Error(`Result folder does not exist: ${job.resultPath}`)
-    }
-
-    // 4. Open in OS file explorer (use resolved path for consistency with the security check)
-    const openError = await shellOpenPath(canonicalResult)
+): () => Promise<void> {
+  return async (): Promise<void> => {
+    // Completed videos are exported to the OS Downloads folder, so "open" always
+    // targets that fixed location — no per-job path lookup or validation needed.
+    const openError = await shellOpenPath(downloadsPath)
     if (openError) {
-      throw new Error(`Failed to open result folder: ${openError}`)
+      throw new Error(`Failed to open downloads folder: ${openError}`)
     }
   }
 }
@@ -185,13 +150,8 @@ export function registerJobHandlers(
     return listCompletedJobs(managedRootArg)
   })
 
-  const openResultFolder = createOpenResultFolderHandler(managedRoot, requestEngine)
-  ipcMain.handle(JOBS_OPEN_RESULT_CHANNEL, (_event, jobId: unknown) => {
-    if (typeof jobId !== 'string') {
-      throw new Error('Open result folder request is invalid')
-    }
-    return openResultFolder(jobId)
-  })
+  const openDownloadsFolder = createOpenDownloadsFolderHandler(app.getPath('downloads'))
+  ipcMain.handle(JOBS_OPEN_DOWNLOADS_CHANNEL, () => openDownloadsFolder())
 
   // job start-to-log-path cache for openLogFolder
   const jobWorkPaths = new Map<string, string>()

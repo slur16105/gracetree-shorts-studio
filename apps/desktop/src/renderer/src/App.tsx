@@ -288,7 +288,7 @@ function App(): React.JSX.Element {
       {resultDialogJob ? (
         <ResultDialog
           onClose={handleResultDialogClose}
-          onOpenFolder={() => window.desktopApi.openResultFolder(resultDialogJob.id).catch(() => {})}
+          onOpenFolder={() => window.desktopApi.openDownloadsFolder().catch(() => {})}
           publishDate={resultDialogJob.publishDate}
           title={resultDialogJob.title}
         />

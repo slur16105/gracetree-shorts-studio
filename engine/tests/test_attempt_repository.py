@@ -56,6 +56,36 @@ def test_create_attempt_sets_running_and_links_job(tmp_path: Path) -> None:
     assert job["running_attempt_id"] == ATTEMPT_ID
 
 
+def test_create_attempt_persists_script_title_from_snapshot(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    repo = AttemptRepository(db)
+
+    repo.create_attempt(
+        attempt_id=ATTEMPT_ID,
+        job_id=JOB_ID,
+        snapshot={"inputs": [], "scriptAst": {"title": "오늘의\n  은혜"}},
+    )
+
+    with connect_database(db) as conn:
+        job = conn.execute("SELECT title FROM jobs WHERE id = ?", (JOB_ID,)).fetchone()
+    # 공백/줄바꿈은 한 줄로 정규화되어 파서의 oneLiner와 일치한다.
+    assert job["title"] == "오늘의 은혜"
+
+
+def test_create_attempt_preserves_title_when_snapshot_has_no_script(tmp_path: Path) -> None:
+    db = _setup_db(tmp_path)
+    with connect_database(db) as conn:
+        conn.execute("UPDATE jobs SET title = ? WHERE id = ?", ("기존 제목", JOB_ID))
+    repo = AttemptRepository(db)
+
+    # 스크립트 AST가 없으면(예: 읽기 실패) 기존 제목을 덮어쓰지 않는다.
+    repo.create_attempt(attempt_id=ATTEMPT_ID, job_id=JOB_ID, snapshot={"inputs": []})
+
+    with connect_database(db) as conn:
+        job = conn.execute("SELECT title FROM jobs WHERE id = ?", (JOB_ID,)).fetchone()
+    assert job["title"] == "기존 제목"
+
+
 def test_create_attempt_blocks_second_attempt(tmp_path: Path) -> None:
     db = _setup_db(tmp_path)
     repo = AttemptRepository(db)

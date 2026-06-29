@@ -246,10 +246,10 @@ export function JobEditor({
     <>
       <button
         className={styles.secondaryButton}
-        onClick={() => window.desktopApi.openResultFolder(job.id).catch(() => {})}
+        onClick={() => window.desktopApi.openDownloadsFolder().catch(() => {})}
         type="button"
       >
-        결과 폴더 열기
+        다운로드 폴더 열기
       </button>
       <button
         aria-busy={isStarting}

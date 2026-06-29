@@ -26,7 +26,7 @@ export const RESOURCE_GET_CHANNEL = "resources:get" as const;
 export const RESOURCE_UPDATE_CHANNEL = "resources:update" as const;
 export const RESOURCE_SELECT_FILE_CHANNEL = "resources:select-file" as const;
 export const JOBS_LIST_COMPLETED_CHANNEL = "jobs:list-completed" as const;
-export const JOBS_OPEN_RESULT_CHANNEL = "jobs:open-result" as const;
+export const JOBS_OPEN_DOWNLOADS_CHANNEL = "jobs:open-downloads" as const;
 export const JOBS_OPEN_LOG_CHANNEL = "jobs:open-log" as const;
 
 export interface SelectedInputFile {
@@ -83,7 +83,7 @@ export interface DesktopApi {
   ): Promise<ResourceUpdateResult>;
   selectResourceFile(resourceType: ResourceType): Promise<SelectedInputFile | null>;
   listCompletedJobs(managedRoot: string): Promise<CompletedJobSummary[]>;
-  openResultFolder(jobId: string): Promise<void>;
+  openDownloadsFolder(): Promise<void>;
   openLogFolder(jobId: string, attemptId: string): Promise<void>;
   startJob(jobId: string, managedRoot: string, workPath: string, regenerate?: boolean): Promise<void>;
   cancelJob(jobId: string, attemptId: string): Promise<void>;
