@@ -17,11 +17,9 @@ _A fully-offline desktop studio that turns a voice recording + script into a fin
 ![Tests](https://img.shields.io/badge/tests-661%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-lightgrey)
 
-<br/>
-
-### 🌐 [홈페이지](https://slur16105.github.io/gracetree-shorts-studio/) · ⬇️ [다운로드](https://github.com/slur16105/gracetree-shorts-studio/releases)
-
 </div>
+
+🌐 [Website](https://slur16105.github.io/gracetree-shorts-studio/) · ⬇️ [Download](https://github.com/slur16105/gracetree-shorts-studio/releases)
 
 ---
 
@@ -217,6 +215,6 @@ gracetree-shorts-studio/
 
 ## 📄 라이선스
 
-**Copyright © 2026 Hoseong Lee. All rights reserved.** — 본 저장소는 열람·평가(포트폴리오) 목적으로 공개되며, 사전 서면 허가 없이 사용·복제·수정·배포·상업적 이용을 허용하지 않는다. 자세한 내용은 [`LICENSE`](LICENSE) 참고.
+**Copyright © 2026 SLUR. All rights reserved.** — 본 저장소는 열람·평가(포트폴리오) 목적으로 공개되며, 사전 서면 허가 없이 사용·복제·수정·배포·상업적 이용을 허용하지 않는다. 자세한 내용은 [`LICENSE`](LICENSE) 참고.
 
 > 번들된 폰트(Black Han Sans, Nanum Gothic)는 SIL Open Font License를 따르며 본 라이선스의 적용을 받지 않는다 — [`resources/licenses/`](resources/licenses/).
